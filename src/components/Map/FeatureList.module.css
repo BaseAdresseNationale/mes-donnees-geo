@@ -1,0 +1,90 @@
+.wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+}
+
+.head {
+  margin-bottom: 0.75rem;
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.empty {
+  padding: 1rem;
+  background: #fff;
+  border: 1px dashed var(--color-border);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+}
+
+.itemSelected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(0, 0, 145, 0.15);
+}
+
+.selectBtn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.geoType {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.deleteBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #c9191e;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.deleteBtn:hover {
+  background: rgba(201, 25, 30, 0.08);
+  border-color: rgba(201, 25, 30, 0.2);
+}

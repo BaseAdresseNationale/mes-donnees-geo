@@ -1,0 +1,15 @@
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: mdg-postgis
+    environment:
+      POSTGRES_USER: mdg
+      POSTGRES_PASSWORD: mdg
+      POSTGRES_DB: mdg
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis-data:/var/lib/postgresql/data
+
+volumes:
+  postgis-data:

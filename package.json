@@ -1,0 +1,36 @@
+{
+  "name": "mes-donnees-geo",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev -p 3006",
+    "build": "next build",
+    "start": "next start -p 3006",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gouvfr-lasuite/ui-components": "^0.29.0",
+    "@gouvfr-lasuite/ui-tokens": "^3.1.0",
+    "maplibre-gl": "^4.7.1",
+    "next": "^16.3.0",
+    "openid-client": "^6.8.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "uuid": "^11.0.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.15",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^16.3.0",
+    "typescript": "^5.7.2"
+  }
+}
