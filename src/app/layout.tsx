@@ -1,5 +1,11 @@
+import { ThemeContextProvider } from "@/contexts/ThemeContext";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+
+import "@gouvfr-lasuite/ui-components/style";
+import "@gouvfr-lasuite/ui-components/fonts/roboto";
+import "@gouvfr-lasuite/ui-components/fonts/marianne";
+import "@gouvfr-lasuite/ui-components/fonts/material-icons";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a href="#contenu" className="skip-link">
           Aller au contenu principal
         </a>
-        {children}
+        <ThemeContextProvider>{children}</ThemeContextProvider>
       </body>
     </html>
   );

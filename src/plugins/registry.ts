@@ -1,21 +1,17 @@
+import "server-only";
 import type { AnyGeoPlugin } from "./types";
 import { demoPlugin } from "./demo";
 import { ruralPathsPlugin } from "./rural-paths";
+import { getCommuneSettings } from "@/lib/db/commune-settings";
 
-/**
- * Catalogue de tous les plugins connus de l'application.
- * L'activation par commune se fait via `getEnabledPlugins`.
- */
 const ALL_PLUGINS: readonly AnyGeoPlugin[] = [demoPlugin, ruralPathsPlugin];
 
-/**
- * En attendant une vraie table `commune_plugins`, on active tous les plugins
- * pour toutes les communes. À remplacer par une lecture DB.
- */
 export async function getEnabledPlugins(
-  _communeInsee: string,
+  communeInsee: string,
 ): Promise<readonly AnyGeoPlugin[]> {
-  return ALL_PLUGINS;
+  const settings = await getCommuneSettings(communeInsee);
+  const disabled = new Set(settings.disabledPlugins);
+  return ALL_PLUGINS.filter((p) => !disabled.has(p.id));
 }
 
 export function getPluginById(pluginId: string): AnyGeoPlugin | undefined {

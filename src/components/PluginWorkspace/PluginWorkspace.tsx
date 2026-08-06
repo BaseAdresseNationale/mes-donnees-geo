@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { MapView } from "@/components/Map/MapView";
 import { FeatureList } from "@/components/Map/FeatureList";
-import { useCommune } from "@/components/CommuneContext";
+import { useCommune } from "@/contexts/CommuneContext";
 import type { GeometryKind, PluginLayerStyle } from "@/plugins/types";
 import styles from "./PluginWorkspace.module.css";
 
@@ -26,7 +26,9 @@ export function PluginWorkspace({
   initialData,
 }: PluginWorkspaceProps) {
   const commune = useCommune();
-  const [features, setFeatures] = useState<Feature<Geometry>[]>(initialData.features);
+  const [features, setFeatures] = useState<Feature<Geometry>[]>(
+    initialData.features,
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState<string>("");
 
