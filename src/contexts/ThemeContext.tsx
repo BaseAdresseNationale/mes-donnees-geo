@@ -26,6 +26,8 @@ export function ThemeContextProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!loaded) {
+      // Ne s'exécute que côté client, après le montage : évite un mismatch d'hydratation SSR.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoaded(true);
     }
   }, [loaded]);

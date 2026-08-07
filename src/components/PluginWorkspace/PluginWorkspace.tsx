@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useMemo, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import {
   LaGaufreV2,
@@ -32,7 +32,6 @@ interface PluginWorkspaceProps {
 export function PluginWorkspace({
   pluginId,
   pluginLabel,
-  pluginDescription,
   geometryTypes,
   layerStyle,
   initialData,
@@ -45,10 +44,12 @@ export function PluginWorkspace({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState<string>("");
 
-  useEffect(() => {
+  const [prevInitialData, setPrevInitialData] = useState(initialData);
+  if (initialData !== prevInitialData) {
+    setPrevInitialData(initialData);
     setFeatures(initialData.features);
     setSelectedId(null);
-  }, [initialData, pluginId]);
+  }
 
   const collection = useMemo<FeatureCollection>(
     () => ({ type: "FeatureCollection", features }),

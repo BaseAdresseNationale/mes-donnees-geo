@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -31,12 +31,14 @@ export function CommuneSettings() {
   const [enabledById, setEnabledById] =
     useState<Record<string, boolean>>(initialEnabled);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
     if (isOpen) {
       setEnabledById(initialEnabled);
       setError(null);
     }
-  }, [isOpen, initialEnabled]);
+  }
 
   const handleClose = () => {
     if (saving) return;
