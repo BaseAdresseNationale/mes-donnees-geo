@@ -16,8 +16,7 @@
     "db:migrate:dev": "dotenv -e .env.local -- prisma migrate dev",
     "db:migrate:status": "dotenv -e .env.local -- prisma migrate status",
     "db:migrate:resolve": "dotenv -e .env.local -- prisma migrate resolve",
-    "db:studio": "dotenv -e .env.local -- prisma studio",
-    "postinstall": "prisma generate"
+    "db:studio": "dotenv -e .env.local -- prisma studio"
   },
   "dependencies": {
     "@gouvfr-lasuite/ui-components": "^0.29.0",

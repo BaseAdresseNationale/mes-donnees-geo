@@ -1,24 +1,6 @@
 import * as client from "openid-client";
 import type { SessionUser } from "./session";
 
-/** Utilisateur factice renvoyé par le stub ProConnect. */
-export function stubUser(): SessionUser {
-  return {
-    sub: "stub-agent-001",
-    email: "agent@commune-test.fr",
-    givenName: "Agent",
-    familyName: "Testeur",
-    communeSiret: "21590350100011",
-    communeInsee: "59350",
-    communeName: "Lille",
-    scopes: ["addresses:write", "boundaries:write", "rural-paths:write"],
-  };
-}
-
-export function isStubMode(): boolean {
-  return (process.env.PROCONNECT_MODE ?? "stub") === "stub";
-}
-
 interface ProConnectSettings {
   issuer: string;
   clientId: string;
@@ -33,14 +15,23 @@ export function proConnectSettings(): ProConnectSettings {
   const clientId = process.env.PROCONNECT_CLIENT_ID;
   const clientSecret = process.env.PROCONNECT_CLIENT_SECRET;
   const redirectUri = process.env.PROCONNECT_REDIRECT_URI;
-  const postLogoutRedirectUri = process.env.PROCONNECT_POST_LOGOUT_REDIRECT_URI ?? "";
-  const scopes = process.env.PROCONNECT_SCOPES ?? "openid given_name usual_name email siret";
+  const postLogoutRedirectUri =
+    process.env.PROCONNECT_POST_LOGOUT_REDIRECT_URI ?? "";
+  const scopes =
+    process.env.PROCONNECT_SCOPES ?? "openid given_name usual_name email siret";
   if (!issuer || !clientId || !clientSecret || !redirectUri) {
     throw new Error(
       "Configuration ProConnect incomplète (PROCONNECT_ISSUER, PROCONNECT_CLIENT_ID, PROCONNECT_CLIENT_SECRET, PROCONNECT_REDIRECT_URI requis).",
     );
   }
-  return { issuer, clientId, clientSecret, redirectUri, postLogoutRedirectUri, scopes };
+  return {
+    issuer,
+    clientId,
+    clientSecret,
+    redirectUri,
+    postLogoutRedirectUri,
+    scopes,
+  };
 }
 
 let cachedConfig: client.Configuration | null = null;

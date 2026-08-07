@@ -1,24 +1,9 @@
 import { NextResponse } from "next/server";
 import * as client from "openid-client";
-import {
-  isStubMode,
-  proConnectConfig,
-  proConnectSettings,
-  stubUser,
-} from "@/lib/auth/proconnect";
-import { setSession } from "@/lib/auth/session";
+import { proConnectConfig, proConnectSettings } from "@/lib/auth/proconnect";
 import { setOidcTransient } from "@/lib/auth/oidc-transient";
 
 export async function POST(request: Request): Promise<Response> {
-  if (isStubMode()) {
-    const user = stubUser();
-    await setSession(user);
-    return NextResponse.redirect(
-      new URL(`/${user.communeInsee}`, request.url),
-      { status: 303 },
-    );
-  }
-
   const config = await proConnectConfig();
   const { redirectUri, scopes } = proConnectSettings();
 

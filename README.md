@@ -17,7 +17,7 @@ Outil cartographique open source permettant aux communes françaises d'éditer l
 | UI             | `@gouvfr-lasuite/ui-components` + `@gouvfr-lasuite/ui-tokens`    |
 | Cartographie   | MapLibre GL JS + Terra Draw                                      |
 | Fonds de carte | IGN Géoplateforme (Plan v2, ortho)                               |
-| Auth           | ProConnect (OIDC) — **stubbée** en dev                           |
+| Auth           | ProConnect (OIDC)                                                |
 | Base           | PostgreSQL 16 + PostGIS 3                                        |
 | ORM            | (à venir) Prisma ou requêtes SQL brutes                          |
 | Store dev      | Fichier JSON local (`.data/`) tant que PostGIS n'est pas branché |
