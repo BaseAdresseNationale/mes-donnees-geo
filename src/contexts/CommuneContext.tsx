@@ -5,11 +5,18 @@ import type { Feature, MultiPolygon, Polygon } from "geojson";
 
 export type BasemapKind = "openmaptiles" | "ortho" | "ign";
 
+export interface CommunePluginSummary {
+  id: string;
+  label: string;
+  icon: string;
+  enabled: boolean;
+}
+
 export interface CommuneContextValue {
   codeInsee: string;
   nom: string;
   contour: Feature<Polygon | MultiPolygon> | null;
-  enabledPluginIds: string[];
+  plugins: CommunePluginSummary[];
   basemap: BasemapKind;
 }
 

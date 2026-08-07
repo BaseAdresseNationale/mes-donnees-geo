@@ -1,19 +1,14 @@
 import "server-only";
-import { db } from "./client";
+import { BasemapKind as PrismaBasemapKind } from "@prisma/client";
+import { prisma } from "./prisma";
 
-export type BasemapKind = "openmaptiles" | "ortho" | "ign";
+export type BasemapKind = PrismaBasemapKind;
 
-export const DEFAULT_BASEMAP: BasemapKind = "ortho";
+export const DEFAULT_BASEMAP: BasemapKind = PrismaBasemapKind.ortho;
 
 export interface CommuneSettings {
   codeInsee: string;
   disabledPlugins: string[];
-  basemap: BasemapKind;
-}
-
-interface Row {
-  code_insee: string;
-  disabled_plugins: string[];
   basemap: BasemapKind;
 }
 
@@ -24,15 +19,14 @@ function defaults(codeInsee: string): CommuneSettings {
 export async function getCommuneSettings(
   codeInsee: string,
 ): Promise<CommuneSettings> {
-  const { rows } = await db().query<Row>(
-    "SELECT code_insee, disabled_plugins, basemap FROM commune_settings WHERE code_insee = $1",
-    [codeInsee],
-  );
-  if (rows.length === 0) return defaults(codeInsee);
-  const row = rows[0];
+  const row = await prisma.communeSettings.findUnique({
+    where: { codeInsee },
+    select: { codeInsee: true, disabledPlugins: true, basemap: true },
+  });
+  if (!row) return defaults(codeInsee);
   return {
-    codeInsee: row.code_insee,
-    disabledPlugins: row.disabled_plugins ?? [],
+    codeInsee: row.codeInsee,
+    disabledPlugins: row.disabledPlugins,
     basemap: row.basemap,
   };
 }
@@ -46,19 +40,24 @@ export async function upsertCommuneSettings(
   codeInsee: string,
   input: UpdateCommuneSettingsInput,
 ): Promise<CommuneSettings> {
-  const { rows } = await db().query<Row>(
-    `INSERT INTO commune_settings (code_insee, disabled_plugins, basemap)
-     VALUES ($1, COALESCE($2, '{}'::text[]), COALESCE($3, 'ortho'::basemap_kind))
-     ON CONFLICT (code_insee) DO UPDATE SET
-       disabled_plugins = COALESCE(EXCLUDED.disabled_plugins, commune_settings.disabled_plugins),
-       basemap = COALESCE(EXCLUDED.basemap, commune_settings.basemap)
-     RETURNING code_insee, disabled_plugins, basemap`,
-    [codeInsee, input.disabledPlugins ?? null, input.basemap ?? null],
-  );
-  const row = rows[0];
+  const row = await prisma.communeSettings.upsert({
+    where: { codeInsee },
+    create: {
+      codeInsee,
+      disabledPlugins: input.disabledPlugins ?? [],
+      basemap: input.basemap ?? DEFAULT_BASEMAP,
+    },
+    update: {
+      ...(input.disabledPlugins !== undefined && {
+        disabledPlugins: input.disabledPlugins,
+      }),
+      ...(input.basemap !== undefined && { basemap: input.basemap }),
+    },
+    select: { codeInsee: true, disabledPlugins: true, basemap: true },
+  });
   return {
-    codeInsee: row.code_insee,
-    disabledPlugins: row.disabled_plugins,
+    codeInsee: row.codeInsee,
+    disabledPlugins: row.disabledPlugins,
     basemap: row.basemap,
   };
 }

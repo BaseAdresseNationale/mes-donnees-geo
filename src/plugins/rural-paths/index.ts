@@ -16,8 +16,7 @@ export type RuralPathProps = z.infer<typeof ruralPathPropsSchema>;
 export const ruralPathsPlugin: GeoPlugin<RuralPathProps> = {
   id: "rural-paths",
   label: "Chemins ruraux",
-  description:
-    "Édition des chemins ruraux communaux (tracés, revêtement, statut d'ouverture).",
+  description: "Édition des chemins ruraux communaux",
   icon: "🥾",
   geometryTypes: ["LineString"],
   requiredScopes: ["rural-paths:write"],

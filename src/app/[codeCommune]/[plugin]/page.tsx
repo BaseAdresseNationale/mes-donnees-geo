@@ -13,7 +13,14 @@ export default async function PluginPage({
   if (!plugin) notFound();
 
   const session = await requireSession();
-  const initialData = await plugin.loadFeatures({ communeInsee: session.communeInsee });
+  const initialData = await plugin.loadFeatures({
+    communeInsee: session.communeInsee,
+  });
+
+  const fullName = [session.givenName, session.familyName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
   return (
     <PluginWorkspace
@@ -23,6 +30,10 @@ export default async function PluginPage({
       geometryTypes={[...plugin.geometryTypes]}
       layerStyle={plugin.layerStyle}
       initialData={initialData}
+      user={{
+        email: session.email,
+        fullName: fullName || session.email,
+      }}
     />
   );
 }

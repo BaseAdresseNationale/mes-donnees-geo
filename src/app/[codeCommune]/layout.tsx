@@ -4,8 +4,7 @@ import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { fetchCommuneContour, isValidInseeCode } from "@/lib/geo/commune";
 import { CommuneProvider } from "@/contexts/CommuneContext";
-import { CommuneLayoutContent } from "@/components/Layout/CommuneLayoutContent";
-import { getEnabledPlugins } from "@/plugins/registry";
+import { listAllPlugins } from "@/plugins/registry";
 import { getCommuneSettings } from "@/lib/db/commune-settings";
 
 export default async function CommuneLayout({
@@ -25,11 +24,17 @@ export default async function CommuneLayout({
     redirect(`/${session.communeInsee}`);
   }
 
-  const [contour, settings, enabledPlugins] = await Promise.all([
+  const [contour, settings] = await Promise.all([
     fetchCommuneContour(codeCommune).catch(() => null),
     getCommuneSettings(codeCommune),
-    getEnabledPlugins(codeCommune),
   ]);
+  const disabled = new Set(settings.disabledPlugins);
+  const plugins = listAllPlugins().map((p) => ({
+    id: p.id,
+    label: p.label,
+    icon: p.icon,
+    enabled: !disabled.has(p.id),
+  }));
 
   return (
     <CommuneProvider
@@ -37,11 +42,11 @@ export default async function CommuneLayout({
         codeInsee: codeCommune,
         nom: session.communeName,
         contour,
-        enabledPluginIds: enabledPlugins.map((p) => p.id),
+        plugins,
         basemap: settings.basemap,
       }}
     >
-      <CommuneLayoutContent>{children}</CommuneLayoutContent>
+      {children}
     </CommuneProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { CunninghamProvider, Loader } from "@gouvfr-lasuite/ui-components";
+import { CunninghamProvider, Spinner } from "@gouvfr-lasuite/ui-components";
 import React, { useState, ReactNode, useEffect } from "react";
 
 interface ThemeContextType {
@@ -10,7 +10,12 @@ interface ThemeContextType {
   setIsLeftPanelOpen: (value: boolean) => void;
 }
 
-const ThemeContext = React.createContext<ThemeContextType | null>(null);
+const ThemeContext = React.createContext<ThemeContextType>({
+  theme: "default",
+  setTheme: () => {},
+  isLeftPanelOpen: true,
+  setIsLeftPanelOpen: () => {},
+});
 
 export function ThemeContextProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState("default");
@@ -26,7 +31,17 @@ export function ThemeContextProvider({ children }: { children: ReactNode }) {
   }, [loaded]);
 
   return !loaded ? (
-    <Loader />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100vw",
+        height: "100vh",
+      }}
+    >
+      <Spinner size="xl" />
+    </div>
   ) : (
     <ThemeContext.Provider value={value}>
       <CunninghamProvider theme={theme}>{children}</CunninghamProvider>

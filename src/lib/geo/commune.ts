@@ -24,6 +24,17 @@ export class NotACommuneError extends Error {
   }
 }
 
+/** Met en forme un nom de commune : "SAINT-DENIS" -> "Saint-Denis", "LA ROCHELLE" -> "La Rochelle". */
+export function formatCommuneName(nom: string): string {
+  return nom
+    .toLocaleLowerCase("fr-FR")
+    .replace(
+      /(^|[\s'-])(\p{L})/gu,
+      (_, sep: string, letter: string) =>
+        sep + letter.toLocaleUpperCase("fr-FR"),
+    );
+}
+
 interface EntrepriseSearchResult {
   results: Array<{
     siren: string;
@@ -43,7 +54,9 @@ interface EntrepriseSearchResult {
  * https://recherche-entreprises.api.gouv.fr (INSEE / annuaire des entreprises).
  * Lève NotACommuneError si l'organisation n'est pas une commune (catégorie 7210).
  */
-export async function resolveCommuneFromSiret(siret: string): Promise<CommuneInfo> {
+export async function resolveCommuneFromSiret(
+  siret: string,
+): Promise<CommuneInfo> {
   const normalized = siret.replace(/\s+/g, "");
   const url = new URL("https://recherche-entreprises.api.gouv.fr/search");
   url.searchParams.set("q", normalized);
@@ -56,7 +69,9 @@ export async function resolveCommuneFromSiret(siret: string): Promise<CommuneInf
   const data = (await res.json()) as EntrepriseSearchResult;
   const hit = data.results?.[0];
   if (!hit) {
-    throw new NotACommuneError("SIRET introuvable dans le répertoire des entreprises.");
+    throw new NotACommuneError(
+      "SIRET introuvable dans le répertoire des entreprises.",
+    );
   }
 
   const natureJuridique = hit.nature_juridique ?? "";
@@ -75,7 +90,11 @@ export async function resolveCommuneFromSiret(siret: string): Promise<CommuneInf
     siret: hit.siege?.siret ?? normalized,
     siren: hit.siren,
     codeInsee,
-    nom: hit.siege?.libelle_commune ?? hit.nom_complet ?? hit.nom_raison_sociale ?? "Commune",
+    nom:
+      hit.siege?.libelle_commune ??
+      hit.nom_complet ??
+      hit.nom_raison_sociale ??
+      "Commune",
     natureJuridique,
   };
 }
@@ -91,7 +110,9 @@ export async function fetchCommuneContour(
   const cached = contourCache.get(codeInsee);
   if (cached) return cached;
 
-  const url = new URL(`https://geo.api.gouv.fr/communes/${encodeURIComponent(codeInsee)}`);
+  const url = new URL(
+    `https://geo.api.gouv.fr/communes/${encodeURIComponent(codeInsee)}`,
+  );
   url.searchParams.set("format", "geojson");
   url.searchParams.set("geometry", "contour");
 

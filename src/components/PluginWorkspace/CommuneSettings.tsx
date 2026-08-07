@@ -1,0 +1,144 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Button,
+  Icon,
+  Modal,
+  ModalSize,
+  Switch,
+} from "@gouvfr-lasuite/ui-components";
+import { useCommune } from "@/contexts/CommuneContext";
+import { formatCommuneName } from "@/lib/geo/commune";
+import styles from "./CommuneSettings.module.css";
+
+export function CommuneSettings() {
+  const commune = useCommune();
+  const communeName = formatCommuneName(commune.nom);
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const initialEnabled = useMemo(
+    () =>
+      Object.fromEntries(
+        commune.plugins.map((p) => [p.id, p.enabled]),
+      ) as Record<string, boolean>,
+    [commune.plugins],
+  );
+  const [enabledById, setEnabledById] =
+    useState<Record<string, boolean>>(initialEnabled);
+
+  useEffect(() => {
+    if (isOpen) {
+      setEnabledById(initialEnabled);
+      setError(null);
+    }
+  }, [isOpen, initialEnabled]);
+
+  const handleClose = () => {
+    if (saving) return;
+    setIsOpen(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    const disabledPlugins = commune.plugins
+      .filter((p) => !enabledById[p.id])
+      .map((p) => p.id);
+    try {
+      const res = await fetch("/api/commune/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disabledPlugins }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error ?? "Enregistrement impossible.");
+      }
+      setIsOpen(false);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.header}>
+        <h2 className={styles.communeName}>
+          {communeName} ({commune.codeInsee})
+        </h2>
+        <Button
+          onClick={() => setIsOpen(true)}
+          color="neutral"
+          variant="tertiary"
+          size="small"
+          icon={<Icon name="settings" />}
+          aria-label={`Paramètres de la commune`}
+        />
+      </div>
+      <Modal
+        isOpen={isOpen}
+        onClose={handleClose}
+        size={ModalSize.MEDIUM}
+        title={`Paramètres`}
+        rightActions={
+          <>
+            <Button
+              variant="secondary"
+              color="neutral"
+              onClick={handleClose}
+              disabled={saving}
+            >
+              Annuler
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </Button>
+          </>
+        }
+      >
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Modules activés</h3>
+          <p className={styles.sectionHint}>
+            Choisissez les modules disponibles pour cette commune.
+          </p>
+          <ul className={styles.pluginList}>
+            {commune.plugins.map((p) => (
+              <li key={p.id} className={styles.pluginRow}>
+                <span aria-hidden className={styles.pluginIcon}>
+                  {p.icon}
+                </span>
+                <span className={styles.pluginLabel}>{p.label}</span>
+                <Switch
+                  aria-label={`Activer le module ${p.label}`}
+                  checked={enabledById[p.id] ?? false}
+                  onChange={(e) =>
+                    setEnabledById((prev) => ({
+                      ...prev,
+                      [p.id]: (e.target as HTMLInputElement).checked,
+                    }))
+                  }
+                  disabled={saving}
+                />
+              </li>
+            ))}
+          </ul>
+          {error ? (
+            <p role="alert" className={styles.error}>
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
+    </>
+  );
+}

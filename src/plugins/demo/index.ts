@@ -13,8 +13,7 @@ export type DemoProps = z.infer<typeof demoPropsSchema>;
 export const demoPlugin: GeoPlugin<DemoProps> = {
   id: "demo",
   label: "Démo",
-  description:
-    "Plugin d'exemple : points de démonstration avec nom et note libres.",
+  description: "Plugin d'exemple ",
   icon: "📍",
   geometryTypes: ["Point"],
   requiredScopes: [],

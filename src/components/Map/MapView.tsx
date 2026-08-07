@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import maplibregl, { type Map as MLMap, type StyleSpecification } from "maplibre-gl";
+import maplibregl, {
+  type Map as MLMap,
+  type StyleSpecification,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type {
   Feature,
@@ -39,9 +42,7 @@ const IGN_STYLE: StyleSpecification = {
       maxzoom: 19,
     },
   },
-  layers: [
-    { id: "ign-plan-layer", type: "raster", source: "ign-plan" },
-  ],
+  layers: [{ id: "ign-plan-layer", type: "raster", source: "ign-plan" }],
 };
 
 type DrawMode = "select" | "point" | "line" | "polygon";
@@ -82,8 +83,13 @@ export function MapView({
       zoom: 5.5,
       attributionControl: { compact: false },
     });
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
-    map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }));
+    map.addControl(
+      new maplibregl.NavigationControl({ visualizePitch: false }),
+      "top-right",
+    );
+    map.addControl(
+      new maplibregl.ScaleControl({ maxWidth: 120, unit: "metric" }),
+    );
 
     map.on("load", () => {
       map.addSource(SOURCE_ID, {
@@ -188,7 +194,14 @@ export function MapView({
     });
 
     mapRef.current = map;
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
+    });
+    resizeObserver.observe(containerRef.current);
+
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       setReady(false);
@@ -279,12 +292,25 @@ export function MapView({
 
   const finishDrawing = useCallback(() => {
     if (mode === "line" && pendingCoords.length >= 2) {
-      const geom: LineString = { type: "LineString", coordinates: pendingCoords };
-      onCreate({ type: "Feature", id: uuidv4(), geometry: geom, properties: {} });
+      const geom: LineString = {
+        type: "LineString",
+        coordinates: pendingCoords,
+      };
+      onCreate({
+        type: "Feature",
+        id: uuidv4(),
+        geometry: geom,
+        properties: {},
+      });
     } else if (mode === "polygon" && pendingCoords.length >= 3) {
       const ring = [...pendingCoords, pendingCoords[0]];
       const geom: Polygon = { type: "Polygon", coordinates: [ring] };
-      onCreate({ type: "Feature", id: uuidv4(), geometry: geom, properties: {} });
+      onCreate({
+        type: "Feature",
+        id: uuidv4(),
+        geometry: geom,
+        properties: {},
+      });
     }
     setPendingCoords([]);
     setMode("select");
@@ -300,12 +326,21 @@ export function MapView({
     const feat = data.features.find((f) => String(f.id) === selectedId);
     if (!feat) return;
     const bounds = geometryBounds(feat.geometry);
-    if (bounds) mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 17, duration: 500 });
+    if (bounds)
+      mapRef.current.fitBounds(bounds, {
+        padding: 60,
+        maxZoom: 17,
+        duration: 500,
+      });
   }, [selectedId, data, ready]);
 
   return (
     <div className={styles.mapWrapper}>
-      <div className={styles.toolbar} role="toolbar" aria-label="Outils d'édition">
+      <div
+        className={styles.toolbar}
+        role="toolbar"
+        aria-label="Outils d'édition"
+      >
         <button
           type="button"
           onClick={() => {
@@ -359,7 +394,8 @@ export function MapView({
         {(mode === "line" || mode === "polygon") && (
           <>
             <span className={styles.hint} aria-live="polite">
-              {pendingCoords.length} point{pendingCoords.length > 1 ? "s" : ""} placé
+              {pendingCoords.length} point{pendingCoords.length > 1 ? "s" : ""}{" "}
+              placé
               {pendingCoords.length > 1 ? "s" : ""}
             </span>
             <button
@@ -373,7 +409,11 @@ export function MapView({
             >
               Terminer
             </button>
-            <button type="button" onClick={cancelDrawing} className={styles.tool}>
+            <button
+              type="button"
+              onClick={cancelDrawing}
+              className={styles.tool}
+            >
               Annuler
             </button>
           </>
@@ -390,16 +430,26 @@ export function MapView({
   );
 }
 
-function geometryBounds(geom: Geometry): [[number, number], [number, number]] | null {
+function geometryBounds(
+  geom: Geometry,
+): [[number, number], [number, number]] | null {
   const coords: [number, number][] = [];
   const push = (c: unknown) => {
-    if (Array.isArray(c) && typeof c[0] === "number" && typeof c[1] === "number") {
+    if (
+      Array.isArray(c) &&
+      typeof c[0] === "number" &&
+      typeof c[1] === "number"
+    ) {
       coords.push([c[0], c[1]]);
     } else if (Array.isArray(c)) {
       c.forEach(push);
     }
   };
-  push(geom.type === "GeometryCollection" ? [] : (geom as { coordinates: unknown }).coordinates);
+  push(
+    geom.type === "GeometryCollection"
+      ? []
+      : (geom as { coordinates: unknown }).coordinates,
+  );
   if (coords.length === 0) return null;
   let [minX, minY] = coords[0];
   let [maxX, maxY] = coords[0];
@@ -409,5 +459,8 @@ function geometryBounds(geom: Geometry): [[number, number], [number, number]] | 
     if (x > maxX) maxX = x;
     if (y > maxY) maxY = y;
   }
-  return [[minX, minY], [maxX, maxY]];
+  return [
+    [minX, minY],
+    [maxX, maxY],
+  ];
 }
