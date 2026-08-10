@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/oidc-transient";
 import { setSession, type SessionUser } from "@/lib/auth/session";
 import { NotACommuneError, resolveCommuneFromSiret } from "@/lib/geo/commune";
+import { resolveAppUrl } from "@/lib/http/request-url";
 
 interface ProConnectUserInfo {
   sub: string;
@@ -23,10 +24,24 @@ function errorRedirect(
   code: string,
   detail?: string,
 ): Response {
-  const url = new URL("/auth/erreur", request.url);
+  const url = resolveAppUrl(request, "/auth/erreur");
   url.searchParams.set("code", code);
   if (detail) url.searchParams.set("detail", detail);
   return NextResponse.redirect(url, { status: 303 });
+}
+
+// openid-client enveloppe l'erreur réelle du fournisseur d'identité dans `cause`.
+function describeOidcError(err: unknown): string {
+  if (!(err instanceof Error)) return "erreur inconnue";
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause && typeof cause === "object") {
+    const { error, error_description: description } = cause as {
+      error?: string;
+      error_description?: string;
+    };
+    if (error) return [error, description].filter(Boolean).join(": ");
+  }
+  return err.message;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -56,8 +71,8 @@ export async function GET(request: Request): Promise<Response> {
     )) as unknown as ProConnectUserInfo;
   } catch (err) {
     await clearOidcTransient();
-    const msg = err instanceof Error ? err.message : "erreur inconnue";
-    return errorRedirect(request, "oidc_exchange_failed", msg);
+    console.error("Échec de l'échange OIDC ProConnect:", err);
+    return errorRedirect(request, "oidc_exchange_failed", describeOidcError(err));
   }
 
   if (!userinfo.siret) {
@@ -92,7 +107,7 @@ export async function GET(request: Request): Promise<Response> {
   await setSession(session);
   await clearOidcTransient();
 
-  return NextResponse.redirect(new URL(`/${commune.codeInsee}`, request.url), {
+  return NextResponse.redirect(resolveAppUrl(request, `/${commune.codeInsee}`), {
     status: 303,
   });
 }
