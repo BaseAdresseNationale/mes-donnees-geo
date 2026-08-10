@@ -13,6 +13,7 @@ export interface SessionUser {
   communeInsee: string;
   communeName: string;
   scopes: string[];
+  idToken?: string;
 }
 
 function secret(): string {

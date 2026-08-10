@@ -1,5 +1,6 @@
 "use client";
 
+import { redirect } from "next/navigation";
 import { useCallback, useContext, useMemo, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import {
@@ -15,6 +16,7 @@ import styles from "./PluginWorkspace.module.css";
 import ThemeContext from "@/contexts/ThemeContext";
 import { PluginSelectionDropDown } from "./PluginSelectionDropDown";
 import { CommuneSettings } from "./CommuneSettings";
+import Image from "next/image";
 
 interface PluginWorkspaceProps {
   pluginId: string;
@@ -93,19 +95,26 @@ export function PluginWorkspace({
 
   const { isLeftPanelOpen } = useContext(ThemeContext);
 
-  const handleLogout = useCallback(async () => {
-    try {
-      await fetch("/auth/logout", { method: "POST" });
-    } finally {
-      window.location.href = "/";
-    }
+  const handleLogout = useCallback(() => {
+    // Navigation plein-page requise : un fetch suivrait la redirection vers
+    // ProConnect en arrière-plan sans effacer le cookie SSO du navigateur.
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/auth/logout";
+    document.body.appendChild(form);
+    form.submit();
   }, []);
 
   return (
     <MainLayout
       icon={
         <span className="headerLogo">
-          <img src={`/images/logo.svg`} alt="Logo Mes données géo" width={32} />
+          <Image
+            src={`/images/logo.svg`}
+            alt="Logo Mes données géo"
+            width={32}
+            height={32}
+          />
           <b>Mes données géo</b>
         </span>
       }

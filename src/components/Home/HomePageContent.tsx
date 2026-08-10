@@ -8,6 +8,7 @@ import {
   MainLayout,
   ProConnectButton,
 } from "@gouvfr-lasuite/ui-components";
+import Image from "next/image";
 
 export function HomePageContent() {
   return (
@@ -16,7 +17,12 @@ export function HomePageContent() {
       leftPanelContent={<LeftPanel />}
       icon={
         <span className="headerLogo">
-          <img src={`/images/logo.svg`} alt="Logo Mes données géo" width={32} />
+          <Image
+            src={`/images/logo.svg`}
+            alt="Logo Mes données géo"
+            width={32}
+            height={32}
+          />
           <b>Mes données géo</b>
         </span>
       }
@@ -25,10 +31,11 @@ export function HomePageContent() {
         <HomeGutter>
           <Hero
             logo={
-              <img
+              <Image
                 src={`/images/logo.svg`}
                 alt="Logo Mes données géo"
                 width={64}
+                height={64}
               />
             }
             title="Vos données territoriales"

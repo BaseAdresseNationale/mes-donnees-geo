@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import * as client from "openid-client";
 import { proConnectConfig } from "@/lib/auth/proconnect";
-import { clearOidcTransient, readOidcTransient } from "@/lib/auth/oidc-transient";
+import {
+  clearOidcTransient,
+  readOidcTransient,
+} from "@/lib/auth/oidc-transient";
 import { setSession, type SessionUser } from "@/lib/auth/session";
 import { NotACommuneError, resolveCommuneFromSiret } from "@/lib/geo/commune";
 
@@ -15,7 +18,11 @@ interface ProConnectUserInfo {
   belonging_population?: string;
 }
 
-function errorRedirect(request: Request, code: string, detail?: string): Response {
+function errorRedirect(
+  request: Request,
+  code: string,
+  detail?: string,
+): Response {
   const url = new URL("/auth/erreur", request.url);
   url.searchParams.set("code", code);
   if (detail) url.searchParams.set("detail", detail);
@@ -79,11 +86,13 @@ export async function GET(request: Request): Promise<Response> {
     communeInsee: commune.codeInsee,
     communeName: commune.nom,
     scopes: [],
+    idToken: tokens.id_token,
   };
 
-  // Conserver l'id_token pour un futur RP-initiated logout.
   await setSession(session);
   await clearOidcTransient();
 
-  return NextResponse.redirect(new URL(`/${commune.codeInsee}`, request.url), { status: 303 });
+  return NextResponse.redirect(new URL(`/${commune.codeInsee}`, request.url), {
+    status: 303,
+  });
 }

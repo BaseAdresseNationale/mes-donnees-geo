@@ -47,3 +47,17 @@ export async function proConnectConfig(): Promise<client.Configuration> {
   );
   return cachedConfig;
 }
+
+export function buildProConnectEndSessionUrl(
+  config: client.Configuration,
+  idToken: string,
+): URL | null {
+  const { postLogoutRedirectUri } = proConnectSettings();
+  if (!config.serverMetadata().end_session_endpoint || !postLogoutRedirectUri) {
+    return null;
+  }
+  return client.buildEndSessionUrl(config, {
+    post_logout_redirect_uri: postLogoutRedirectUri,
+    id_token_hint: idToken,
+  });
+}
