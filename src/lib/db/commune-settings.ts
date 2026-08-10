@@ -1,5 +1,5 @@
 import "server-only";
-import { BasemapKind as PrismaBasemapKind } from "@prisma/client";
+import { BasemapKind as PrismaBasemapKind } from "@/generated/prisma/client";
 import { prisma } from "./prisma";
 
 export type BasemapKind = PrismaBasemapKind;
