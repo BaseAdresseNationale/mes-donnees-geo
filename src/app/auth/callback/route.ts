@@ -30,11 +30,16 @@ function errorRedirect(
   return NextResponse.redirect(url, { status: 303 });
 }
 
-// openid-client enveloppe l'erreur réelle du fournisseur d'identité dans `cause`.
+// oauth4webapi (utilisé par openid-client) met les paramètres d'erreur du
+// fournisseur d'identité dans `cause`, sous forme de URLSearchParams.
 function describeOidcError(err: unknown): string {
   if (!(err instanceof Error)) return "erreur inconnue";
   const cause = (err as { cause?: unknown }).cause;
-  if (cause && typeof cause === "object") {
+  if (cause instanceof URLSearchParams) {
+    const error = cause.get("error");
+    const description = cause.get("error_description");
+    if (error) return [error, description].filter(Boolean).join(": ");
+  } else if (cause && typeof cause === "object") {
     const { error, error_description: description } = cause as {
       error?: string;
       error_description?: string;
@@ -72,7 +77,11 @@ export async function GET(request: Request): Promise<Response> {
   } catch (err) {
     await clearOidcTransient();
     console.error("Échec de l'échange OIDC ProConnect:", err);
-    return errorRedirect(request, "oidc_exchange_failed", describeOidcError(err));
+    return errorRedirect(
+      request,
+      "oidc_exchange_failed",
+      describeOidcError(err),
+    );
   }
 
   if (!userinfo.siret) {
@@ -107,7 +116,10 @@ export async function GET(request: Request): Promise<Response> {
   await setSession(session);
   await clearOidcTransient();
 
-  return NextResponse.redirect(resolveAppUrl(request, `/${commune.codeInsee}`), {
-    status: 303,
-  });
+  return NextResponse.redirect(
+    resolveAppUrl(request, `/${commune.codeInsee}`),
+    {
+      status: 303,
+    },
+  );
 }
