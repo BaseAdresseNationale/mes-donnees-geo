@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import * as client from "openid-client";
-import { proConnectConfig } from "@/lib/auth/proconnect";
+import { proConnectConfig, proConnectSettings } from "@/lib/auth/proconnect";
 import {
   clearOidcTransient,
   readOidcTransient,
@@ -59,7 +59,13 @@ export async function GET(request: Request): Promise<Response> {
   let userinfo: ProConnectUserInfo;
   try {
     const config = await proConnectConfig();
-    tokens = await client.authorizationCodeGrant(config, new URL(request.url), {
+    // openid-client dérive le redirect_uri envoyé au token endpoint de cette URL :
+    // on force le host/chemin configurés (PROCONNECT_REDIRECT_URI) pour qu'il
+    // corresponde exactement à celui envoyé lors de la demande d'autorisation,
+    // même si `request.url` reflète un host interne (proxy Scalingo).
+    const currentUrl = new URL(proConnectSettings().redirectUri);
+    currentUrl.search = new URL(request.url).search;
+    tokens = await client.authorizationCodeGrant(config, currentUrl, {
       pkceCodeVerifier: transient.codeVerifier,
       expectedState: transient.state,
       expectedNonce: transient.nonce,
