@@ -13,7 +13,11 @@ import { useCommune } from "@/contexts/CommuneContext";
 import { formatCommuneName } from "@/lib/geo/commune";
 import styles from "./CommuneSettings.module.css";
 
-export function CommuneSettings() {
+export function CommuneSettings({
+  currentPluginId,
+}: {
+  currentPluginId?: string;
+}) {
   const commune = useCommune();
   const communeName = formatCommuneName(commune.nom);
   const router = useRouter();
@@ -49,7 +53,7 @@ export function CommuneSettings() {
     setSaving(true);
     setError(null);
     const disabledPlugins = commune.plugins
-      .filter((p) => !enabledById[p.id])
+      .filter((p) => p.id !== currentPluginId && !enabledById[p.id])
       .map((p) => p.id);
     try {
       const res = await fetch("/api/commune/settings", {
@@ -122,14 +126,18 @@ export function CommuneSettings() {
                 <span className={styles.pluginLabel}>{p.label}</span>
                 <Switch
                   aria-label={`Activer le module ${p.label}`}
-                  checked={enabledById[p.id] ?? false}
+                  checked={
+                    p.id === currentPluginId
+                      ? true
+                      : (enabledById[p.id] ?? false)
+                  }
                   onChange={(e) =>
                     setEnabledById((prev) => ({
                       ...prev,
                       [p.id]: (e.target as HTMLInputElement).checked,
                     }))
                   }
-                  disabled={saving}
+                  disabled={saving || p.id === currentPluginId}
                 />
               </li>
             ))}

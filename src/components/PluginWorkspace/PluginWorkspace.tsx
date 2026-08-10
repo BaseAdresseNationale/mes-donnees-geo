@@ -142,7 +142,7 @@ export function PluginWorkspace({
           aria-labelledby={`plugin-tab-${pluginId}`}
         >
           <header className={styles.header}>
-            <CommuneSettings />
+            <CommuneSettings currentPluginId={pluginId} />
             <PluginSelectionDropDown
               pluginId={pluginId}
               pluginLabel={pluginLabel}
