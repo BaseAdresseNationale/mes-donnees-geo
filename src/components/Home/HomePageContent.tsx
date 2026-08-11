@@ -1,32 +1,18 @@
 "use client";
 
+import { AppLayout } from "@/layouts/AppLayout";
 import {
   Footer,
   Hero,
   HomeGutter,
   LeftPanel,
-  MainLayout,
   ProConnectButton,
 } from "@gouvfr-lasuite/ui-components";
 import Image from "next/image";
 
 export function HomePageContent() {
   return (
-    <MainLayout
-      hideLeftPanelOnDesktop
-      leftPanelContent={<LeftPanel />}
-      icon={
-        <span className="headerLogo">
-          <Image
-            src={`/images/logo.svg`}
-            alt="Logo Mes données géo"
-            width={32}
-            height={32}
-          />
-          <b>Mes données géo</b>
-        </span>
-      }
-    >
+    <AppLayout hideLeftPanelOnDesktop leftPanelContent={<LeftPanel />}>
       <div className="app__home">
         <HomeGutter>
           <Hero
@@ -50,6 +36,6 @@ export function HomePageContent() {
         </HomeGutter>
         <Footer />
       </div>
-    </MainLayout>
+    </AppLayout>
   );
 }
