@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
+import { MapRootLayout } from "@/layouts/MapRootLayout";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { fetchCommuneContour, isValidInseeCode } from "@/lib/geo/commune";
@@ -52,7 +53,9 @@ export default async function CommuneLayout({
         }}
       >
         <MapContextProvider>
-          <CadastreContextProvider>{children}</CadastreContextProvider>
+          <CadastreContextProvider>
+            <MapRootLayout session={session}>{children}</MapRootLayout>
+          </CadastreContextProvider>
         </MapContextProvider>
       </CommuneProvider>
     </LocalStorageContextProvider>

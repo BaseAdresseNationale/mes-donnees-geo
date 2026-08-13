@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getPluginById } from "@/plugins/registry";
 import { requireSession } from "@/lib/auth/session";
-import { PluginWorkspace } from "@/components/PluginWorkspace/PluginWorkspace";
+import { PluginLayout } from "@/layouts/PluginLayout";
 
 export default async function PluginPage({
   params,
@@ -17,23 +17,9 @@ export default async function PluginPage({
     communeInsee: session.communeInsee,
   });
 
-  const fullName = [session.givenName, session.familyName]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-
   return (
-    <PluginWorkspace
-      pluginId={plugin.id}
-      pluginLabel={plugin.label}
-      pluginDescription={plugin.description}
-      geometryTypes={[...plugin.geometryTypes]}
-      layerStyle={plugin.layerStyle}
-      initialData={initialData}
-      user={{
-        email: session.email,
-        fullName: fullName || session.email,
-      }}
-    />
+    <PluginLayout pluginId={plugin.id} pluginLabel={plugin.label}>
+      <div>{JSON.stringify(initialData)}</div>
+    </PluginLayout>
   );
 }

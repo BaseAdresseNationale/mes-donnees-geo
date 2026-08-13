@@ -78,13 +78,15 @@ export function MapLayout({
   return (
     <AppLayout {...props}>
       <div className={styles.mapWrapper}>
-        <div
-          className={styles.toolbar}
-          role="toolbar"
-          aria-label="Outils d'édition"
-        >
-          {toolbarChildren}
-        </div>
+        {toolbarChildren && (
+          <div
+            className={styles.toolbar}
+            role="toolbar"
+            aria-label="Outils d'édition"
+          >
+            {toolbarChildren}
+          </div>
+        )}
         <Map
           ref={mapRefCb}
           mapStyle={mapStyles[0].uri}
