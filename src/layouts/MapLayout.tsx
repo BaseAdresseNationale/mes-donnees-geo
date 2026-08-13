@@ -1,9 +1,4 @@
-import Map, {
-  Layer,
-  NavigationControl,
-  ScaleControl,
-  Source,
-} from "react-map-gl/maplibre";
+import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
 import {
   useCallback,
   useContext,
@@ -19,10 +14,10 @@ import styles from "./MapLayout.module.css";
 import { PanoramaxToggle } from "@/components/Map/Panoramax/PanoramaxToggle";
 import { PanoramaxMap } from "@/components/Map/Panoramax/PanoramaxMap";
 import { PanoramaxLensDrag } from "@/components/Map/Panoramax/PanoramaxLensDrag";
-import { CadastreToggle } from "@/components/Map/Controls/CadastreToggle";
-import { StylesSwitch } from "@/components/Map/Controls/StylesSwitch";
+import { StylesSwitch } from "@/components/Map/controls/StylesSwitch";
 import { mapStyles } from "@/components/Map/styles";
 import MapContext from "@/contexts/MapContext";
+import { useLocalStorageContext } from "@/contexts/LocalStorageContext";
 import {
   parcelleHoveredLayer,
   staticCadastreLayers,
@@ -37,6 +32,8 @@ import {
   communeMaskLayer,
   communeOutlineLayer,
 } from "@/components/Map/layers/commune.layers";
+import { CadastreControl } from "@/components/Map/controls/cadastre/CadastreControl";
+import { ControlGroupPortal } from "@/components/Map/controls/ControlGroupPortal";
 
 type MapLayoutProps = {
   mapChildren?: React.ReactNode;
@@ -57,6 +54,12 @@ export function MapLayout({
   const { showCadastre, setShowCadastre } = useContext(CadastreContext);
   const { showPanoramax, setShowPanoramax } = useContext(PanoramaxContext);
   const { contour: communeContour } = useCommune();
+  const { basemapId } = useLocalStorageContext();
+
+  const currentMapStyle = useMemo(
+    () => mapStyles.find((style) => style.id === basemapId) ?? mapStyles[0],
+    [basemapId],
+  );
 
   const communeMask = useMemo(
     () => (communeContour ? buildInvertedMask(communeContour.geometry) : null),
@@ -89,7 +92,7 @@ export function MapLayout({
         )}
         <Map
           ref={mapRefCb}
-          mapStyle={mapStyles[0].uri}
+          mapStyle={currentMapStyle.uri}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           interactiveLayerIds={[
@@ -142,20 +145,18 @@ export function MapLayout({
 
           <PanoramaxLensDrag />
           <NavigationControl position="top-right" />
-
-          <CadastreToggle
-            layers={staticCadastreLayers.map((layer) => layer.id)}
-            showCadastre={showCadastre}
-            setShowCadastre={setShowCadastre}
-            position="top-right"
-          />
           <PanoramaxToggle
             showPanoramax={showPanoramax}
             setShowPanoramax={setShowPanoramax}
-            position="top-right"
           />
 
-          <StylesSwitch styles={mapStyles} position="bottom-left" />
+          <ControlGroupPortal position="bottom-left">
+            <StylesSwitch styles={mapStyles} />
+            <CadastreControl
+              showCadastre={showCadastre}
+              setShowCadastre={setShowCadastre}
+            />
+          </ControlGroupPortal>
         </Map>
       </div>
     </AppLayout>

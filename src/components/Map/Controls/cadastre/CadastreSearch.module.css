@@ -1,0 +1,23 @@
+.cadastreSearch {
+  /* position: absolute pour sortir du flux flex : évite que la taille du
+     conteneur maplibre (auto/shrink-to-fit) doive se recalculer en boucle
+     pendant la transition de largeur, ce qui empêchait l'animation. */
+  position: absolute;
+  top: 0;
+  left: 100%;
+  height: 40px;
+  cursor: default;
+
+  &.hidden {
+    overflow: hidden;
+    width: 0px;
+    transition: width 0.3s;
+    padding: 0;
+    border: 0;
+  }
+
+  &.visible {
+    width: 200px;
+    transition: width 0.3s;
+  }
+}
