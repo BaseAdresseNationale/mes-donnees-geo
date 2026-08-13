@@ -6,6 +6,11 @@ import { fetchCommuneContour, isValidInseeCode } from "@/lib/geo/commune";
 import { CommuneProvider } from "@/contexts/CommuneContext";
 import { listAllPlugins } from "@/plugins/registry";
 import { getCommuneSettings } from "@/lib/db/commune-settings";
+import { MapContextProvider } from "@/contexts/MapContext";
+import { CadastreContextProvider } from "@/contexts/CadastreContext";
+import { LocalStorageContextProvider } from "@/contexts/LocalStorageContext";
+
+import "maplibre-gl/dist/maplibre-gl.css";
 
 export default async function CommuneLayout({
   children,
@@ -37,16 +42,19 @@ export default async function CommuneLayout({
   }));
 
   return (
-    <CommuneProvider
-      value={{
-        codeInsee: codeCommune,
-        nom: session.communeName,
-        contour,
-        plugins,
-        basemap: settings.basemap,
-      }}
-    >
-      {children}
-    </CommuneProvider>
+    <LocalStorageContextProvider>
+      <CommuneProvider
+        value={{
+          codeInsee: codeCommune,
+          nom: session.communeName,
+          contour,
+          plugins,
+        }}
+      >
+        <MapContextProvider>
+          <CadastreContextProvider>{children}</CadastreContextProvider>
+        </MapContextProvider>
+      </CommuneProvider>
+    </LocalStorageContextProvider>
   );
 }

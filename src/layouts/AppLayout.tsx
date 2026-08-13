@@ -8,7 +8,7 @@ import type { PropsWithChildren } from "react";
 import Image from "next/image";
 import { useCallback } from "react";
 
-type AppLayoutProps = {
+export type AppLayoutProps = {
   user?: {
     email: string;
     fullName: string;

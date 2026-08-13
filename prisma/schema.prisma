@@ -12,20 +12,11 @@ datasource db {
   provider = "postgresql"
 }
 
-enum BasemapKind {
-  openmaptiles
-  ortho
-  ign
-
-  @@map("basemap_kind")
-}
-
 model CommuneSettings {
-  codeInsee       String      @id @map("code_insee") @db.VarChar(5)
-  disabledPlugins String[]    @default([]) @map("disabled_plugins")
-  basemap         BasemapKind @default(ortho)
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime    @default(now()) @map("updated_at") @db.Timestamptz(6)
+  codeInsee       String   @id @map("code_insee") @db.VarChar(5)
+  disabledPlugins String[] @default([]) @map("disabled_plugins")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   @@map("commune_settings")
 }

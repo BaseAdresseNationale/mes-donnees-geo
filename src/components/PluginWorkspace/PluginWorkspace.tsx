@@ -2,7 +2,6 @@
 
 import { useCallback, useContext, useMemo, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
-import { MapView } from "@/components/Map/MapView";
 import { FeatureList } from "@/components/Map/FeatureList";
 import { useCommune } from "@/contexts/CommuneContext";
 import type { GeometryKind, PluginLayerStyle } from "@/plugins/types";
@@ -10,7 +9,7 @@ import styles from "./PluginWorkspace.module.css";
 import ThemeContext from "@/contexts/ThemeContext";
 import { PluginSelectionDropDown } from "./PluginSelectionDropDown";
 import { CommuneSettings } from "./CommuneSettings";
-import { AppLayout } from "@/layouts/AppLayout";
+import { MapLayout } from "@/layouts/MapLayout";
 
 interface PluginWorkspaceProps {
   pluginId: string;
@@ -90,7 +89,7 @@ export function PluginWorkspace({
   const { isLeftPanelOpen } = useContext(ThemeContext);
 
   return (
-    <AppLayout
+    <MapLayout
       user={user}
       isLeftPanelOpen={isLeftPanelOpen}
       leftPanelContent={
@@ -118,19 +117,6 @@ export function PluginWorkspace({
           </p>
         </div>
       }
-    >
-      <div className={styles.mapArea}>
-        <MapView
-          pluginId={pluginId}
-          layerStyle={layerStyle}
-          geometryTypes={geometryTypes}
-          data={collection}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onCreate={handleCreate}
-          communeContour={commune.contour}
-        />
-      </div>
-    </AppLayout>
+    />
   );
 }

@@ -3,8 +3,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Feature, MultiPolygon, Polygon } from "geojson";
 
-export type BasemapKind = "openmaptiles" | "ortho" | "ign";
-
 export interface CommunePluginSummary {
   id: string;
   label: string;
@@ -17,7 +15,6 @@ export interface CommuneContextValue {
   nom: string;
   contour: Feature<Polygon | MultiPolygon> | null;
   plugins: CommunePluginSummary[];
-  basemap: BasemapKind;
 }
 
 const CommuneContext = createContext<CommuneContextValue | null>(null);

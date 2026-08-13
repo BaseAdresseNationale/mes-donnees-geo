@@ -1,5 +1,6 @@
 {
   "version": 8,
+  "name": "Ortho",
   "glyphs": "https://openmaptiles.geo.data.gouv.fr/fonts/{fontstack}/{range}.pbf",
   "sources": {
     "raster-tiles": {
@@ -14,9 +15,10 @@
       "type": "vector",
       "url": "https://openmaptiles.geo.data.gouv.fr/data/cadastre.json"
     },
-    "decoupage-administratif": {
+    "decoupage-administratif-ortho": {
       "type": "vector",
-      "url": "https://openmaptiles.geo.data.gouv.fr/data/decoupage-administratif.json"
+      "tiles": ["https://openmaptiles.data.gouv.fr/data/decoupage-administratif/{z}/{x}/{y}.pbf"],
+      "maxzoom": 12
     }
   },
   "layers": [
@@ -28,7 +30,7 @@
     {
       "id": "communes",
       "type": "line",
-      "source": "decoupage-administratif",
+      "source": "decoupage-administratif-ortho",
       "source-layer": "communes",
       "minzoom": 2,
       "layout": {
@@ -36,7 +38,7 @@
         "visibility": "visible"
       },
       "paint": {
-        "line-color": "#ffffff",
+        "line-color": "hsl(248, 7%, 66%)",
         "line-dasharray": [3, 1, 1, 1],
         "line-width": {
           "base": 1.4,
@@ -51,7 +53,7 @@
     {
       "id": "departements",
       "type": "line",
-      "source": "decoupage-administratif",
+      "source": "decoupage-administratif-ortho",
       "source-layer": "departements",
       "maxzoom": 9,
       "layout": {
@@ -75,7 +77,7 @@
     {
       "id": "regions",
       "type": "line",
-      "source": "decoupage-administratif",
+      "source": "decoupage-administratif-ortho",
       "source-layer": "regions",
       "maxzoom": 5,
       "layout": {
