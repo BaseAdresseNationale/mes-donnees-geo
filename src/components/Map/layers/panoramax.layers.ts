@@ -149,13 +149,13 @@ export const snapPointToSequenceGeometry = (
   return [ll.lng, ll.lat];
 };
 
-export const PANORAMAX_VIEWER_URL = `${process.env.REACT_APP_PANORAMAX_API}/?focus=pic&pic=`;
+export const PANORAMAX_VIEWER_URL = `${process.env.NEXT_PUBLIC_PANORAMAX_API_URL}/?focus=pic&pic=`;
 
 export const getPanoramaxThumbUrl = (pictureId: string) =>
-  `${process.env.REACT_APP_PANORAMAX_API}/api/pictures/${pictureId}/thumb.jpg`;
+  `${process.env.NEXT_PUBLIC_PANORAMAX_API_URL}/api/pictures/${pictureId}/thumb.jpg`;
 
 export const getPanoramaxSequenceThumbUrl = (sequenceId: string) =>
-  `${process.env.REACT_APP_PANORAMAX_API}/api/collections/${sequenceId}/thumb.jpg`;
+  `${process.env.NEXT_PUBLIC_PANORAMAX_API_URL}/api/collections/${sequenceId}/thumb.jpg`;
 
 /**
  * Wait until the picture features for the given sequence are loaded near

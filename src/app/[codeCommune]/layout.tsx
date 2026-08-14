@@ -9,6 +9,7 @@ import { listAllPlugins } from "@/plugins/registry";
 import { getCommuneSettings } from "@/lib/db/commune-settings";
 import { MapContextProvider } from "@/contexts/MapContext";
 import { CadastreContextProvider } from "@/contexts/CadastreContext";
+import { PanoramaxContextProvider } from "@/contexts/PanoramaxContext";
 import { LocalStorageContextProvider } from "@/contexts/LocalStorageContext";
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -54,7 +55,9 @@ export default async function CommuneLayout({
       >
         <MapContextProvider>
           <CadastreContextProvider>
-            <MapRootLayout session={session}>{children}</MapRootLayout>
+            <PanoramaxContextProvider>
+              <MapRootLayout session={session}>{children}</MapRootLayout>
+            </PanoramaxContextProvider>
           </CadastreContextProvider>
         </MapContextProvider>
       </CommuneProvider>

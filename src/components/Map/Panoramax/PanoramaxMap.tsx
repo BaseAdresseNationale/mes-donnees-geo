@@ -17,7 +17,7 @@ import {
   resolveNearestPictureAfterDive,
   snapPointToSequenceGeometry,
 } from "../layers/panoramax.layers";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 const DIVE_TARGET_ZOOM = 20;
 const DIVE_DURATION_MS = 900;
@@ -25,6 +25,10 @@ const DIVE_DURATION_MS = 900;
 export function PanoramaxMap() {
   const map = useMap();
   const router = useRouter();
+  const { codeCommune, plugin } = useParams<{
+    codeCommune: string;
+    plugin: string;
+  }>();
   const { showPanoramax, isDiving, setIsDiving, setSavedView } =
     useContext(PanoramaxContext);
   const hoveredSequenceIdRef = useRef<string | null>(null);
@@ -76,7 +80,9 @@ export function PanoramaxMap() {
         const pictureId = resolved?.id ?? null;
         setIsDiving(false);
         if (pictureId) {
-          router.push(`/panoramax/${encodeURIComponent(pictureId)}`);
+          router.push(
+            `/${codeCommune}/${plugin}/panoramax-viewer?pictureID=${encodeURIComponent(pictureId)}`,
+          );
         }
       };
       m.on("moveend", onMoveEnd);
@@ -89,7 +95,7 @@ export function PanoramaxMap() {
         essential: true,
       });
     },
-    [map, router, setIsDiving, setSavedView],
+    [map, router, codeCommune, plugin, setIsDiving, setSavedView],
   );
 
   useEffect(() => {
@@ -159,7 +165,7 @@ export function PanoramaxMap() {
     }
   }, [map, showPanoramax]);
 
-  if (!process.env.REACT_APP_PANORAMAX_API) {
+  if (!process.env.NEXT_PUBLIC_PANORAMAX_API_URL) {
     return null;
   }
 

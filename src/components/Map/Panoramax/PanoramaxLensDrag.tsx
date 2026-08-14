@@ -1,6 +1,6 @@
 import MapContext from "@/contexts/MapContext";
 import PanoramaxContext from "@/contexts/PanoramaxContext";
-import { usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMap } from "react-map-gl/maplibre";
@@ -49,6 +49,10 @@ export function PanoramaxLensDrag() {
   const map = useMap();
   const pathname = usePathname();
   const router = useRouter();
+  const { codeCommune, plugin } = useParams<{
+    codeCommune: string;
+    plugin: string;
+  }>();
   const {
     showPanoramax,
     setShowPanoramax,
@@ -63,7 +67,7 @@ export function PanoramaxLensDrag() {
   const [lens, setLens] = useState<LensState | null>(null);
   const [scanMode, setScanMode] = useState(false);
 
-  const isViewerRoute = pathname.startsWith("/panoramax/");
+  const isViewerRoute = pathname.endsWith("/panoramax-viewer");
 
   // Always-up-to-date refs so the long-lived window listeners see fresh values.
   const showPanoramaxRef = useRef(showPanoramax);
@@ -286,7 +290,9 @@ export function PanoramaxLensDrag() {
           }
           setIsDiving(false);
           if (pictureId) {
-            router.push(`/panoramax/${encodeURIComponent(pictureId)}`);
+            router.push(
+              `/${codeCommune}/${plugin}/panoramax-viewer?pictureID=${encodeURIComponent(pictureId)}`,
+            );
           }
         };
         m.on("moveend", onMoveEnd);
@@ -344,6 +350,8 @@ export function PanoramaxLensDrag() {
     setIsDiving,
     setMapMessage,
     router,
+    codeCommune,
+    plugin,
     endDrag,
     enterScanMode,
     exitScanMode,
@@ -420,8 +428,22 @@ export function PanoramaxLensDrag() {
       }}
       aria-hidden="true"
     >
-      <Image src="/icons/panoramax.svg" alt="" className={styles.icon} />
-      {thumbUrl && <Image src={thumbUrl} alt="" className={styles.thumb} />}
+      <Image
+        width={24}
+        height={24}
+        src="/icons/panoramax.svg"
+        alt=""
+        className={styles.icon}
+      />
+      {thumbUrl && (
+        <Image
+          width={100}
+          height={100}
+          src={thumbUrl}
+          alt=""
+          className={styles.thumb}
+        />
+      )}
     </div>,
     document.body,
   );

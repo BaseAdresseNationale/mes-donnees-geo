@@ -163,3 +163,16 @@ body.panoramax-dragging * {
   filter: invert(1);
   transform: none;
 }
+/* Disabled: no Panoramax data in the current viewport */
+#panoramax-toggle.disabled {
+  cursor: not-allowed !important;
+}
+#panoramax-toggle.disabled:hover,
+#panoramax-toggle.disabled:focus,
+#panoramax-toggle.disabled:active {
+  background-color: transparent !important;
+}
+#panoramax-toggle.disabled > img {
+  filter: grayscale(1);
+  opacity: 0.5;
+}

@@ -7,22 +7,21 @@ import {
   useRef,
   useState,
 } from "react";
-import { PanoramaxContext } from "../contexts/PanoramaxContext";
 import { CadastreContext } from "../contexts/CadastreContext";
 import { AppLayout, AppLayoutProps } from "./AppLayout";
 import styles from "./MapLayout.module.css";
-import { PanoramaxToggle } from "@/components/Map/Panoramax/PanoramaxToggle";
-import { PanoramaxMap } from "@/components/Map/Panoramax/PanoramaxMap";
-import { PanoramaxLensDrag } from "@/components/Map/Panoramax/PanoramaxLensDrag";
-import { StylesSwitch } from "@/components/Map/controls/StylesSwitch";
-import { mapStyles } from "@/components/Map/styles";
+import { PanoramaxToggle } from "@/components/map/Panoramax/PanoramaxToggle";
+import { PanoramaxMap } from "@/components/map/Panoramax/PanoramaxMap";
+import { PanoramaxLensDrag } from "@/components/map/Panoramax/PanoramaxLensDrag";
+import { StylesSwitch } from "@/components/map/controls/StylesSwitch";
+import { mapStyles } from "@/components/map/styles";
 import MapContext from "@/contexts/MapContext";
 import { useLocalStorageContext } from "@/contexts/LocalStorageContext";
 import {
   parcelleHoveredLayer,
   staticCadastreLayers,
-} from "@/components/Map/layers/cadastre.layers";
-import { PANORAMAX_SEQUENCE_LAYER_ID } from "@/components/Map/layers/panoramax.layers";
+} from "@/components/map/layers/cadastre.layers";
+import { PANORAMAX_SEQUENCE_LAYER_ID } from "@/components/map/layers/panoramax.layers";
 import { useCommune } from "@/contexts/CommuneContext";
 import { geometryBounds } from "@/lib/geo/bounds";
 import { buildInvertedMask } from "@/lib/geo/mask";
@@ -31,9 +30,9 @@ import {
   COMMUNE_SOURCE,
   communeMaskLayer,
   communeOutlineLayer,
-} from "@/components/Map/layers/commune.layers";
-import { CadastreControl } from "@/components/Map/controls/cadastre/CadastreControl";
-import { ControlGroupPortal } from "@/components/Map/controls/ControlGroupPortal";
+} from "@/components/map/layers/commune.layers";
+import { CadastreControl } from "@/components/map/controls/cadastre/CadastreControl";
+import { ControlGroupPortal } from "@/components/map/controls/ControlGroupPortal";
 
 type MapLayoutProps = {
   mapChildren?: React.ReactNode;
@@ -52,7 +51,6 @@ export function MapLayout({
 
   const { mapRefCb, mapRef } = useContext(MapContext);
   const { showCadastre, setShowCadastre } = useContext(CadastreContext);
-  const { showPanoramax, setShowPanoramax } = useContext(PanoramaxContext);
   const { contour: communeContour } = useCommune();
   const { basemapId } = useLocalStorageContext();
 
@@ -145,13 +143,10 @@ export function MapLayout({
 
           <PanoramaxLensDrag />
           <NavigationControl position="top-right" />
-          <PanoramaxToggle
-            showPanoramax={showPanoramax}
-            setShowPanoramax={setShowPanoramax}
-          />
 
           <ControlGroupPortal position="bottom-left">
             <StylesSwitch styles={mapStyles} />
+            <PanoramaxToggle />
             <CadastreControl
               showCadastre={showCadastre}
               setShowCadastre={setShowCadastre}

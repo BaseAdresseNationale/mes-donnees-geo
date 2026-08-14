@@ -1,165 +1,128 @@
-import {
-  ControlPosition,
-  IControl,
-  MapInstance,
-  useControl,
-} from "react-map-gl/maplibre";
-import { useEffect, useRef } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
+import { useMap } from "react-map-gl/maplibre";
+import PanoramaxContext from "@/contexts/PanoramaxContext";
 import {
   PANORAMAX_LAYERS_SOURCE,
   PANORAMAX_SOURCE_ID,
 } from "../layers/panoramax.layers";
-
-type PanoramaxToggleProps = {
-  showPanoramax: boolean;
-  setShowPanoramax: (show: boolean) => void;
-  position?: ControlPosition;
-};
+import cssStyles from "./PanoramaxToggle.module.css";
 
 const ENABLED_TITLE = "Masquer Panoramax";
 const DISABLED_TITLE = "Afficher Panoramax";
 const UNAVAILABLE_TITLE =
   "Aucune photographie Panoramax disponible sur cette zone";
+const SCAN_TITLE = "Fermer le mode scan Panoramax";
 
-export class PanoramaxToggleControl implements IControl {
-  private controlContainer: HTMLElement | undefined;
-  private buttonElement: HTMLButtonElement | undefined;
-  private map?: MapInstance;
-  private boundSourceData?: (e: any) => void;
-  private boundMoveEnd?: () => void;
+export function PanoramaxToggle() {
+  const { showPanoramax } = useContext(PanoramaxContext);
+  const map = useMap();
 
-  constructor(private props: PanoramaxToggleProps) {}
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  // Refs mirror props/state for use inside long-lived event handlers.
+  const showPanoramaxRef = useRef(showPanoramax);
 
-  public getDefaultPosition(): ControlPosition {
-    return "top-right";
-  }
-
-  private updateButtonAppearance() {
-    if (!this.buttonElement) return;
-    const { showPanoramax } = this.props;
-    const isDisabled = this.buttonElement.hasAttribute("data-unavailable");
-    const isScanMode = this.buttonElement.classList.contains("scan-mode");
+  const updateButtonAppearance = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    const isDisabled = button.hasAttribute("data-unavailable");
+    const isScanMode = button.classList.contains("scan-mode");
 
     if (isDisabled) {
-      this.buttonElement.title = UNAVAILABLE_TITLE;
-      this.buttonElement.ariaLabel = UNAVAILABLE_TITLE;
-      this.buttonElement.classList.add("disabled");
-      this.buttonElement.classList.remove("active");
-    } else {
-      this.buttonElement.classList.remove("disabled");
-      const title = isScanMode
-        ? "Fermer le mode scan Panoramax"
-        : showPanoramax
-          ? ENABLED_TITLE
-          : DISABLED_TITLE;
-      this.buttonElement.title = title;
-      this.buttonElement.ariaLabel = title;
-      showPanoramax
-        ? this.buttonElement.classList.add("active")
-        : this.buttonElement.classList.remove("active");
+      button.title = UNAVAILABLE_TITLE;
+      button.ariaLabel = UNAVAILABLE_TITLE;
+      button.classList.add("disabled");
+      button.classList.remove("active");
+      return;
     }
-  }
+    button.classList.remove("disabled");
+    const title = isScanMode
+      ? SCAN_TITLE
+      : showPanoramaxRef.current
+        ? ENABLED_TITLE
+        : DISABLED_TITLE;
+    button.title = title;
+    button.ariaLabel = title;
+    if (showPanoramaxRef.current) {
+      button.classList.add("active");
+    } else {
+      button.classList.remove("active");
+    }
+  }, []);
 
-  public setShowPanoramax(show: boolean) {
-    this.props.showPanoramax = show;
-    this.updateButtonAppearance();
-  }
-
-  public onAdd(map: MapInstance): HTMLElement {
-    this.map = map;
-    this.controlContainer = document.createElement("div");
-    this.controlContainer.classList.add(
-      "maplibregl-ctrl",
-      "maplibregl-ctrl-group",
-    );
-
-    const buttonElement = document.createElement("button");
-    this.buttonElement = buttonElement;
-    buttonElement.id = "panoramax-toggle";
-    buttonElement.type = "button";
-    buttonElement.classList.add("panoramax-draggable");
-    buttonElement.setAttribute("data-unavailable", "");
+  // Create the button imperatively so PanoramaxLensDrag can freely mutate its
+  // classes (scan-mode, active…) and the inner <img> src without React
+  // overwriting them on re-renders. Click semantics are owned by
+  // <PanoramaxLensDrag />, which delegates via #panoramax-toggle.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const button = document.createElement("button");
+    buttonRef.current = button;
+    button.id = "panoramax-toggle";
+    button.type = "button";
+    button.className = `panoramax-draggable ${cssStyles.control}`;
+    button.setAttribute("data-unavailable", "");
     // Prevent the browser from interpreting touch gestures on the button as
     // scroll/pinch (which would fire pointercancel and break the drag flow).
-    buttonElement.style.touchAction = "none";
+    button.style.touchAction = "none";
 
-    const iconElement = document.createElement("img");
-    iconElement.src = "/icons/panoramax.svg";
-    iconElement.alt = "Panoramax";
-    iconElement.width = 18;
-    iconElement.height = 18;
-    buttonElement.appendChild(iconElement);
+    const img = document.createElement("img");
+    img.src = "/icons/panoramax.svg";
+    img.alt = "Panoramax";
+    img.width = 24;
+    img.height = 24;
+    button.appendChild(img);
+    container.appendChild(button);
+    updateButtonAppearance();
 
-    // Click semantics are owned by <PanoramaxLensDrag /> (enter/exit scan mode
-    // on click, drag + drop on a picture to dive). We keep no native click
-    // handler here so the two flows don't conflict.
+    return () => {
+      button.remove();
+      buttonRef.current = null;
+    };
+  }, [updateButtonAppearance]);
 
-    this.controlContainer.appendChild(buttonElement);
+  useEffect(() => {
+    showPanoramaxRef.current = showPanoramax;
+    updateButtonAppearance();
+  }, [showPanoramax, updateButtonAppearance]);
 
-    // Availability check: the button is enabled as soon as a Panoramax
-    // sequence is present in the viewport. The picture-level dive target is
-    // resolved later, after the dive zoom finishes (see PanoramaxMap /
-    // PanoramaxLensDrag).
+  // Availability check: the button is enabled as soon as a Panoramax sequence
+  // is present in the viewport. The picture-level dive target is resolved
+  // later, after the dive zoom finishes (see PanoramaxMap / PanoramaxLensDrag).
+  useEffect(() => {
+    const m = map.current?.getMap();
+    if (!m) return;
+
     const refreshAvailability = () => {
-      const m = this.map as any;
-      if (!m || !this.buttonElement) return;
+      const button = buttonRef.current;
+      if (!button) return;
       const sequences = m.querySourceFeatures(PANORAMAX_SOURCE_ID, {
         sourceLayer: PANORAMAX_LAYERS_SOURCE.SEQUENCES,
       });
       const available = !!(sequences && sequences.length > 0);
       if (available) {
-        this.buttonElement.removeAttribute("data-unavailable");
+        button.removeAttribute("data-unavailable");
       } else {
-        this.buttonElement.setAttribute("data-unavailable", "");
+        button.setAttribute("data-unavailable", "");
       }
-      this.updateButtonAppearance();
+      updateButtonAppearance();
     };
 
-    this.boundSourceData = (e: any) => {
+    const onSourceData = (e: any) => {
       if (e.sourceId === PANORAMAX_SOURCE_ID && e.isSourceLoaded) {
         refreshAvailability();
       }
     };
-    this.boundMoveEnd = refreshAvailability;
-    map.on("sourcedata", this.boundSourceData as any);
-    map.on("moveend", this.boundMoveEnd);
+    m.on("sourcedata", onSourceData);
+    m.on("moveend", refreshAvailability);
+    refreshAvailability();
 
-    this.updateButtonAppearance();
+    return () => {
+      m.off("sourcedata", onSourceData);
+      m.off("moveend", refreshAvailability);
+    };
+  }, [map, updateButtonAppearance]);
 
-    return this.controlContainer;
-  }
-
-  public onRemove(): void {
-    if (this.map && this.boundSourceData) {
-      this.map.off("sourcedata", this.boundSourceData as any);
-    }
-    if (this.map && this.boundMoveEnd) {
-      this.map.off("moveend", this.boundMoveEnd);
-    }
-    if (this.controlContainer && this.controlContainer.parentNode) {
-      this.controlContainer.parentNode.removeChild(this.controlContainer);
-    }
-    this.map = undefined;
-  }
-}
-
-export function PanoramaxToggle(props: PanoramaxToggleProps) {
-  const { position, ...rest } = props;
-  const controlRef = useRef<PanoramaxToggleControl | null>(null);
-
-  useControl(
-    () => {
-      const control = new PanoramaxToggleControl(rest);
-      controlRef.current = control;
-      return control;
-    },
-    { position },
-  );
-
-  // Keep control state in sync with React state changes
-  useEffect(() => {
-    controlRef.current?.setShowPanoramax(props.showPanoramax);
-  }, [props.showPanoramax]);
-
-  return null;
+  return <div ref={containerRef} className={cssStyles.controlContainer} />;
 }
