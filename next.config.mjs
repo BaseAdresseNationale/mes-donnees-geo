@@ -8,12 +8,9 @@ const nextConfig = {
   ],
   images: {
     remotePatterns: [
-      new URL(
-        "https://base-adresse-locale-prod-blasons-communes.s3.fr-par.scw.cloud/**",
-      ),
       new URL(`${process.env.NEXT_PUBLIC_PANORAMAX_API_URL}/**`),
       new URL(
-        "https://annuaire-des-collectivites-production-storage.s3.fr-par.scw.cloud/**",
+        `${process.env.NEXT_PUBLIC_BUCKET_ANNUAIRE_DES_COLLECTIVITES}/**`,
       ),
     ],
   },

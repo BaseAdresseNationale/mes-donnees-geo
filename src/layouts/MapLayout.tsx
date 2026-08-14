@@ -142,8 +142,7 @@ export function MapLayout({
           {mapChildren}
 
           <PanoramaxLensDrag />
-          <NavigationControl position="top-right" />
-
+          <NavigationControl position="bottom-right" />
           <ControlGroupPortal position="bottom-left">
             <StylesSwitch styles={mapStyles} />
             <PanoramaxToggle />

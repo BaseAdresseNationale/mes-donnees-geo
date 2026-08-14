@@ -12,15 +12,21 @@ import {
 import { useCommune } from "@/contexts/CommuneContext";
 import { formatCommuneName } from "@/lib/geo/commune";
 import styles from "./CommuneSettings.module.css";
+import Image from "next/image";
+
+interface CommuneSettingsProps {
+  currentPluginId?: string;
+  communeFlagUrl: string;
+}
 
 export function CommuneSettings({
   currentPluginId,
-}: {
-  currentPluginId?: string;
-}) {
+  communeFlagUrl,
+}: CommuneSettingsProps) {
   const commune = useCommune();
   const communeName = formatCommuneName(commune.nom);
   const router = useRouter();
+
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +85,12 @@ export function CommuneSettings({
   return (
     <>
       <div className={styles.header}>
+        <Image
+          src={communeFlagUrl}
+          alt={`Blason de ${communeName}`}
+          width={32}
+          height={32}
+        />
         <h2 className={styles.communeName}>
           {communeName} ({commune.codeInsee})
         </h2>
@@ -147,6 +159,19 @@ export function CommuneSettings({
               {error}
             </p>
           ) : null}
+        </div>
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Blason de la commune</h3>
+          <p className={styles.sectionHint}>
+            Vous souhaitez modifier le blason de cette commune ?{" "}
+            <a
+              href="https://collectivite.fr/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              C&apos;est par ici
+            </a>
+          </p>
         </div>
       </Modal>
     </>
