@@ -133,12 +133,13 @@ function AutocompleteInput<T>({
   return (
     <div className={style.autocomplete}>
       <ul
-        {...(resultsListPosition === "top"
-          ? { top: 0, transform: "translateY(-100%)" }
-          : { bottom: 0, transform: "translateY(100%)" })}
-        {...(showResultsList
-          ? { className: `${style.resultList} ${style.visible}` }
-          : { className: style.resultList })}
+        className={[
+          style.resultList,
+          style[resultsListPosition],
+          showResultsList && style.visible,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         {...getMenuProps()}
       >
         {items.length === 0 ? (
@@ -165,8 +166,8 @@ function AutocompleteInput<T>({
         label={label}
         rightIcon={<span className="material-icons">search</span>}
         color="neutral"
-        {...inputProps}
         {...getInputProps()}
+        {...inputProps}
       />
     </div>
   );

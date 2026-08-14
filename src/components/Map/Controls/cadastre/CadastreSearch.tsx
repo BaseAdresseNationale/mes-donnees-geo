@@ -8,7 +8,6 @@ import AutocompleteInput, {
 } from "@/components/common/autocomplete";
 import { ParcelleFeature, useCadastreSearch } from "@/contexts/CadastreContext";
 import MapContext from "@/contexts/MapContext";
-import { SearchFilter } from "@gouvfr-lasuite/ui-components";
 
 interface CadastreSearchProps {
   visible?: boolean;
@@ -49,20 +48,15 @@ function CadastreSearch({ visible }: CadastreSearchProps) {
       }
     >
       <AutocompleteInput
+        key={String(visible)}
         onSearch={handleSearchParcelle}
         onSelect={handleSelectParcelle}
         noResultsMessage="Aucune parcelle ne correspond à votre recherche"
         resultsListPosition="top"
         itemToString={(parcelle) => (parcelle ? parcelle.id : "")}
         inputProps={{
-          width: "100%",
-          placeholder: "Rechercher une parcelle",
           hideLabel: true,
-          style: {
-            borderBottomLeftRadius: 0,
-            borderTopLeftRadius: 0,
-            borderLeft: 0,
-          },
+          fullWidth: true,
         }}
       />
     </div>

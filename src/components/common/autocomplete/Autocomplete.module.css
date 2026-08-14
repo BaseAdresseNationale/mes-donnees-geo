@@ -28,20 +28,37 @@
   }
 
   .resultList {
-    overflow: hidden;
+    margin: 0;
+    padding: 0;
     position: absolute;
+    left: 0;
     width: 100%;
     z-index: 1;
     max-height: 200px;
     overflow-y: auto;
     background: white;
-    border-top-left-radius: 3px;
-    border-top-right-radius: 3px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     display: none;
 
+    li {
+      list-style: none;
+    }
+
     &.visible {
       display: block;
+    }
+
+    &.top {
+      bottom: 100%;
+      border-top-left-radius: 3px;
+      border-top-right-radius: 3px;
+      box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    &.bottom {
+      top: 100%;
+      border-bottom-left-radius: 3px;
+      border-bottom-right-radius: 3px;
     }
   }
 }

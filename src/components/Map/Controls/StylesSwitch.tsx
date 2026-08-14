@@ -71,6 +71,12 @@ export function StylesSwitch({ styles }: StylesSwitchProps) {
           aria-haspopup="menu"
           aria-expanded={isOpen}
           aria-label={`Changer de fond de carte — fond actuel : ${currentStyle?.title ?? ""}`}
+          {...(isOpen && {
+            style: {
+              backgroundColor: "var(--color-primary)",
+              color: "#fff",
+            },
+          })}
         >
           <span
             aria-hidden

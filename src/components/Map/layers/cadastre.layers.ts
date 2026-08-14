@@ -51,15 +51,54 @@ export const staticCadastreLayers = [
     },
   },
   {
+    id: "sections",
+    type: "line",
+    source: "cadastre",
+    "source-layer": "sections",
+    minzoom: 12,
+    maxzoom: 24,
+    layout: {
+      visibility: "none",
+    },
+    paint: {
+      "line-color": "rgba(116, 134, 241, 1)",
+      "line-opacity": 0.9,
+      "line-width": 2,
+    },
+  },
+  {
+    id: "code-section",
+    type: "symbol",
+    source: "cadastre",
+
+    "source-layer": "sections",
+    minzoom: 12.5,
+    maxzoom: 16,
+    layout: {
+      visibility: "none",
+      "text-field": "{code}",
+      "text-font": ["Open Sans Regular"],
+    },
+    paint: {
+      "text-halo-color": "rgba(255, 246, 241, 1)",
+      "text-halo-width": 1.5,
+    },
+  },
+  {
     id: "code-parcelles",
     type: "symbol",
     source: "cadastre",
     "source-layer": "parcelles",
-    minzoom: PARCELLES_MINZOOM,
+    minzoom: 16,
+    filter: ["all"],
     layout: {
       visibility: "none",
-      "text-field": "{numero}",
-      "text-font": ["Noto Sans Bold"],
+      "text-field": [
+        "concat",
+        ["get", "section"],
+        ["slice", ["concat", "000", ["to-string", ["get", "numero"]]], -4],
+      ],
+      "text-font": ["Open Sans Regular"],
       "text-allow-overlap": false,
       "text-size": 16,
     },
