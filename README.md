@@ -11,16 +11,16 @@ Outil cartographique open source permettant aux communes françaises d'éditer l
 
 ## Stack technique
 
-| Couche         | Choix                                                            |
-| -------------- | ---------------------------------------------------------------- |
-| Framework      | Next.js 15 (App Router) + TypeScript                             |
-| UI             | `@gouvfr-lasuite/ui-components` + `@gouvfr-lasuite/ui-tokens`    |
-| Cartographie   | MapLibre GL JS + Terra Draw                                      |
-| Fonds de carte | IGN Géoplateforme (Plan v2, ortho)                               |
-| Auth           | ProConnect (OIDC)                                                |
-| Base           | PostgreSQL 16 + PostGIS 3                                        |
-| ORM            | (à venir) Prisma ou requêtes SQL brutes                          |
-| Store dev      | Fichier JSON local (`.data/`) tant que PostGIS n'est pas branché |
+| Couche         | Choix                                                                       |
+| -------------- | --------------------------------------------------------------------------- |
+| Framework      | Next.js 15 (App Router) + TypeScript                                        |
+| UI             | `@gouvfr-lasuite/ui-components` + `@gouvfr-lasuite/ui-tokens`               |
+| Cartographie   | MapLibre GL JS + Terra Draw                                                 |
+| Fonds de carte | IGN Géoplateforme (Plan v2, ortho)                                          |
+| Auth           | ProConnect (OIDC)                                                           |
+| Base           | PostgreSQL 16 + PostGIS 3                                                   |
+| ORM            | Prisma 7 (driver adapter `@prisma/adapter-pg`, ESM)                         |
+| Store dev      | Fichier JSON local (`.data/`) — legacy, migre progressivement vers Postgres |
 
 ## Architecture plugin
 
@@ -55,8 +55,66 @@ Le **registre** central charge dynamiquement les plugins activés pour la commun
 
 ## Plugins fournis (V1)
 
-- **`demo`** — Plugin générique de démonstration (points), sert de référence pour créer de nouveaux plugins.
 - **`rural-paths`** — Édition des chemins ruraux (lignes) avec attributs (nom, revêtement, statut).
+
+### Plugin `rural-paths`
+
+Le plugin gère la CRUD des **chemins ruraux** d'une commune. Chaque chemin est un
+`MultiLineString` GeoJSON dont **chaque `LineString` porte son propre revêtement**
+(le tableau `surfaces` a la même longueur que `path.coordinates` — cohérence
+vérifiée en base par un `CHECK`).
+
+Modèle métier :
+
+- `id` (UUID v4) · `codeInsee` · `statut` (`draft` / `published` / `certified`)
+- `nom?` · `path?: GeoJSON.MultiLineString` · `surfaces: RuralPathSurface[]`
+- champs base entity (`createdAt`, `updatedAt`, `deletedAt?`)
+
+Persistance :
+
+- Table `rural_paths` avec :
+  - colonne `path JSONB` (source de vérité, lecture/écriture Prisma) ;
+  - colonne dérivée `path_geom geometry(MultiLineString, 4326)` (PostGIS)
+    maintenue par trigger et indexée en GIST — utilisée pour de futures
+    requêtes spatiales (`$queryRaw` uniquement, `Unsupported` côté Prisma).
+- Enums PostgreSQL `rural_path_status` et `rural_path_surface`.
+
+Routes Next :
+
+- `/[codeCommune]/rural-paths` — **liste** des chemins (recherche par nom, filtre statut, bouton « Nouveau »).
+- `/[codeCommune]/rural-paths/new` — **formulaire vierge**.
+- `/[codeCommune]/rural-paths/[pathId]` — **formulaire pré-rempli**.
+
+API serveur :
+
+- `getRuralPaths(codeCommune)` / `getRuralPathById(codeCommune, id)` dans
+  `src/lib/db/rural-paths.ts` (mapper Prisma → domaine, filtre `deleted_at IS NULL`).
+- Mutations : `createRuralPath`, `updateRuralPath`, `softDeleteRuralPath`
+  (le `DELETE` est un soft-delete via `deleted_at`).
+
+Routes REST :
+
+- `POST   /api/plugins/rural-paths` — créer un chemin.
+- `PUT    /api/plugins/rural-paths/[pathId]` — mise à jour complète.
+- `DELETE /api/plugins/rural-paths/[pathId]` — soft-delete.
+
+Toutes ces routes exigent une session (`requireSession`) et sont scopées au
+`codeInsee` de la session. La validation métier partagée
+(`src/components/rural-path/validation.ts`) est appelée en amont côté client
+_et_ ré-appliquée côté serveur (defense in depth) : cohérence
+`surfaces[].length === path.coordinates.length`, statut/surface dans les enums,
+`nom` ≤ 200 caractères, coordonnées dans WGS84.
+
+Édition cartographique :
+
+- Le formulaire utilise **Terra Draw** (`terra-draw` +
+  `terra-draw-maplibre-gl-adapter`) attaché à l'instance MapLibre via
+  `MapContext.mapRef`. Deux modes : `linestring` (tracer un nouveau segment)
+  et `select` (déplacer/supprimer des vertices d'un segment existant).
+- Chaque `LineString` dessinée devient un segment du `MultiLineString`.
+  Le revêtement de chaque segment se choisit dans la liste du formulaire
+  (par défaut `terre`). La sauvegarde reconstruit le `MultiLineString`
+  à partir du snapshot Terra Draw et l'envoie via l'API REST ci-dessus.
 
 ## Authentification
 
@@ -86,6 +144,23 @@ Ouvrir http://localhost:3006. Cliquer sur « Se connecter » (stub ProConnect).
 docker compose up -d
 ```
 
+### Base de données & migrations
+
+Convention **base entity** : chaque table métier doit exposer `id UUID PK`,
+`created_at`, `updated_at`, `deleted_at?`. Les triggers `touch_updated_at`
+et le soft-delete via `deleted_at IS NULL` sont la norme.
+
+Commandes utiles :
+
+```bash
+npx prisma migrate dev --name mon_changement   # dev : génère + applique
+npx prisma migrate deploy                       # prod / CI
+npx prisma generate                             # régénère src/generated/prisma
+```
+
+Les migrations liées à PostGIS (extensions, types `geometry`, triggers) sont
+écrites manuellement en SQL (Prisma ne diff pas ces objets).
+
 ## Structure du dépôt
 
 ```
@@ -99,7 +174,6 @@ src/
 └── plugins/                Plugins métier
     ├── registry.ts         Enregistrement des plugins
     ├── types.ts            Contrat GeoPlugin
-    ├── demo/               Plugin démo
     └── rural-paths/        Plugin chemins ruraux
 ```
 

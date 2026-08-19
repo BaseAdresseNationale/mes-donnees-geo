@@ -92,7 +92,7 @@ export function CommuneSettings({
           height={32}
         />
         <h2 className={styles.communeName}>
-          {communeName} ({commune.codeInsee})
+          {communeName} <span>({commune.codeInsee})</span>
         </h2>
         <Button
           onClick={() => setIsOpen(true)}

@@ -8,10 +8,47 @@ datasource db {
 }
 
 model CommuneSettings {
-  codeInsee       String   @id @map("code_insee") @db.VarChar(5)
-  disabledPlugins String[] @default([]) @map("disabled_plugins")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeInsee       String    @unique @map("code_insee") @db.VarChar(5)
+  disabledPlugins String[]  @default([]) @map("disabled_plugins")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@map("commune_settings")
+}
+
+enum RuralPathStatus {
+  DRAFT     @map("draft")
+  PUBLISHED @map("published")
+  CERTIFIED @map("certified")
+
+  @@map("rural_path_status")
+}
+
+enum RuralPathSurface {
+  EARTH  @map("terre")
+  GRAVEL @map("gravier")
+  PAVED  @map("enrobe")
+  STONED @map("empierre")
+  GRASS  @map("herbe")
+
+  @@map("rural_path_surface")
+}
+
+model RuralPath {
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeInsee String             @map("code_insee") @db.VarChar(5)
+  statut    RuralPathStatus    @default(DRAFT)
+  nom       String?
+  path      Json?              @db.JsonB
+  surfaces  RuralPathSurface[] @default([])
+  pathGeom  Unsupported("geometry(MultiLineString, 4326)")? @map("path_geom")
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([codeInsee])
+  @@index([deletedAt])
+  @@map("rural_paths")
 }

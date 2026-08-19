@@ -291,7 +291,7 @@ export function PanoramaxLensDrag() {
           setIsDiving(false);
           if (pictureId) {
             router.push(
-              `/${codeCommune}/${plugin}/panoramax-viewer?pictureID=${encodeURIComponent(pictureId)}`,
+              `/${codeCommune}/panoramax-viewer?pictureID=${encodeURIComponent(pictureId)}`,
             );
           }
         };

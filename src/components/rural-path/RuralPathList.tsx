@@ -1,0 +1,125 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import {
+  Button,
+  Input,
+  Select,
+  Filter,
+  FilterOption,
+} from "@gouvfr-lasuite/ui-components";
+import styles from "./RuralPathList.module.css";
+import { RuralPath, RuralPathStatus } from "./types";
+
+interface RuralPathListProps {
+  codeCommune: string;
+  paths: RuralPath[];
+}
+
+const STATUS_LABEL: Record<RuralPathStatus, string> = {
+  [RuralPathStatus.DRAFT]: "Brouillon",
+  [RuralPathStatus.PUBLISHED]: "Publié",
+  [RuralPathStatus.CERTIFIED]: "Certifié",
+};
+
+const STATUS_CLASS: Record<RuralPathStatus, string> = {
+  [RuralPathStatus.DRAFT]: styles.statusDraft,
+  [RuralPathStatus.PUBLISHED]: styles.statusPublished,
+  [RuralPathStatus.CERTIFIED]: styles.statusCertified,
+};
+
+export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<RuralPathStatus | null>(
+    null,
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase();
+    return paths.filter((p) => {
+      if (statusFilter !== null && p.statut !== statusFilter) return false;
+      if (!q) return true;
+      return (p.nom ?? "").toLocaleLowerCase().includes(q);
+    });
+  }, [paths, query, statusFilter]);
+
+  const statusOptions: FilterOption[] = useMemo(
+    () => [
+      ...Object.values(RuralPathStatus).map((s) => ({
+        label: STATUS_LABEL[s],
+        value: s,
+      })),
+    ],
+    [],
+  );
+
+  return (
+    <section className={styles.container} aria-label="Liste des chemins ruraux">
+      <div className={styles.toolbar}>
+        <div className={styles.toolbarRow}>
+          <div className={styles.search}>
+            <Input
+              hideLabel
+              fullWidth
+              className={styles.searchInput}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              icon={<span className="material-icons">search</span>}
+            />
+          </div>
+          <Link
+            href={`/${codeCommune}/rural-paths/new`}
+            className={styles.newButton}
+          >
+            <Button
+              color="brand"
+              icon={<span className="material-icons">add</span>}
+              aria-label="Créer un nouveau chemin rural"
+            />
+          </Link>
+        </div>
+        <Filter
+          label="Filtrer par statut"
+          options={statusOptions}
+          value={statusFilter}
+          onChange={(value) => setStatusFilter(value as RuralPathStatus)}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className={styles.empty}>
+          {paths.length === 0
+            ? 'Aucun chemin rural pour cette commune. Cliquez sur "Nouveau" pour démarrer.'
+            : "Aucun résultat pour ces filtres."}
+        </p>
+      ) : (
+        <ul className={styles.list}>
+          {filtered.map((p) => (
+            <li key={p.id}>
+              <Link
+                href={`/${codeCommune}/rural-paths/${p.id}`}
+                className={styles.item}
+              >
+                <span className={styles.itemTitle}>
+                  {p.nom?.trim() || "Chemin sans nom"}
+                </span>
+                <span className={styles.itemMeta}>
+                  <span
+                    className={`${styles.statusBadge} ${STATUS_CLASS[p.statut]}`}
+                  >
+                    {STATUS_LABEL[p.statut]}
+                  </span>
+                  <span>
+                    {p.surfaces.length} segment
+                    {p.surfaces.length > 1 ? "s" : ""}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

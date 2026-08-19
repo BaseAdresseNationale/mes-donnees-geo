@@ -81,7 +81,7 @@ export function PanoramaxMap() {
         setIsDiving(false);
         if (pictureId) {
           router.push(
-            `/${codeCommune}/${plugin}/panoramax-viewer?pictureID=${encodeURIComponent(pictureId)}`,
+            `/${codeCommune}/panoramax-viewer?pictureID=${encodeURIComponent(pictureId)}`,
           );
         }
       };
@@ -95,7 +95,7 @@ export function PanoramaxMap() {
         essential: true,
       });
     },
-    [map, router, codeCommune, plugin, setIsDiving, setSavedView],
+    [map, router, codeCommune, setIsDiving, setSavedView],
   );
 
   useEffect(() => {
