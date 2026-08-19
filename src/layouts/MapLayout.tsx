@@ -29,6 +29,7 @@ import {
   COMMUNE_MASK_SOURCE,
   COMMUNE_SOURCE,
   communeMaskLayer,
+  communeOutlineCasingLayer,
   communeOutlineLayer,
 } from "@/components/map/layers/commune.layers";
 import { CadastreControl } from "@/components/map/controls/cadastre/CadastreControl";
@@ -135,6 +136,7 @@ export function MapLayout({
               features: communeContour ? [communeContour] : [],
             }}
           >
+            <Layer {...(communeOutlineCasingLayer as any)} />
             <Layer {...(communeOutlineLayer as any)} />
           </Source>
           <PanoramaxMap />
