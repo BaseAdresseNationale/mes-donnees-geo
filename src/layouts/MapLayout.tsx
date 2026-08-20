@@ -36,13 +36,11 @@ import { CadastreControl } from "@/components/map/controls/cadastre/CadastreCont
 import { ControlGroupPortal } from "@/components/map/controls/ControlGroupPortal";
 
 type MapLayoutProps = {
-  mapChildren?: React.ReactNode;
   toolbarChildren?: React.ReactNode;
 } & AppLayoutProps;
 
 export function MapLayout({
   children,
-  mapChildren,
   toolbarChildren,
   ...props
 }: MapLayoutProps) {
@@ -50,7 +48,7 @@ export function MapLayout({
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => setCursor(null), []);
 
-  const { mapRefCb, mapRef } = useContext(MapContext);
+  const { mapRefCb, mapRef, mapChildren } = useContext(MapContext);
   const { showCadastre, setShowCadastre } = useContext(CadastreContext);
   const { contour: communeContour } = useCommune();
   const { basemapId } = useLocalStorageContext();

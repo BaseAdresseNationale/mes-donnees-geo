@@ -1,0 +1,43 @@
+.popup :global(.maplibregl-popup-content) {
+  padding: 0.5rem 0.625rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 0.8125rem;
+  pointer-events: none;
+}
+
+.popup :global(.maplibregl-popup-tip) {
+  pointer-events: none;
+}
+
+.popupTitle {
+  font-weight: 600;
+  color: #161616;
+}
+
+.popupStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.25rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.statusDraft {
+  background: #ececfe;
+  color: #4b4bcb;
+}
+
+.statusPublished {
+  background: #b8fec9;
+  color: #1e6b2c;
+}
+
+.statusCertified {
+  background: #fee7fc;
+  color: #6e2e63;
+}

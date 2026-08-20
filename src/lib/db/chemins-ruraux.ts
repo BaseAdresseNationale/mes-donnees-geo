@@ -5,7 +5,7 @@ import type {
   RuralPath,
   RuralPathStatus,
   RuralPathSurface,
-} from "@/components/CheminsRuraux/types";
+} from "@/components/chemins-ruraux/types";
 
 const SELECT = {
   id: true,

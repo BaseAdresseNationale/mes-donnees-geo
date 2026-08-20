@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { getRuralPathById } from "@/lib/db/chemins-ruraux";
-import { RuralPathForm } from "@/components/CheminsRuraux/RuralPathForm";
+import { RuralPathForm } from "@/components/chemins-ruraux/CheminsRurauxForm";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

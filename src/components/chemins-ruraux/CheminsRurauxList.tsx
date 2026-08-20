@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState, useEffect } from "react";
 import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
-import styles from "./RuralPathList.module.css";
-import { RuralPath, RuralPathStatus } from "@/components/CheminsRuraux/types";
+import styles from "./CheminsRurauxList.module.css";
+import { RuralPath, RuralPathStatus } from "@/components/chemins-ruraux/types";
+import MapContext from "@/contexts/MapContext";
+import { CheminsRurauxMap } from "./CheminsRurauxMap";
 
 interface RuralPathListProps {
   codeCommune: string;
-  paths: RuralPath[];
+  ruralPaths: RuralPath[];
 }
 
 const STATUS_LABEL: Record<RuralPathStatus, string> = {
@@ -23,7 +25,8 @@ const STATUS_CLASS: Record<RuralPathStatus, string> = {
   [RuralPathStatus.CERTIFIED]: styles.statusCertified,
 };
 
-export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
+export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
+  const { setMapChildren } = useContext(MapContext);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<RuralPathStatus | null>(
     null,
@@ -31,12 +34,12 @@ export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
-    return paths.filter((p) => {
+    return ruralPaths.filter((p) => {
       if (statusFilter !== null && p.statut !== statusFilter) return false;
       if (!q) return true;
       return (p.nom ?? "").toLocaleLowerCase().includes(q);
     });
-  }, [paths, query, statusFilter]);
+  }, [ruralPaths, query, statusFilter]);
 
   const statusOptions: FilterOption[] = useMemo(
     () => [
@@ -47,6 +50,16 @@ export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
     ],
     [],
   );
+
+  useEffect(() => {
+    setMapChildren(
+      <CheminsRurauxMap codeCommune={codeCommune} ruralPaths={ruralPaths} />,
+    );
+
+    return () => {
+      setMapChildren(null);
+    };
+  }, [setMapChildren, ruralPaths, codeCommune]);
 
   return (
     <section className={styles.container} aria-label="Liste des chemins ruraux">
@@ -73,7 +86,7 @@ export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
 
       {filtered.length === 0 ? (
         <p className={styles.empty}>
-          {paths.length === 0
+          {ruralPaths.length === 0
             ? "Aucun chemin rural pour cette commune."
             : "Aucun résultat pour ces filtres."}
         </p>

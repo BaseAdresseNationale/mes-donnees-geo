@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createRuralPath } from "@/lib/db/chemins-ruraux";
-import { validateRuralPathInput } from "@/components/CheminsRuraux/validation";
+import { validateRuralPathInput } from "@/components/chemins-ruraux/validation";
 
 export async function POST(request: Request): Promise<Response> {
   let session;

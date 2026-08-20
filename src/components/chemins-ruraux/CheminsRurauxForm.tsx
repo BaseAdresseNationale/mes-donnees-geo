@@ -1,11 +1,12 @@
 "use client";
 
-import { useContext, useState, useTransition } from "react";
+import { useContext, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Select } from "@gouvfr-lasuite/ui-components";
 import MapContext from "@/contexts/MapContext";
-import styles from "./RuralPathForm.module.css";
-import { useRuralPathDrawer } from "./useRuralPathDrawer";
+import CheminsRurauxContext from "@/contexts/CheminsRurauxContext";
+import styles from "./CheminsRurauxForm.module.css";
+import { useRuralPathDrawer } from "./useCheminsRurauxDrawer";
 import { validateRuralPathInput } from "./validation";
 import type { RuralPath } from "./types";
 import { RuralPathStatus, RuralPathSurface } from "@/generated/prisma/browser";
@@ -32,6 +33,7 @@ const SURFACE_OPTIONS = [
 export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const router = useRouter();
   const { mapRef } = useContext(MapContext);
+  const { setIsEditing } = useContext(CheminsRurauxContext);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,14 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const [statut, setStatut] = useState<RuralPathStatus>(
     initial?.statut ?? RuralPathStatus.DRAFT,
   );
+
+  useEffect(() => {
+    setIsEditing(true);
+
+    return () => {
+      setIsEditing(false);
+    };
+  }, [setIsEditing]);
 
   const drawer = useRuralPathDrawer(
     mapRef,
