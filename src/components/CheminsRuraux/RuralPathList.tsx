@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
 import styles from "./RuralPathList.module.css";
-import { RuralPath, RuralPathStatus } from "@/generated/prisma/browser";
+import { RuralPath, RuralPathStatus } from "@/components/CheminsRuraux/types";
 
 interface RuralPathListProps {
   codeCommune: string;
