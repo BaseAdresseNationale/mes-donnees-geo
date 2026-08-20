@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { Feature, Position, LineString as GeoLineString } from "geojson";
-import { RuralPathSurface } from "./types";
+import { RuralPathSurface } from "@/generated/prisma/browser";
 
 type TerraDrawInstance = {
   start: () => void;

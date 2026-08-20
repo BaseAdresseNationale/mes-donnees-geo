@@ -13,32 +13,8 @@
   background: #fff;
   border-bottom: 1px solid var(--color-border);
   flex-wrap: wrap;
-}
-
-.tool,
-.toolActive {
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 0.375rem 0.75rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  color: var(--color-fg);
-}
-
-.tool:hover {
-  background: #f0f0f0;
-}
-
-.tool:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.toolActive {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
+  background-color: var(--color-bg);
+  height: 50px;
 }
 
 .hint {

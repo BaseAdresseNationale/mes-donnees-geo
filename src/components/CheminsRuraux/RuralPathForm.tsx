@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Select } from "@gouvfr-lasuite/ui-components";
 import MapContext from "@/contexts/MapContext";
 import styles from "./RuralPathForm.module.css";
-import { RuralPath, RuralPathStatus, RuralPathSurface } from "./types";
 import { useRuralPathDrawer } from "./useRuralPathDrawer";
 import { validateRuralPathInput } from "./validation";
+import type { RuralPath } from "./types";
+import { RuralPathStatus, RuralPathSurface } from "@/generated/prisma/browser";
 
 interface RuralPathFormProps {
   codeCommune: string;
@@ -70,8 +71,8 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     startTransition(async () => {
       try {
         const url = isEdit
-          ? `/api/plugins/rural-paths/${initial!.id}`
-          : "/api/plugins/rural-paths";
+          ? `/api/chemins-ruraux/${initial!.id}`
+          : "/api/chemins-ruraux";
         const res = await fetch(url, {
           method: isEdit ? "PUT" : "POST",
           headers: { "content-type": "application/json" },
@@ -88,7 +89,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
         }
         const saved = (await res.json()) as RuralPath;
         router.refresh();
-        router.push(`/${codeCommune}/rural-paths/${saved.id}`);
+        router.push(`/${codeCommune}/chemins-ruraux/${saved.id}`);
       } catch {
         setError("Erreur réseau lors de l'enregistrement.");
       }
@@ -107,7 +108,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/plugins/rural-paths/${initial.id}`, {
+        const res = await fetch(`/api/chemins-ruraux/${initial.id}`, {
           method: "DELETE",
         });
         if (!res.ok) {
@@ -115,7 +116,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           return;
         }
         router.refresh();
-        router.push(`/${codeCommune}/rural-paths`);
+        router.push(`/${codeCommune}/chemins-ruraux`);
       } catch {
         setError("Erreur réseau lors de la suppression.");
       }
@@ -223,17 +224,17 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
                     }
                     clearable={false}
                     disabled={pending}
+                    fullWidth
                   />
                 </div>
-                <button
+                <Button
                   type="button"
                   className={styles.segmentRemove}
                   onClick={() => drawer.removeSegment(seg.id)}
                   aria-label={`Supprimer le segment ${i + 1}`}
                   disabled={pending}
-                >
-                  \u2715
-                </button>
+                  icon={<span className="material-icons">delete</span>}
+                />
               </li>
             ))}
           </ul>
@@ -245,7 +246,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           type="button"
           color="neutral"
           variant="tertiary"
-          onClick={() => router.push(`/${codeCommune}/rural-paths`)}
+          onClick={() => router.push(`/${codeCommune}/chemins-ruraux`)}
           disabled={pending}
         >
           Annuler

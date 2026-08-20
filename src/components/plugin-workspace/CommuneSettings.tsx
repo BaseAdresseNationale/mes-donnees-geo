@@ -84,30 +84,26 @@ export function CommuneSettings({
 
   return (
     <>
-      <div className={styles.header}>
-        <Image
-          src={communeFlagUrl}
-          alt={`Blason de ${communeName}`}
-          width={32}
-          height={32}
-        />
-        <h2 className={styles.communeName}>
-          {communeName} <span>({commune.codeInsee})</span>
-        </h2>
-        <Button
-          onClick={() => setIsOpen(true)}
-          color="neutral"
-          variant="tertiary"
-          size="small"
-          icon={<Icon name="settings" />}
-          aria-label={`Paramètres de la commune`}
-        />
-      </div>
+      <Button
+        onClick={() => setIsOpen(true)}
+        color="neutral"
+        variant="tertiary"
+        size="small"
+        icon={
+          <Image
+            src={communeFlagUrl}
+            alt={`Blason de ${communeName}`}
+            width={24}
+            height={24}
+          />
+        }
+        aria-label={`Paramètres de ${communeName} (${commune.codeInsee})`}
+      />
       <Modal
         isOpen={isOpen}
         onClose={handleClose}
         size={ModalSize.MEDIUM}
-        title={`Paramètres`}
+        title={`Paramètres de ${communeName} (${commune.codeInsee})`}
         rightActions={
           <>
             <Button

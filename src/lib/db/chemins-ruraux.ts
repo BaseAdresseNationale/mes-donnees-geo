@@ -5,7 +5,7 @@ import type {
   RuralPath,
   RuralPathStatus,
   RuralPathSurface,
-} from "@/components/rural-path/types";
+} from "@/components/CheminsRuraux/types";
 
 const SELECT = {
   id: true,
@@ -21,10 +21,10 @@ const SELECT = {
 type Row = {
   id: string;
   codeInsee: string;
-  statut: string;
+  statut: RuralPathStatus;
   nom: string | null;
   path: unknown;
-  surfaces: string[];
+  surfaces: RuralPathSurface[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -33,10 +33,10 @@ function toDomain(row: Row): RuralPath {
   return {
     id: row.id,
     codeInsee: row.codeInsee,
-    statut: row.statut as RuralPathStatus,
+    statut: row.statut,
     ...(row.nom != null ? { nom: row.nom } : {}),
     ...(row.path != null ? { path: row.path as GeoJSON.MultiLineString } : {}),
-    surfaces: row.surfaces as RuralPathSurface[],
+    surfaces: row.surfaces,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -77,13 +77,12 @@ export async function createRuralPath(
     data: {
       codeInsee: codeCommune,
       nom: input.nom,
-      statut: input.statut as unknown as Prisma.RuralPathCreateInput["statut"],
+      statut: input.statut,
       path:
         input.path === null
           ? Prisma.JsonNull
           : (input.path as unknown as Prisma.InputJsonValue),
-      surfaces:
-        input.surfaces as unknown as Prisma.RuralPathCreateInput["surfaces"],
+      surfaces: input.surfaces,
     },
     select: SELECT,
   });
@@ -99,13 +98,12 @@ export async function updateRuralPath(
     where: { id, codeInsee: codeCommune, deletedAt: null },
     data: {
       nom: input.nom,
-      statut: input.statut as unknown as Prisma.RuralPathUpdateInput["statut"],
+      statut: input.statut,
       path:
         input.path === null
           ? Prisma.JsonNull
           : (input.path as unknown as Prisma.InputJsonValue),
-      surfaces:
-        input.surfaces as unknown as Prisma.RuralPathUpdateInput["surfaces"],
+      surfaces: input.surfaces,
     },
   });
   if (result.count === 0) return null;

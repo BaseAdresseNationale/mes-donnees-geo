@@ -3,6 +3,7 @@ import {
   MainLayout,
   UserMenu,
 } from "@gouvfr-lasuite/ui-components";
+import styles from "./AppLayout.module.css";
 import type { MainLayoutProps } from "@gouvfr-lasuite/ui-components";
 import type { PropsWithChildren } from "react";
 import Image from "next/image";
@@ -13,9 +14,15 @@ export type AppLayoutProps = {
     email: string;
     fullName: string;
   };
+  rightHeaderContentChildren?: React.ReactNode;
 } & PropsWithChildren<MainLayoutProps>;
 
-export function AppLayout({ children, user, ...props }: AppLayoutProps) {
+export function AppLayout({
+  children,
+  rightHeaderContentChildren,
+  user,
+  ...props
+}: AppLayoutProps) {
   const handleLogout = useCallback(() => {
     // Navigation plein-page requise : un fetch suivrait la redirection vers
     // ProConnect en arrière-plan sans effacer le cookie SSO du navigateur.
@@ -28,6 +35,7 @@ export function AppLayout({ children, user, ...props }: AppLayoutProps) {
 
   return (
     <MainLayout
+      enableResize
       icon={
         <span className="headerLogo">
           <Image
@@ -40,7 +48,7 @@ export function AppLayout({ children, user, ...props }: AppLayoutProps) {
         </span>
       }
       rightHeaderContent={
-        <>
+        <div className={styles.rightHeaderContent}>
           {user && (
             <UserMenu
               logout={handleLogout}
@@ -54,7 +62,12 @@ export function AppLayout({ children, user, ...props }: AppLayoutProps) {
             apiUrl={`https://operateurs.suite.anct.gouv.fr/api/v1.0/lagaufre/services/?operator=${process.env.NEXT_PUBLIC_OPERATOR_ID}`}
             widgetPath="https://static.suite.anct.gouv.fr/widgets/lagaufre.js"
           />
-        </>
+          {rightHeaderContentChildren && (
+            <div className={styles.rightHeaderContentChildren}>
+              {rightHeaderContentChildren}
+            </div>
+          )}
+        </div>
       }
       {...props}
     >

@@ -11,7 +11,8 @@ interface MapRootLayoutProps {
 }
 
 export function MapRootLayout({ children, session }: MapRootLayoutProps) {
-  const { isLeftPanelOpen } = useContext(ThemeContext);
+  const { isLeftPanelOpen, toolbarChildren, rightHeaderContentChildren } =
+    useContext(ThemeContext);
   const fullName = [session.givenName, session.familyName]
     .filter(Boolean)
     .join(" ")
@@ -25,6 +26,8 @@ export function MapRootLayout({ children, session }: MapRootLayoutProps) {
       }}
       isLeftPanelOpen={isLeftPanelOpen}
       leftPanelContent={children}
+      toolbarChildren={toolbarChildren}
+      rightHeaderContentChildren={rightHeaderContentChildren}
     />
   );
 }

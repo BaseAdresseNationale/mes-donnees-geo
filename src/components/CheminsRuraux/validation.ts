@@ -1,4 +1,4 @@
-import { RuralPathStatus, RuralPathSurface } from "./types";
+import { RuralPathStatus, RuralPathSurface } from "@/generated/prisma/browser";
 
 export interface RuralPathInput {
   nom: string | null;

@@ -1,21 +1,37 @@
 "use client";
-
-import { CommuneSettings } from "@/components/plugin-workspace/CommuneSettings";
+import { useContext, useEffect } from "react";
+import ThemeContext from "@/contexts/ThemeContext";
 import styles from "./PluginLayout.module.css";
 import { PluginSelectionDropDown } from "@/components/plugin-workspace/PluginSelectionDropDown";
 
 interface PluginLayoutProps {
   pluginId: string;
   pluginLabel: string;
-  communeFlagUrl: string;
+  toolbarChildren: React.ReactNode | null;
+  rightHeaderContentChildren: React.ReactNode | null;
+  children: React.ReactNode;
 }
 
 export function PluginLayout({
   pluginId,
   pluginLabel,
-  communeFlagUrl,
   children,
-}: PluginLayoutProps & { children: React.ReactNode }) {
+  toolbarChildren,
+  rightHeaderContentChildren,
+}: PluginLayoutProps) {
+  const { setToolbarChildren, setRightHeaderContentChildren } =
+    useContext(ThemeContext);
+
+  useEffect(() => {
+    setToolbarChildren(toolbarChildren);
+    setRightHeaderContentChildren(rightHeaderContentChildren);
+  }, [
+    toolbarChildren,
+    rightHeaderContentChildren,
+    setToolbarChildren,
+    setRightHeaderContentChildren,
+  ]);
+
   return (
     <div
       className={styles.sidebar}
@@ -23,16 +39,12 @@ export function PluginLayout({
       role="tabpanel"
       aria-labelledby={`plugin-tab-${pluginId}`}
     >
-      <header className={styles.header}>
-        <CommuneSettings
-          currentPluginId={pluginId}
-          communeFlagUrl={communeFlagUrl}
-        />
+      <div className={styles.sidebarHeader}>
         <PluginSelectionDropDown
           pluginId={pluginId}
           pluginLabel={pluginLabel}
         />
-      </header>
+      </div>
       {children}
     </div>
   );

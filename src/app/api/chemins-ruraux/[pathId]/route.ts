@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
-import { softDeleteRuralPath, updateRuralPath } from "@/lib/db/rural-paths";
-import { validateRuralPathInput } from "@/components/rural-path/validation";
+import { softDeleteRuralPath, updateRuralPath } from "@/lib/db/chemins-ruraux";
+import { validateRuralPathInput } from "@/components/CheminsRuraux/validation";
 
 interface RouteParams {
   params: Promise<{ pathId: string }>;

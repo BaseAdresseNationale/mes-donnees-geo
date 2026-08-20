@@ -11,16 +11,15 @@ Outil cartographique open source permettant aux communes françaises d'éditer l
 
 ## Stack technique
 
-| Couche         | Choix                                                                       |
-| -------------- | --------------------------------------------------------------------------- |
-| Framework      | Next.js 15 (App Router) + TypeScript                                        |
-| UI             | `@gouvfr-lasuite/ui-components` + `@gouvfr-lasuite/ui-tokens`               |
-| Cartographie   | MapLibre GL JS + Terra Draw                                                 |
-| Fonds de carte | IGN Géoplateforme (Plan v2, ortho)                                          |
-| Auth           | ProConnect (OIDC)                                                           |
-| Base           | PostgreSQL 16 + PostGIS 3                                                   |
-| ORM            | Prisma 7 (driver adapter `@prisma/adapter-pg`, ESM)                         |
-| Store dev      | Fichier JSON local (`.data/`) — legacy, migre progressivement vers Postgres |
+| Couche         | Choix                                                         |
+| -------------- | ------------------------------------------------------------- |
+| Framework      | Next.js 16 (App Router) + TypeScript                          |
+| UI             | `@gouvfr-lasuite/ui-components` + `@gouvfr-lasuite/ui-tokens` |
+| Cartographie   | MapLibre GL JS + Terra Draw                                   |
+| Fonds de carte | IGN Géoplateforme (Plan v2, ortho)                            |
+| Auth           | ProConnect (OIDC)                                             |
+| Base           | PostgreSQL 16 + PostGIS 3                                     |
+| ORM            | Prisma 7 (driver adapter `@prisma/adapter-pg`, ESM)           |
 
 ## Architecture plugin
 
@@ -38,7 +37,7 @@ flowchart LR
     Reg --> Map
     Reg --> List
     P1[demo] --> Reg
-    P2[rural-paths] --> Reg
+    P2[chemins-ruraux] --> Reg
     P3[... futurs plugins] -.-> Reg
 ```
 
@@ -55,9 +54,9 @@ Le **registre** central charge dynamiquement les plugins activés pour la commun
 
 ## Plugins fournis (V1)
 
-- **`rural-paths`** — Édition des chemins ruraux (lignes) avec attributs (nom, revêtement, statut).
+- **`chemins-ruraux`** — Édition des chemins ruraux (lignes) avec attributs (nom, revêtement, statut).
 
-### Plugin `rural-paths`
+### Plugin `chemins-ruraux`
 
 Le plugin gère la CRUD des **chemins ruraux** d'une commune. Chaque chemin est un
 `MultiLineString` GeoJSON dont **chaque `LineString` porte son propre revêtement**
@@ -81,22 +80,22 @@ Persistance :
 
 Routes Next :
 
-- `/[codeCommune]/rural-paths` — **liste** des chemins (recherche par nom, filtre statut, bouton « Nouveau »).
-- `/[codeCommune]/rural-paths/new` — **formulaire vierge**.
-- `/[codeCommune]/rural-paths/[pathId]` — **formulaire pré-rempli**.
+- `/[codeCommune]/chemins-ruraux` — **liste** des chemins (recherche par nom, filtre statut, bouton « Nouveau »).
+- `/[codeCommune]/chemins-ruraux/new` — **formulaire vierge**.
+- `/[codeCommune]/chemins-ruraux/[pathId]` — **formulaire pré-rempli**.
 
 API serveur :
 
 - `getRuralPaths(codeCommune)` / `getRuralPathById(codeCommune, id)` dans
-  `src/lib/db/rural-paths.ts` (mapper Prisma → domaine, filtre `deleted_at IS NULL`).
+  `src/lib/db/chemins-ruraux.ts` (mapper Prisma → domaine, filtre `deleted_at IS NULL`).
 - Mutations : `createRuralPath`, `updateRuralPath`, `softDeleteRuralPath`
   (le `DELETE` est un soft-delete via `deleted_at`).
 
 Routes REST :
 
-- `POST   /api/plugins/rural-paths` — créer un chemin.
-- `PUT    /api/plugins/rural-paths/[pathId]` — mise à jour complète.
-- `DELETE /api/plugins/rural-paths/[pathId]` — soft-delete.
+- `POST   /api/plugins/chemins-ruraux` — créer un chemin.
+- `PUT    /api/plugins/chemins-ruraux/[pathId]` — mise à jour complète.
+- `DELETE /api/plugins/chemins-ruraux/[pathId]` — soft-delete.
 
 Toutes ces routes exigent une session (`requireSession`) et sont scopées au
 `codeInsee` de la session. La validation métier partagée
@@ -174,7 +173,7 @@ src/
 └── plugins/                Plugins métier
     ├── registry.ts         Enregistrement des plugins
     ├── types.ts            Contrat GeoPlugin
-    └── rural-paths/        Plugin chemins ruraux
+    └── chemins-ruraux/        Plugin chemins ruraux
 ```
 
 ## Licence

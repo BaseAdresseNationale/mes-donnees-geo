@@ -1,8 +1,6 @@
 .autocomplete {
   position: relative;
   width: 100%;
-  /* couleur primary du site au focus au lieu du violet par défaut de la lib */
-  --c--components--forms-input--border-color--focus: var(--color-primary);
 
   :global(.c__input__wrapper) {
     height: 40px;

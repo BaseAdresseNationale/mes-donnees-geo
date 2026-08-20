@@ -2,15 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import {
-  Button,
-  Input,
-  Select,
-  Filter,
-  FilterOption,
-} from "@gouvfr-lasuite/ui-components";
+import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
 import styles from "./RuralPathList.module.css";
-import { RuralPath, RuralPathStatus } from "./types";
+import { RuralPath, RuralPathStatus } from "@/generated/prisma/browser";
 
 interface RuralPathListProps {
   codeCommune: string;
@@ -68,16 +62,6 @@ export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
               icon={<span className="material-icons">search</span>}
             />
           </div>
-          <Link
-            href={`/${codeCommune}/rural-paths/new`}
-            className={styles.newButton}
-          >
-            <Button
-              color="brand"
-              icon={<span className="material-icons">add</span>}
-              aria-label="Créer un nouveau chemin rural"
-            />
-          </Link>
         </div>
         <Filter
           label="Filtrer par statut"
@@ -90,7 +74,7 @@ export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
       {filtered.length === 0 ? (
         <p className={styles.empty}>
           {paths.length === 0
-            ? 'Aucun chemin rural pour cette commune. Cliquez sur "Nouveau" pour démarrer.'
+            ? "Aucun chemin rural pour cette commune."
             : "Aucun résultat pour ces filtres."}
         </p>
       ) : (
@@ -98,7 +82,7 @@ export function RuralPathList({ codeCommune, paths }: RuralPathListProps) {
           {filtered.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/${codeCommune}/rural-paths/${p.id}`}
+                href={`/${codeCommune}/chemins-ruraux/${p.id}`}
                 className={styles.item}
               >
                 <span className={styles.itemTitle}>

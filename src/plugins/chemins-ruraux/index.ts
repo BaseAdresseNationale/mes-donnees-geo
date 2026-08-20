@@ -1,6 +1,7 @@
 import "server-only";
-import { getRuralPaths as getRuralPathsFromDb } from "@/lib/db/rural-paths";
-import type { RuralPath } from "@/components/rural-path/types";
+import { getRuralPaths as getRuralPathsFromDb } from "@/lib/db/chemins-ruraux";
+
+import type { RuralPath } from "@/generated/prisma/browser";
 
 export function getRuralPaths(codeCommune: string): Promise<RuralPath[]> {
   return getRuralPathsFromDb(codeCommune);

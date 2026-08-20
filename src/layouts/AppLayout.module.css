@@ -1,0 +1,18 @@
+.rightHeaderContent {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.rightHeaderContentChildren {
+  &:before {
+    content: "";
+    width: 1px;
+    height: 24px;
+    background-color: var(--c--contextuals--border--surface--primary);
+  }
+
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
