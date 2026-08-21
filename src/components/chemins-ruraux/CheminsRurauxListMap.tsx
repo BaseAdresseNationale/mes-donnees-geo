@@ -82,22 +82,21 @@ export function CheminsRurauxListMap({
   >(() => {
     return {
       type: "FeatureCollection",
-      features: ruralPaths.flatMap((p) => {
-        if (!p.path) return [];
-        return p.path.coordinates.map(
-          (coordinates, i): Feature<LineString, SegmentProperties> => ({
+      features: ruralPaths.flatMap((p) =>
+        p.segments.map(
+          (seg): Feature<LineString, SegmentProperties> => ({
             type: "Feature",
-            id: `${p.id}::${i}`,
+            id: seg.id,
             properties: {
               pathId: p.id,
               nom: p.nom ?? "",
               statut: p.statut,
-              surface: p.surfaces[i] ?? "",
+              surface: seg.surface,
             },
-            geometry: { type: "LineString", coordinates },
+            geometry: seg.path,
           }),
-        );
-      }),
+        ),
+      ),
     };
   }, [ruralPaths]);
 

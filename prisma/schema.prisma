@@ -36,19 +36,68 @@ enum RuralPathSurface {
   @@map("rural_path_surface")
 }
 
+enum RuralPathClassement {
+  CHEMIN_RURAL          @map("chemin_rural")
+  VOIE_COMMUNALE        @map("voie_communale")
+  CHEMIN_D_EXPLOITATION @map("chemin_d_exploitation")
+  VOIE_COMMUNAUTAIRE    @map("voie_communautaire")
+
+  @@map("rural_path_classement")
+}
+
+enum RuralPathEtat {
+  EXCELLENT @map("excellent")
+  BON       @map("bon")
+  MOYEN     @map("moyen")
+  MAUVAIS   @map("mauvais")
+
+  @@map("rural_path_etat")
+}
+
+enum RuralPathDomanialite {
+  INDETERMINE                   @map("indetermine")
+  PRIVE                         @map("prive")
+  PRIVE_OUVERT_A_LA_CIRCULATION @map("prive_ouvert_a_la_circulation")
+  PUBLIC                        @map("public")
+
+  @@map("rural_path_domanialite")
+}
+
 model RuralPath {
-  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  codeInsee String             @map("code_insee") @db.VarChar(5)
-  statut    RuralPathStatus    @default(DRAFT)
-  nom       String?
-  path      Json?              @db.JsonB
-  surfaces  RuralPathSurface[] @default([])
-  pathGeom  Unsupported("geometry(MultiLineString, 4326)")? @map("path_geom")
-  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
-  deletedAt DateTime?          @map("deleted_at") @db.Timestamptz(6)
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeInsee   String              @map("code_insee") @db.VarChar(5)
+  statut      RuralPathStatus     @default(DRAFT)
+  nom         String?
+  classement  RuralPathClassement
+  numero      Int
+  commentaire String?
+  segments    RuralPathSegment[]
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?           @map("deleted_at") @db.Timestamptz(6)
 
   @@index([codeInsee])
   @@index([deletedAt])
   @@map("rural_paths")
+}
+
+model RuralPathSegment {
+  id               String                                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruralPathId      String                                     @map("rural_path_id") @db.Uuid
+  ruralPath        RuralPath                                  @relation(fields: [ruralPathId], references: [id])
+  ordre            Int
+  path             Json                                       @db.JsonB
+  pathGeom         Unsupported("geometry(LineString, 4326)")? @map("path_geom")
+  surface          RuralPathSurface
+  largeurMoyenne   Int?                                       @map("largeur_moyenne")
+  etatEntretien    RuralPathEtat?                             @map("etat_entretien")
+  etatConservation RuralPathEtat?                             @map("etat_conservation")
+  domanialite      RuralPathDomanialite?
+  createdAt        DateTime                                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                                   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?                                  @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([ruralPathId, ordre])
+  @@index([deletedAt])
+  @@map("rural_path_segments")
 }

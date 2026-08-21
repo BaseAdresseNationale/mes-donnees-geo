@@ -12,10 +12,15 @@ import MapContext, {
 } from "@/contexts/MapContext";
 import styles from "./CheminsRurauxForm.module.css";
 import { useRuralPathDrawer } from "./useCheminsRurauxDrawer";
+import { RuralPathSegmentForm } from "./RuralPathSegmentForm";
 import { validateRuralPathInput } from "./validation";
 import type { RuralPath } from "./types";
-import { SURFACE_LABELS } from "./types";
-import { RuralPathStatus, RuralPathSurface } from "@/generated/prisma/browser";
+import { CLASSEMENT_LABELS } from "./types";
+import {
+  RuralPathClassement,
+  RuralPathStatus,
+  RuralPathSurface,
+} from "@/generated/prisma/browser";
 import { CheminsRurauxFormMap } from "./CheminsRurauxFormMap";
 import { geometryBounds } from "@/lib/geo/bounds";
 
@@ -30,8 +35,8 @@ const STATUS_OPTIONS = [
   { label: "Certifié", value: RuralPathStatus.CERTIFIED },
 ];
 
-const SURFACE_OPTIONS = Object.values(RuralPathSurface).map((value) => ({
-  label: SURFACE_LABELS[value],
+const CLASSEMENT_OPTIONS = Object.values(RuralPathClassement).map((value) => ({
+  label: CLASSEMENT_LABELS[value],
   value,
 }));
 
@@ -50,13 +55,23 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const [statut, setStatut] = useState<RuralPathStatus>(
     initial?.statut ?? RuralPathStatus.DRAFT,
   );
+  const [classement, setClassement] = useState<RuralPathClassement>(
+    initial?.classement ?? RuralPathClassement.CHEMIN_RURAL,
+  );
+  const [numero, setNumero] = useState(
+    initial?.numero !== undefined ? String(initial.numero) : "",
+  );
+  const [commentaire, setCommentaire] = useState(initial?.commentaire ?? "");
   const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
 
   // Fly to the initial path if provided
   useEffect(() => {
     const m = mapRef?.getMap();
-    if (!m || !initial?.path) return;
-    const bounds = geometryBounds(initial.path);
+    if (!m || !initial?.segments.length) return;
+    const bounds = geometryBounds({
+      type: "MultiLineString",
+      coordinates: initial.segments.map((s) => s.path.coordinates),
+    });
     if (!bounds) return;
     const camera = m.cameraForBounds(bounds, {
       padding: FLY_TO_PADDING,
@@ -73,12 +88,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const drawer = useRuralPathDrawer(
     mapRef,
     setMapMessage,
-    initial
-      ? {
-          ...(initial.path ? { path: initial.path } : {}),
-          surfaces: initial.surfaces,
-        }
-      : null,
+    initial ? { segments: initial.segments } : null,
   );
 
   useEffect(() => {
@@ -86,8 +96,12 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
       ? [
           {
             id: "__preview__",
-            surface: RuralPathSurface.EARTH,
             coordinates: drawer.previewCoordinates,
+            surface: RuralPathSurface.EARTH,
+            largeurMoyenne: null,
+            etatEntretien: null,
+            etatConservation: null,
+            domanialite: null,
           },
         ]
       : [];
@@ -128,14 +142,15 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
 
   function submit() {
     setError(null);
-    const path = drawer.toMultiLineString();
-    const surfaces = drawer.surfacesArray();
+    const parsedNumero = Number(numero);
 
     const validation = validateRuralPathInput({
       nom: nom.trim() || null,
       statut,
-      path,
-      surfaces,
+      classement,
+      numero: parsedNumero,
+      commentaire: commentaire.trim() || null,
+      segments: drawer.toSegmentsInput(),
     });
     if (!validation.ok) {
       setError(validation.error);
@@ -220,6 +235,34 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
         </p>
       )}
 
+      <div className={styles.pathIdentifier}>
+        <Select
+          label="Classement"
+          className={styles.pathType}
+          options={CLASSEMENT_OPTIONS}
+          value={classement}
+          onChange={(e) =>
+            setClassement(
+              (e.target.value as RuralPathClassement) ??
+                RuralPathClassement.CHEMIN_RURAL,
+            )
+          }
+          disabled={pending}
+          clearable={false}
+        />
+
+        <Input
+          className={styles.pathNumber}
+          label="Numéro"
+          type="number"
+          min={0}
+          step={1}
+          value={numero}
+          onChange={(e) => setNumero(e.target.value)}
+          disabled={pending}
+        />
+      </div>
+
       <Input
         label="Nom du chemin"
         fullWidth
@@ -228,19 +271,21 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
         disabled={pending}
       />
 
-      <Select
-        label="Statut"
-        options={STATUS_OPTIONS}
-        value={statut}
-        onChange={(e) =>
-          setStatut(
-            (e.target.value as RuralPathStatus) ?? RuralPathStatus.DRAFT,
-          )
-        }
-        disabled={pending}
-        clearable={false}
-        fullWidth
-      />
+      <div className={styles.textareaField}>
+        <label
+          className={styles.textareaLabel}
+          htmlFor="rural-path-commentaire"
+        >
+          Commentaire
+        </label>
+        <textarea
+          id="rural-path-commentaire"
+          className={styles.textarea}
+          value={commentaire}
+          onChange={(e) => setCommentaire(e.target.value)}
+          disabled={pending}
+        />
+      </div>
 
       <div
         className={styles.modeSwitch}
@@ -297,30 +342,26 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
                     )
                   }
                 >
-                  <span className={styles.segmentLabel}>
-                    Segment {i + 1}
-                    <span className={styles.segmentLength}>
-                      {formatLength(segmentLengths[i] ?? 0)}
-                    </span>
-                  </span>
-                  <div className={styles.segmentSelect}>
-                    <Select
-                      label={`Revêtement du segment ${i + 1}`}
-                      hideLabel
-                      options={SURFACE_OPTIONS}
-                      value={seg.surface}
-                      onChange={(e) =>
-                        drawer.setSurface(
-                          seg.id,
-                          (e.target.value as RuralPathSurface) ??
-                            RuralPathSurface.EARTH,
-                        )
-                      }
-                      clearable={false}
-                      disabled={pending}
-                      fullWidth
-                    />
-                  </div>
+                  <details className={styles.segmentAccordion}>
+                    <summary className={styles.segmentSummary}>
+                      <span className={styles.segmentLabel}>
+                        Segment {i + 1}
+                        <span className={styles.segmentLength}>
+                          {formatLength(segmentLengths[i] ?? 0)}
+                        </span>
+                      </span>
+                    </summary>
+                    <div className={styles.segmentBody}>
+                      <RuralPathSegmentForm
+                        index={i}
+                        segment={seg}
+                        disabled={pending}
+                        onChange={(patch) =>
+                          drawer.updateSegmentAttributes(seg.id, patch)
+                        }
+                      />
+                    </div>
+                  </details>
                   <Button
                     type="button"
                     className={styles.segmentRemove}

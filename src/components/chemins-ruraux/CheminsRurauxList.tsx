@@ -130,8 +130,8 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
                     {STATUS_LABEL[p.statut]}
                   </span>
                   <span>
-                    {p.surfaces.length} segment
-                    {p.surfaces.length > 1 ? "s" : ""}
+                    {p.segments.length} segment
+                    {p.segments.length > 1 ? "s" : ""}
                   </span>
                 </span>
               </Link>

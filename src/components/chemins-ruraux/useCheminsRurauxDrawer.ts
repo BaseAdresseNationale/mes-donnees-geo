@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { Feature, Position, LineString as GeoLineString } from "geojson";
-import { RuralPathSurface } from "@/generated/prisma/browser";
+import {
+  RuralPathDomanialite,
+  RuralPathEtat,
+  RuralPathSurface,
+} from "@/generated/prisma/browser";
+import type { RuralPathSegment } from "./types";
 
 type CartesianPoint = { x: number; y: number };
 
@@ -30,10 +35,26 @@ type TerraDrawInstance = {
   off: (event: string, cb: (...args: unknown[]) => void) => void;
 };
 
-export interface Segment {
-  id: string;
+export interface SegmentAttributes {
   surface: RuralPathSurface;
+  largeurMoyenne: number | null;
+  etatEntretien: RuralPathEtat | null;
+  etatConservation: RuralPathEtat | null;
+  domanialite: RuralPathDomanialite | null;
+}
+
+export interface Segment extends SegmentAttributes {
+  id: string;
   coordinates: Position[];
+}
+
+export interface SegmentInput {
+  path: GeoJSON.LineString;
+  surface: RuralPathSurface;
+  largeurMoyenne: number | null;
+  etatEntretien: RuralPathEtat | null;
+  etatConservation: RuralPathEtat | null;
+  domanialite: RuralPathDomanialite | null;
 }
 
 export type DrawMode = "draw" | "select";
@@ -43,14 +64,22 @@ export interface UseRuralPathDrawerResult {
   previewCoordinates: Position[] | null;
   mode: DrawMode;
   setMode: (m: DrawMode) => void;
-  setSurface: (id: string, surface: RuralPathSurface) => void;
+  updateSegmentAttributes: (
+    id: string,
+    patch: Partial<SegmentAttributes>,
+  ) => void;
   removeSegment: (id: string) => void;
-  toMultiLineString: () => GeoJSON.MultiLineString | null;
-  surfacesArray: () => RuralPathSurface[];
+  toSegmentsInput: () => SegmentInput[];
   isReady: boolean;
 }
 
-const DEFAULT_SURFACE = RuralPathSurface.EARTH;
+const DEFAULT_ATTRIBUTES: SegmentAttributes = {
+  surface: RuralPathSurface.EARTH,
+  largeurMoyenne: null,
+  etatEntretien: null,
+  etatConservation: null,
+  domanialite: null,
+};
 
 // Distance, en pixels écran, en dessous de laquelle le premier point d'un
 // nouveau segment est aimanté à une extrémité du chemin existant.
@@ -98,8 +127,7 @@ export function useRuralPathDrawer(
   mapRef: MapRef | null,
   setMapMessage: (message: string | null) => void,
   initial: {
-    path?: GeoJSON.MultiLineString;
-    surfaces: RuralPathSurface[];
+    segments: RuralPathSegment[];
   } | null,
 ): UseRuralPathDrawerResult {
   const drawRef = useRef<TerraDrawInstance | null>(null);
@@ -112,7 +140,6 @@ export function useRuralPathDrawer(
   const [mode, setModeState] = useState<DrawMode>("draw");
   const [isReady, setIsReady] = useState(false);
 
-  const surfaceMapRef = useRef<Map<string, RuralPathSurface>>(new Map());
   const segmentsRef = useRef<Segment[]>([]);
   const modeRef = useRef<DrawMode>("draw");
   const setMapMessageRef = useRef(setMapMessage);
@@ -178,45 +205,50 @@ export function useRuralPathDrawer(
   // Annule immédiatement le tracé si son premier point n'est pas (ou plus,
   // une fois aimanté) sur une extrémité du chemin existant, plutôt que
   // d'attendre la fin du tracé pour le rejeter.
-  const updatePreviewFromSnapshot = useCallback(() => {
-    const draw = drawRef.current;
-    if (!draw) return;
-    const knownIds = new Set(segmentsRef.current.map((s) => s.id));
-    const wip = draw
-      .getSnapshot()
-      .find(
-        (f) => f.geometry?.type === "LineString" && !knownIds.has(String(f.id)),
-      );
-    if (!wip) {
-      setPreviewCoordinates(null);
-      return;
-    }
-    const coords = (wip.geometry as GeoLineString).coordinates;
-    if (!coords || coords.length === 0) {
-      setPreviewCoordinates(null);
-      return;
-    }
+  const updatePreviewFromSnapshot = useCallback(
+    (initial: { segments: Segment[] } | null) => {
+      const draw = drawRef.current;
+      if (!draw) return;
 
-    const chain = segmentsRef.current;
-    if (chain.length > 0) {
-      const chainStart = chain[0].coordinates[0];
-      const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
-      const firstPoint = coords[0];
-      if (
-        !isSamePoint(firstPoint, chainStart) &&
-        !isSamePoint(firstPoint, chainEnd)
-      ) {
+      const knownIds = new Set([
+        ...segmentsRef.current.map((s) => s.id),
+        ...(initial?.segments.map((s) => s.id) || []),
+      ]);
+      const wip = draw.getSnapshot().find((f) => {
+        return f.geometry?.type === "LineString" && !knownIds.has(String(f.id));
+      });
+      if (!wip) {
         setPreviewCoordinates(null);
-        showTemporaryError(MSG_INVALID_SEGMENT);
-        // Différé : on est encore dans la pile d'appel du clic qui vient de
-        // créer ce tracé ; annuler ici casserait l'état interne du mode.
-        setTimeout(() => drawRef.current?.setMode("linestring"), 0);
         return;
       }
-    }
+      const coords = (wip.geometry as GeoLineString).coordinates;
+      if (!coords || coords.length === 0) {
+        setPreviewCoordinates(null);
+        return;
+      }
 
-    setPreviewCoordinates(coords.length >= 2 ? coords : null);
-  }, [showTemporaryError]);
+      const chain = segmentsRef.current;
+      if (chain.length > 0) {
+        const chainStart = chain[0].coordinates[0];
+        const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
+        const firstPoint = coords[0];
+        if (
+          !isSamePoint(firstPoint, chainStart) &&
+          !isSamePoint(firstPoint, chainEnd)
+        ) {
+          setPreviewCoordinates(null);
+          showTemporaryError(MSG_INVALID_SEGMENT);
+          // Différé : on est encore dans la pile d'appel du clic qui vient de
+          // créer ce tracé ; annuler ici casserait l'état interne du mode.
+          setTimeout(() => drawRef.current?.setMode("linestring"), 0);
+          return;
+        }
+      }
+
+      setPreviewCoordinates(coords.length >= 2 ? coords : null);
+    },
+    [showTemporaryError],
+  );
 
   const handleFinish = useCallback(
     (id: string) => {
@@ -234,8 +266,7 @@ export function useRuralPathDrawer(
 
       const chain = segmentsRef.current;
       if (chain.length === 0) {
-        surfaceMapRef.current.set(id, DEFAULT_SURFACE);
-        setSegments([{ id, surface: DEFAULT_SURFACE, coordinates: coords }]);
+        setSegments([{ id, ...DEFAULT_ATTRIBUTES, coordinates: coords }]);
         setMapMessageRef.current(MSG_DRAW_CONTINUE);
         return;
       }
@@ -246,19 +277,19 @@ export function useRuralPathDrawer(
 
       let next: Segment[] | null = null;
       if (isSamePoint(newStart, chainEnd)) {
-        next = [
-          ...chain,
-          { id, surface: DEFAULT_SURFACE, coordinates: coords },
-        ];
+        next = [...chain, { id, ...DEFAULT_ATTRIBUTES, coordinates: coords }];
       } else if (isSamePoint(newStart, chainStart)) {
         next = [
-          { id, surface: DEFAULT_SURFACE, coordinates: [...coords].reverse() },
+          {
+            id,
+            ...DEFAULT_ATTRIBUTES,
+            coordinates: [...coords].reverse(),
+          },
           ...chain,
         ];
       }
 
       if (next) {
-        surfaceMapRef.current.set(id, DEFAULT_SURFACE);
         setSegments(next);
         setMapMessageRef.current(MSG_DRAW_CONTINUE);
       } else {
@@ -392,7 +423,7 @@ export function useRuralPathDrawer(
         if (modeRef.current === "select" && type === "update") {
           updateSegmentsFromIds(ids);
         } else if (modeRef.current === "draw") {
-          updatePreviewFromSnapshot();
+          updatePreviewFromSnapshot(initial);
         }
       });
       instance.on("finish", (...args: unknown[]) => {
@@ -422,18 +453,20 @@ export function useRuralPathDrawer(
       instance.setMode("linestring");
       setIsReady(true);
 
-      // Chargement de l'état initial (edit mode)
+      // Chargement de l'état initial (edit mode). Les id des segments DB
+      // sont réutilisés comme id de feature terra-draw (mêmes UUID).
       let hasInitialSegments = false;
-      if (initial?.path && !initialAppliedRef.current) {
+      if (initial?.segments.length && !initialAppliedRef.current) {
         initialAppliedRef.current = true;
-        const initSegments: Segment[] = initial.path.coordinates.map(
-          (coords, i) => {
-            const id = crypto.randomUUID();
-            const surface = initial.surfaces[i] ?? DEFAULT_SURFACE;
-            surfaceMapRef.current.set(id, surface);
-            return { id, surface, coordinates: coords };
-          },
-        );
+        const initSegments: Segment[] = initial.segments.map((s) => ({
+          id: s.id,
+          coordinates: s.path.coordinates,
+          surface: s.surface,
+          largeurMoyenne: s.largeurMoyenne ?? null,
+          etatEntretien: s.etatEntretien ?? null,
+          etatConservation: s.etatConservation ?? null,
+          domanialite: s.domanialite ?? null,
+        }));
         if (initSegments.length > 0) {
           instance.addFeatures(
             initSegments.map((s) => toLineStringFeature(s.id, s.coordinates)),
@@ -472,12 +505,14 @@ export function useRuralPathDrawer(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapRef]);
 
-  const setSurface = useCallback((id: string, surface: RuralPathSurface) => {
-    surfaceMapRef.current.set(id, surface);
-    setSegments((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, surface } : s)),
-    );
-  }, []);
+  const updateSegmentAttributes = useCallback(
+    (id: string, patch: Partial<SegmentAttributes>) => {
+      setSegments((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      );
+    },
+    [],
+  );
 
   const removeSegment = useCallback(
     (id: string) => {
@@ -489,23 +524,22 @@ export function useRuralPathDrawer(
         showTemporaryError(MSG_INVALID_DELETE);
         return;
       }
-      surfaceMapRef.current.delete(id);
       drawRef.current?.removeFeatures([id]);
       setSegments((prev) => prev.filter((s) => s.id !== id));
     },
     [showTemporaryError],
   );
 
-  const toMultiLineString = useCallback((): GeoJSON.MultiLineString | null => {
-    if (segments.length === 0) return null;
-    return {
-      type: "MultiLineString",
-      coordinates: segments.map((s) => s.coordinates),
-    };
-  }, [segments]);
-
-  const surfacesArray = useCallback(
-    () => segments.map((s) => s.surface),
+  const toSegmentsInput = useCallback(
+    (): SegmentInput[] =>
+      segments.map((s) => ({
+        path: { type: "LineString", coordinates: s.coordinates },
+        surface: s.surface,
+        largeurMoyenne: s.largeurMoyenne,
+        etatEntretien: s.etatEntretien,
+        etatConservation: s.etatConservation,
+        domanialite: s.domanialite,
+      })),
     [segments],
   );
 
@@ -515,10 +549,9 @@ export function useRuralPathDrawer(
       previewCoordinates,
       mode,
       setMode,
-      setSurface,
+      updateSegmentAttributes,
       removeSegment,
-      toMultiLineString,
-      surfacesArray,
+      toSegmentsInput,
       isReady,
     }),
     [
@@ -526,10 +559,9 @@ export function useRuralPathDrawer(
       previewCoordinates,
       mode,
       setMode,
-      setSurface,
+      updateSegmentAttributes,
       removeSegment,
-      toMultiLineString,
-      surfacesArray,
+      toSegmentsInput,
       isReady,
     ],
   );

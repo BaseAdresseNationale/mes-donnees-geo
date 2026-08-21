@@ -6,6 +6,7 @@
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
 }
 
 .title {
@@ -36,7 +37,6 @@
   background: #f0f0f0;
   border-radius: 4px;
 }
-
 .modeBtn {
   flex: 1;
   padding: 0.25rem 0.5rem;
@@ -48,10 +48,45 @@
   font-size: 0.8125rem;
 }
 
+.pathIdentifier {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pathType {
+  flex-grow: 1;
+}
+
+.pathNumber {
+  flex-basis: 150px;
+}
+
 .modeBtnActive {
   background: #fff;
   border-color: var(--color-border, #d0d0d0);
   font-weight: 600;
+}
+
+.textareaField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.textareaLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.textarea {
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border, #d0d0d0);
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 4.5rem;
 }
 
 .segments {
@@ -89,13 +124,52 @@
 }
 
 .segmentItem {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   padding: 0.375rem 0.5rem;
   background: #fff;
   border: 1px solid var(--color-border, #e5e5e5);
   border-radius: 4px;
+}
+
+.segmentAccordion {
+  flex: 1;
+  min-width: 0;
+}
+
+.segmentSummary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.0625rem 0;
+  list-style: none;
+}
+
+.segmentSummary::-webkit-details-marker {
+  display: none;
+}
+
+.segmentSummary::before {
+  content: "";
+  flex-shrink: 0;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+  margin-right: 0.5rem;
+}
+
+.segmentAccordion[open] > .segmentSummary::before {
+  transform: rotate(45deg);
+}
+
+.segmentBody {
+  padding: 0.5rem 0 0.25rem;
 }
 
 .segmentLabel {
@@ -113,12 +187,10 @@
   color: var(--color-muted, #666);
 }
 
-.segmentSelect {
-  flex: 1;
-  min-width: 0;
-}
-
 .segmentRemove {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 3px;
