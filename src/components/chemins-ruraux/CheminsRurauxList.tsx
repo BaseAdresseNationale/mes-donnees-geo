@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useContext, useMemo, useState, useEffect } from "react";
+import ThemeContext from "@/contexts/ThemeContext";
 import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
 import styles from "./CheminsRurauxList.module.css";
 import { RuralPath, RuralPathStatus } from "@/components/chemins-ruraux/types";
 import MapContext from "@/contexts/MapContext";
 import { CheminsRurauxListMap } from "./CheminsRurauxListMap";
+import { RuralPathToolbar } from "./CheminsRurauxToolbar";
 
 interface RuralPathListProps {
   codeCommune: string;
@@ -27,6 +29,7 @@ const STATUS_CLASS: Record<RuralPathStatus, string> = {
 
 export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
   const { setMapChildren } = useContext(MapContext);
+  const { setToolbarChildren } = useContext(ThemeContext);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<RuralPathStatus | null>(
     null,
@@ -51,6 +54,14 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
     ],
     [],
   );
+
+  useEffect(() => {
+    setToolbarChildren(<RuralPathToolbar codeCommune={codeCommune} />);
+
+    return () => {
+      setToolbarChildren(null);
+    };
+  }, [codeCommune, setToolbarChildren]);
 
   useEffect(() => {
     setMapChildren(

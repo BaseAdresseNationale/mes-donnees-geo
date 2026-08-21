@@ -35,7 +35,6 @@ export default async function CheminsRurauxLayout({
     <PluginLayout
       pluginId={currentPlugin.id}
       pluginLabel={currentPlugin.label}
-      toolbarChildren={<RuralPathToolbar codeCommune={session.communeInsee} />}
       rightHeaderContentChildren={
         <CommuneSettings
           currentPluginId={currentPlugin.id}

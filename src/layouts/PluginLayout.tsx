@@ -7,7 +7,6 @@ import { PluginSelectionDropDown } from "@/components/plugin-workspace/PluginSel
 interface PluginLayoutProps {
   pluginId: string;
   pluginLabel: string;
-  toolbarChildren: React.ReactNode | null;
   rightHeaderContentChildren: React.ReactNode | null;
   children: React.ReactNode;
 }
@@ -16,21 +15,13 @@ export function PluginLayout({
   pluginId,
   pluginLabel,
   children,
-  toolbarChildren,
   rightHeaderContentChildren,
 }: PluginLayoutProps) {
-  const { setToolbarChildren, setRightHeaderContentChildren } =
-    useContext(ThemeContext);
+  const { setRightHeaderContentChildren } = useContext(ThemeContext);
 
   useEffect(() => {
-    setToolbarChildren(toolbarChildren);
     setRightHeaderContentChildren(rightHeaderContentChildren);
-  }, [
-    toolbarChildren,
-    rightHeaderContentChildren,
-    setToolbarChildren,
-    setRightHeaderContentChildren,
-  ]);
+  }, [rightHeaderContentChildren, setRightHeaderContentChildren]);
 
   return (
     <div
