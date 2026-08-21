@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RuralPath } from "@/components/chemins-ruraux/types";
 import { useRouter } from "next/navigation";
 import {
@@ -12,7 +12,7 @@ import {
   useMap,
 } from "react-map-gl/maplibre";
 import type { ExpressionSpecification } from "maplibre-gl";
-import type { FeatureCollection, MultiLineString } from "geojson";
+import type { Feature, FeatureCollection, LineString } from "geojson";
 import {
   RuralPathStatus,
   SURFACE_COLORS,
@@ -21,7 +21,7 @@ import styles from "./CheminsRurauxListMap.module.css";
 
 const SOURCE_ID = "chemins-ruraux";
 const LINE_LAYER_ID = "chemins-ruraux-line";
-const HALO_LAYER_ID = "chemins-ruraux-halo";
+const HOVER_HALO_LAYER_ID = "chemins-ruraux-hover-halo";
 const CASING_LAYER_ID = "chemins-ruraux-casing";
 
 const STATUS_LABEL: Record<RuralPathStatus, string> = {
@@ -36,16 +36,6 @@ const STATUS_BADGE_CLASS: Record<RuralPathStatus, string> = {
   [RuralPathStatus.CERTIFIED]: styles.statusCertified,
 };
 
-const STATUS_COLOR_MATCH: ExpressionSpecification = [
-  "match",
-  ["get", "statut"],
-  RuralPathStatus.PUBLISHED,
-  "#1e6b2c",
-  RuralPathStatus.CERTIFIED,
-  "#6e2e63",
-  "#4b4bcb",
-];
-
 const SURFACE_COLOR_MATCH: ExpressionSpecification = [
   "match",
   ["get", "surface"],
@@ -56,8 +46,15 @@ const SURFACE_COLOR_MATCH: ExpressionSpecification = [
   "#4b4bcb",
 ] as unknown as ExpressionSpecification;
 
+type SegmentProperties = {
+  pathId: string;
+  nom: string;
+  statut: RuralPathStatus;
+  surface: string;
+};
+
 type HoverState = {
-  id: string;
+  pathId: string;
   lng: number;
   lat: number;
   nom: string;
@@ -67,65 +64,60 @@ type HoverState = {
 export function CheminsRurauxListMap({
   codeCommune,
   ruralPaths,
+  hoveredPathId,
 }: {
   codeCommune: string;
   ruralPaths: RuralPath[];
+  hoveredPathId?: string | null;
 }) {
   const map = useMap();
   const router = useRouter();
 
   const [hover, setHover] = useState<HoverState | null>(null);
-  const hoveredIdRef = useRef<string | null>(null);
 
-  const featureCollection = useMemo<FeatureCollection<MultiLineString>>(() => {
+  // Un feature par segment (pas par chemin) pour pouvoir colorer chaque
+  // tronçon selon son propre revêtement.
+  const featureCollection = useMemo<
+    FeatureCollection<LineString, SegmentProperties>
+  >(() => {
     return {
       type: "FeatureCollection",
-      features: ruralPaths
-        .filter((p): p is typeof p & { path: MultiLineString } =>
-          Boolean(p.path),
-        )
-        .map((p) => ({
-          type: "Feature",
-          id: p.id,
-          properties: { id: p.id, nom: p.nom ?? "", statut: p.statut },
-          geometry: p.path,
-        })),
+      features: ruralPaths.flatMap((p) => {
+        if (!p.path) return [];
+        return p.path.coordinates.map(
+          (coordinates, i): Feature<LineString, SegmentProperties> => ({
+            type: "Feature",
+            id: `${p.id}::${i}`,
+            properties: {
+              pathId: p.id,
+              nom: p.nom ?? "",
+              statut: p.statut,
+              surface: p.surfaces[i] ?? "",
+            },
+            geometry: { type: "LineString", coordinates },
+          }),
+        );
+      }),
     };
   }, [ruralPaths]);
+
+  // Survol : celui pilotable depuis la liste (prop) prévaut sur celui détecté
+  // au survol de la carte elle-même.
+  const effectiveHoveredPathId = hoveredPathId ?? hover?.pathId ?? null;
 
   useEffect(() => {
     const m = map.current?.getMap();
     if (!m) return;
 
-    const clearHover = () => {
-      const prev = hoveredIdRef.current;
-      if (!prev) return;
-      m.setFeatureState({ source: SOURCE_ID, id: prev }, { hover: false });
-      hoveredIdRef.current = null;
-    };
-
-    const setHoveredFeature = (id: string) => {
-      if (hoveredIdRef.current === id) return;
-      clearHover();
-      m.setFeatureState({ source: SOURCE_ID, id }, { hover: true });
-      hoveredIdRef.current = id;
-    };
-
     const onMove = (e: MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
-      const id =
-        (f.properties?.id as string | undefined) ??
-        (f.id != null ? String(f.id) : "");
-      if (!id) return;
-      setHoveredFeature(id);
+      const props = f.properties as Partial<SegmentProperties> | null;
+      const pathId = props?.pathId;
+      if (!pathId) return;
       m.getCanvas().style.cursor = "pointer";
-      const props = f.properties as {
-        nom?: string;
-        statut?: RuralPathStatus;
-      } | null;
       setHover({
-        id,
+        pathId,
         lng: e.lngLat.lng,
         lat: e.lngLat.lat,
         nom: props?.nom ?? "",
@@ -134,7 +126,6 @@ export function CheminsRurauxListMap({
     };
 
     const onLeave = () => {
-      clearHover();
       m.getCanvas().style.cursor = "";
       setHover(null);
     };
@@ -142,11 +133,9 @@ export function CheminsRurauxListMap({
     const onClick = (e: MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
-      const id =
-        (f.properties?.id as string | undefined) ??
-        (f.id != null ? String(f.id) : "");
-      if (!id) return;
-      router.push(`/${codeCommune}/chemins-ruraux/${id}`);
+      const props = f.properties as Partial<SegmentProperties> | null;
+      if (!props?.pathId) return;
+      router.push(`/${codeCommune}/chemins-ruraux/${props.pathId}`);
     };
 
     m.on("mousemove", LINE_LAYER_ID, onMove);
@@ -158,24 +147,20 @@ export function CheminsRurauxListMap({
       m.off("mouseleave", LINE_LAYER_ID, onLeave);
       m.off("click", LINE_LAYER_ID, onClick);
       m.getCanvas().style.cursor = "";
-      clearHover();
     };
   }, [map, router, codeCommune]);
 
   // Le survol est masqué si la feature n'est plus rendue (navigation, suppression).
   const visibleHover =
-    hover && featureCollection.features.some((f) => f.id === hover.id)
+    hover &&
+    !hoveredPathId &&
+    featureCollection.features.some((f) => f.properties.pathId === hover.pathId)
       ? hover
       : null;
 
   return (
     <>
-      <Source
-        id={SOURCE_ID}
-        type="geojson"
-        data={featureCollection}
-        promoteId="id"
-      >
+      <Source id={SOURCE_ID} type="geojson" data={featureCollection}>
         <Layer
           {...({
             id: CASING_LAYER_ID,
@@ -190,21 +175,21 @@ export function CheminsRurauxListMap({
         />
         <Layer
           {...({
-            id: HALO_LAYER_ID,
+            id: HOVER_HALO_LAYER_ID,
             type: "line",
             layout: { "line-join": "round", "line-cap": "round" },
             paint: {
-              "line-color": STATUS_COLOR_MATCH,
+              "line-color": SURFACE_COLOR_MATCH,
               "line-blur": 4,
               "line-width": [
                 "case",
-                ["boolean", ["feature-state", "hover"], false],
+                ["==", ["get", "pathId"], effectiveHoveredPathId ?? ""],
                 14,
                 0,
               ],
               "line-opacity": [
                 "case",
-                ["boolean", ["feature-state", "hover"], false],
+                ["==", ["get", "pathId"], effectiveHoveredPathId ?? ""],
                 0.45,
                 0,
               ],
@@ -217,10 +202,10 @@ export function CheminsRurauxListMap({
             type: "line",
             layout: { "line-join": "round", "line-cap": "round" },
             paint: {
-              "line-color": STATUS_COLOR_MATCH,
+              "line-color": SURFACE_COLOR_MATCH,
               "line-width": [
                 "case",
-                ["boolean", ["feature-state", "hover"], false],
+                ["==", ["get", "pathId"], effectiveHoveredPathId ?? ""],
                 5,
                 3,
               ],

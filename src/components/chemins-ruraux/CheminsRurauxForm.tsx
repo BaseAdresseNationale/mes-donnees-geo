@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Select } from "@gouvfr-lasuite/ui-components";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
-import MapContext from "@/contexts/MapContext";
+import MapContext, {
+  FLY_TO_DURATION_MS,
+  FLY_TO_MAX_ZOOM,
+  FLY_TO_PADDING,
+} from "@/contexts/MapContext";
 import styles from "./CheminsRurauxForm.module.css";
 import { useRuralPathDrawer } from "./useCheminsRurauxDrawer";
 import { validateRuralPathInput } from "./validation";
@@ -13,6 +17,7 @@ import type { RuralPath } from "./types";
 import { SURFACE_LABELS } from "./types";
 import { RuralPathStatus, RuralPathSurface } from "@/generated/prisma/browser";
 import { CheminsRurauxFormMap } from "./CheminsRurauxFormMap";
+import { geometryBounds } from "@/lib/geo/bounds";
 
 interface RuralPathFormProps {
   codeCommune: string;
@@ -46,6 +51,24 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     initial?.statut ?? RuralPathStatus.DRAFT,
   );
   const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
+
+  // Fly to the initial path if provided
+  useEffect(() => {
+    const m = mapRef?.getMap();
+    if (!m || !initial?.path) return;
+    const bounds = geometryBounds(initial.path);
+    if (!bounds) return;
+    const camera = m.cameraForBounds(bounds, {
+      padding: FLY_TO_PADDING,
+      maxZoom: FLY_TO_MAX_ZOOM,
+    });
+    if (!camera) return;
+    m.flyTo({
+      center: camera.center,
+      zoom: camera.zoom,
+      duration: FLY_TO_DURATION_MS,
+    });
+  }, [mapRef, initial]);
 
   const drawer = useRuralPathDrawer(
     mapRef,

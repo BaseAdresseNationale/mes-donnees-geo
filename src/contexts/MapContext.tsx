@@ -3,6 +3,10 @@
 import React, { createContext, useCallback, useMemo, useState } from "react";
 import { MapRef } from "react-map-gl/maplibre";
 
+export const FLY_TO_DURATION_MS = 1500;
+export const FLY_TO_PADDING = 64;
+export const FLY_TO_MAX_ZOOM = 17;
+
 interface MapContextValue {
   mapRef: MapRef | null;
   mapRefCb: (instance: MapRef | null) => void;

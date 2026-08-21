@@ -31,6 +31,7 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
   const [statusFilter, setStatusFilter] = useState<RuralPathStatus | null>(
     null,
   );
+  const [hoveredPathId, setHoveredPathId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
@@ -56,13 +57,14 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
       <CheminsRurauxListMap
         codeCommune={codeCommune}
         ruralPaths={ruralPaths}
+        hoveredPathId={hoveredPathId}
       />,
     );
 
     return () => {
       setMapChildren(null);
     };
-  }, [setMapChildren, ruralPaths, codeCommune]);
+  }, [setMapChildren, ruralPaths, codeCommune, hoveredPathId]);
 
   return (
     <section className={styles.container} aria-label="Liste des chemins ruraux">
@@ -100,6 +102,12 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
               <Link
                 href={`/${codeCommune}/chemins-ruraux/${p.id}`}
                 className={styles.item}
+                onMouseEnter={() => setHoveredPathId(p.id)}
+                onMouseLeave={() =>
+                  setHoveredPathId((current) =>
+                    current === p.id ? null : current,
+                  )
+                }
               >
                 <span className={styles.itemTitle}>
                   {p.nom?.trim() || "Chemin sans nom"}
