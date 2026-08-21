@@ -206,7 +206,7 @@ export function useRuralPathDrawer(
   // une fois aimanté) sur une extrémité du chemin existant, plutôt que
   // d'attendre la fin du tracé pour le rejeter.
   const updatePreviewFromSnapshot = useCallback(
-    (initial: { segments: Segment[] } | null) => {
+    (initial: { segments: RuralPathSegment[] } | null) => {
       const draw = drawRef.current;
       if (!draw) return;
 

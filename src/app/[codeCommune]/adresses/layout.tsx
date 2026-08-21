@@ -33,7 +33,6 @@ export default async function AdressesLayout({
     <PluginLayout
       pluginId={currentPlugin.id}
       pluginLabel={currentPlugin.label}
-      toolbarChildren={null}
       rightHeaderContentChildren={
         <CommuneSettings
           currentPluginId={currentPlugin.id}

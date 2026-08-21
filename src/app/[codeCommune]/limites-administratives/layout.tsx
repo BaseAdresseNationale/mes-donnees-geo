@@ -33,7 +33,6 @@ export default async function LimitesAdministrativesLayout({
     <PluginLayout
       pluginId={currentPlugin.id}
       pluginLabel={currentPlugin.label}
-      toolbarChildren={null}
       rightHeaderContentChildren={
         <CommuneSettings
           currentPluginId={currentPlugin.id}
