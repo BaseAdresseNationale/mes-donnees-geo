@@ -102,6 +102,15 @@
   font-size: 0.8125rem;
   font-weight: 600;
   min-width: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+}
+
+.segmentLength {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-muted, #666);
 }
 
 .segmentSelect {

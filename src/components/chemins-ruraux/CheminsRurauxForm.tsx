@@ -1,15 +1,18 @@
 "use client";
 
-import { useContext, useEffect, useState, useTransition } from "react";
+import { useContext, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Select } from "@gouvfr-lasuite/ui-components";
+import turfLength from "@turf/length";
+import { lineString } from "@turf/helpers";
 import MapContext from "@/contexts/MapContext";
-import CheminsRurauxContext from "@/contexts/CheminsRurauxContext";
 import styles from "./CheminsRurauxForm.module.css";
 import { useRuralPathDrawer } from "./useCheminsRurauxDrawer";
 import { validateRuralPathInput } from "./validation";
 import type { RuralPath } from "./types";
+import { SURFACE_LABELS } from "./types";
 import { RuralPathStatus, RuralPathSurface } from "@/generated/prisma/browser";
+import { CheminsRurauxFormMap } from "./CheminsRurauxFormMap";
 
 interface RuralPathFormProps {
   codeCommune: string;
@@ -22,18 +25,19 @@ const STATUS_OPTIONS = [
   { label: "Certifié", value: RuralPathStatus.CERTIFIED },
 ];
 
-const SURFACE_OPTIONS = [
-  { label: "Terre", value: RuralPathSurface.EARTH },
-  { label: "Gravier", value: RuralPathSurface.GRAVEL },
-  { label: "Enrobé", value: RuralPathSurface.PAVED },
-  { label: "Empierré", value: RuralPathSurface.STONED },
-  { label: "Herbe", value: RuralPathSurface.GRASS },
-];
+const SURFACE_OPTIONS = Object.values(RuralPathSurface).map((value) => ({
+  label: SURFACE_LABELS[value],
+  value,
+}));
+
+function formatLength(meters: number): string {
+  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
+  return `${Math.round(meters)} m`;
+}
 
 export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const router = useRouter();
-  const { mapRef } = useContext(MapContext);
-  const { setIsEditing } = useContext(CheminsRurauxContext);
+  const { mapRef, setMapMessage, setMapChildren } = useContext(MapContext);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -42,22 +46,48 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     initial?.statut ?? RuralPathStatus.DRAFT,
   );
 
-  useEffect(() => {
-    setIsEditing(true);
-
-    return () => {
-      setIsEditing(false);
-    };
-  }, [setIsEditing]);
-
   const drawer = useRuralPathDrawer(
     mapRef,
+    setMapMessage,
     initial
       ? {
           ...(initial.path ? { path: initial.path } : {}),
           surfaces: initial.surfaces,
         }
       : null,
+  );
+
+  useEffect(() => {
+    const preview = drawer.previewCoordinates
+      ? [
+          {
+            id: "__preview__",
+            surface: RuralPathSurface.EARTH,
+            coordinates: drawer.previewCoordinates,
+          },
+        ]
+      : [];
+
+    const displaySegments = [...drawer.segments, ...preview];
+    setMapChildren(<CheminsRurauxFormMap drawSegments={displaySegments} />);
+
+    return () => {
+      setMapChildren(null);
+    };
+  }, [setMapChildren, drawer.segments, drawer.previewCoordinates]);
+
+  const segmentLengths = useMemo(
+    () =>
+      drawer.segments.map((seg) =>
+        seg.coordinates.length >= 2
+          ? turfLength(lineString(seg.coordinates), { units: "meters" })
+          : 0,
+      ),
+    [drawer.segments],
+  );
+  const totalLength = useMemo(
+    () => segmentLengths.reduce((sum, l) => sum + l, 0),
+    [segmentLengths],
   );
 
   const isEdit = Boolean(initial);
@@ -206,7 +236,10 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
       <section className={styles.segments} aria-label="Segments du chemin">
         <h3 className={styles.segmentsHeader}>
           <span>Segments</span>
-          <span>{drawer.segments.length}</span>
+          <span>
+            {drawer.segments.length}
+            {drawer.segments.length > 0 && ` — ${formatLength(totalLength)}`}
+          </span>
         </h3>
         {drawer.segments.length === 0 ? (
           <p className={styles.segmentsEmpty}>
@@ -216,37 +249,55 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           </p>
         ) : (
           <ul className={styles.segmentList}>
-            {drawer.segments.map((seg, i) => (
-              <li key={seg.id} className={styles.segmentItem}>
-                <span className={styles.segmentLabel}>Segment {i + 1}</span>
-                <div className={styles.segmentSelect}>
-                  <Select
-                    label={`Revêtement du segment ${i + 1}`}
-                    hideLabel
-                    options={SURFACE_OPTIONS}
-                    value={seg.surface}
-                    onChange={(e) =>
-                      drawer.setSurface(
-                        seg.id,
-                        (e.target.value as RuralPathSurface) ??
-                          RuralPathSurface.EARTH,
-                      )
+            {drawer.segments.map((seg, i) => {
+              const isOuterSegment =
+                i === 0 || i === drawer.segments.length - 1;
+              return (
+                <li key={seg.id} className={styles.segmentItem}>
+                  <span className={styles.segmentLabel}>
+                    Segment {i + 1}
+                    <span className={styles.segmentLength}>
+                      {formatLength(segmentLengths[i] ?? 0)}
+                    </span>
+                  </span>
+                  <div className={styles.segmentSelect}>
+                    <Select
+                      label={`Revêtement du segment ${i + 1}`}
+                      hideLabel
+                      options={SURFACE_OPTIONS}
+                      value={seg.surface}
+                      onChange={(e) =>
+                        drawer.setSurface(
+                          seg.id,
+                          (e.target.value as RuralPathSurface) ??
+                            RuralPathSurface.EARTH,
+                        )
+                      }
+                      clearable={false}
+                      disabled={pending}
+                      fullWidth
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    className={styles.segmentRemove}
+                    onClick={() => drawer.removeSegment(seg.id)}
+                    aria-label={
+                      isOuterSegment
+                        ? `Supprimer le segment ${i + 1}`
+                        : "Seules les extrémités du chemin peuvent être supprimées"
                     }
-                    clearable={false}
-                    disabled={pending}
-                    fullWidth
+                    title={
+                      isOuterSegment
+                        ? undefined
+                        : "Seules les extrémités du chemin peuvent être supprimées"
+                    }
+                    disabled={pending || !isOuterSegment}
+                    icon={<span className="material-icons">delete</span>}
                   />
-                </div>
-                <Button
-                  type="button"
-                  className={styles.segmentRemove}
-                  onClick={() => drawer.removeSegment(seg.id)}
-                  aria-label={`Supprimer le segment ${i + 1}`}
-                  disabled={pending}
-                  icon={<span className="material-icons">delete</span>}
-                />
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

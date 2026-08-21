@@ -48,7 +48,7 @@ export function MapLayout({
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => setCursor(null), []);
 
-  const { mapRefCb, mapRef, mapChildren } = useContext(MapContext);
+  const { mapRefCb, mapRef, mapChildren, mapMessage } = useContext(MapContext);
   const { showCadastre, setShowCadastre } = useContext(CadastreContext);
   const { contour: communeContour } = useCommune();
   const { basemapId } = useLocalStorageContext();
@@ -140,6 +140,12 @@ export function MapLayout({
           <PanoramaxMap />
 
           {mapChildren}
+
+          {mapMessage && (
+            <div className={styles.mapMessage} role="status">
+              {mapMessage}
+            </div>
+          )}
 
           <PanoramaxLensDrag />
           <NavigationControl position="bottom-right" />

@@ -5,6 +5,20 @@ import type { MapRef } from "react-map-gl/maplibre";
 import type { Feature, Position, LineString as GeoLineString } from "geojson";
 import { RuralPathSurface } from "@/generated/prisma/browser";
 
+type CartesianPoint = { x: number; y: number };
+
+type SnappableContext = {
+  currentCoordinate?: number;
+  project: (lng: number, lat: number) => CartesianPoint;
+};
+
+type TerraDrawMouseEvent = {
+  lng: number;
+  lat: number;
+  containerX: number;
+  containerY: number;
+};
+
 type TerraDrawInstance = {
   start: () => void;
   stop: () => void;
@@ -26,6 +40,7 @@ export type DrawMode = "draw" | "select";
 
 export interface UseRuralPathDrawerResult {
   segments: Segment[];
+  previewCoordinates: Position[] | null;
   mode: DrawMode;
   setMode: (m: DrawMode) => void;
   setSurface: (id: string, surface: RuralPathSurface) => void;
@@ -36,6 +51,36 @@ export interface UseRuralPathDrawerResult {
 }
 
 const DEFAULT_SURFACE = RuralPathSurface.EARTH;
+
+// Distance, en pixels écran, en dessous de laquelle le premier point d'un
+// nouveau segment est aimanté à une extrémité du chemin existant.
+const SNAP_PIXEL_DISTANCE = 25;
+// Tolérance, en mètres, pour considérer que deux points coïncident.
+const SNAP_TOLERANCE_METERS = 2;
+
+const MSG_DRAW_START =
+  "Cliquez sur la carte pour commencer à tracer le chemin, double-cliquez pour terminer le segment.";
+const MSG_DRAW_CONTINUE =
+  "Reprenez le tracé depuis une extrémité du chemin (surlignée), double-cliquez pour terminer le segment.";
+const MSG_SELECT = "Cliquez-glissez un point du tracé pour ajuster le chemin.";
+const MSG_INVALID_SEGMENT =
+  "Le nouveau segment doit partir d'une extrémité du chemin existant.";
+const MSG_INVALID_DELETE =
+  "Seuls le premier et le dernier segment du chemin peuvent être supprimés.";
+const ERROR_MESSAGE_DURATION_MS = 3500;
+
+function metersBetween(a: Position, b: Position): number {
+  const [lng1, lat1] = a;
+  const [lng2, lat2] = b;
+  const latRad = ((lat1 + lat2) / 2) * (Math.PI / 180);
+  const dx = (lng2 - lng1) * 111320 * Math.cos(latRad);
+  const dy = (lat2 - lat1) * 110540;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function isSamePoint(a: Position, b: Position): boolean {
+  return metersBetween(a, b) <= SNAP_TOLERANCE_METERS;
+}
 
 function toLineStringFeature(
   id: string,
@@ -51,6 +96,7 @@ function toLineStringFeature(
 
 export function useRuralPathDrawer(
   mapRef: MapRef | null,
+  setMapMessage: (message: string | null) => void,
   initial: {
     path?: GeoJSON.MultiLineString;
     surfaces: RuralPathSurface[];
@@ -60,28 +106,131 @@ export function useRuralPathDrawer(
   const initialAppliedRef = useRef(false);
 
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [previewCoordinates, setPreviewCoordinates] = useState<
+    Position[] | null
+  >(null);
   const [mode, setModeState] = useState<DrawMode>("draw");
   const [isReady, setIsReady] = useState(false);
 
   const surfaceMapRef = useRef<Map<string, RuralPathSurface>>(new Map());
+  const segmentsRef = useRef<Segment[]>([]);
+  const modeRef = useRef<DrawMode>("draw");
+  const setMapMessageRef = useRef(setMapMessage);
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const rebuildFromSnapshot = useCallback(() => {
+  useEffect(() => {
+    segmentsRef.current = segments;
+  }, [segments]);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  useEffect(() => {
+    setMapMessageRef.current = setMapMessage;
+  }, [setMapMessage]);
+
+  const guidanceMessage = useCallback(() => {
+    if (modeRef.current === "select") return MSG_SELECT;
+    return segmentsRef.current.length === 0
+      ? MSG_DRAW_START
+      : MSG_DRAW_CONTINUE;
+  }, []);
+
+  const showTemporaryError = useCallback(
+    (message: string) => {
+      setMapMessageRef.current(message);
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = setTimeout(() => {
+        setMapMessageRef.current(guidanceMessage());
+      }, ERROR_MESSAGE_DURATION_MS);
+    },
+    [guidanceMessage],
+  );
+
+  const updateSegmentsFromIds = useCallback((ids: (string | number)[]) => {
     const draw = drawRef.current;
     if (!draw) return;
+    const changedIds = new Set(ids.map(String));
     const snap = draw.getSnapshot();
-    const next: Segment[] = [];
-    for (const f of snap) {
-      if (!f || f.geometry?.type !== "LineString") continue;
-      const id = String(f.id ?? "");
-      if (!id) continue;
-      const coords = (f.geometry as GeoLineString).coordinates;
-      if (!coords || coords.length < 2) continue;
-      const surface = surfaceMapRef.current.get(id) ?? DEFAULT_SURFACE;
-      surfaceMapRef.current.set(id, surface);
-      next.push({ id, surface, coordinates: coords });
-    }
-    setSegments(next);
+    setSegments((prev) =>
+      prev.map((seg) => {
+        if (!changedIds.has(seg.id)) return seg;
+        const f = snap.find((f) => String(f.id) === seg.id);
+        if (!f || f.geometry?.type !== "LineString") return seg;
+        const coords = (f.geometry as GeoLineString).coordinates;
+        if (!coords || coords.length < 2) return seg;
+        return { ...seg, coordinates: coords };
+      }),
+    );
   }, []);
+
+  // Aperçu en direct du segment en cours de tracé (pas encore finalisé).
+  const updatePreviewFromSnapshot = useCallback(() => {
+    const draw = drawRef.current;
+    if (!draw) return;
+    const knownIds = new Set(segmentsRef.current.map((s) => s.id));
+    const wip = draw
+      .getSnapshot()
+      .find(
+        (f) => f.geometry?.type === "LineString" && !knownIds.has(String(f.id)),
+      );
+    if (!wip) {
+      setPreviewCoordinates(null);
+      return;
+    }
+    const coords = (wip.geometry as GeoLineString).coordinates;
+    setPreviewCoordinates(coords && coords.length >= 2 ? coords : null);
+  }, []);
+
+  const handleFinish = useCallback(
+    (id: string) => {
+      const draw = drawRef.current;
+      if (!draw) return;
+      setPreviewCoordinates(null);
+      const snap = draw.getSnapshot();
+      const f = snap.find((f) => String(f.id) === id);
+      if (!f || f.geometry?.type !== "LineString") return;
+      const coords = (f.geometry as GeoLineString).coordinates;
+      if (!coords || coords.length < 2) {
+        draw.removeFeatures([id]);
+        return;
+      }
+
+      const chain = segmentsRef.current;
+      if (chain.length === 0) {
+        surfaceMapRef.current.set(id, DEFAULT_SURFACE);
+        setSegments([{ id, surface: DEFAULT_SURFACE, coordinates: coords }]);
+        setMapMessageRef.current(MSG_DRAW_CONTINUE);
+        return;
+      }
+
+      const chainStart = chain[0].coordinates[0];
+      const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
+      const newStart = coords[0];
+
+      let next: Segment[] | null = null;
+      if (isSamePoint(newStart, chainEnd)) {
+        next = [
+          ...chain,
+          { id, surface: DEFAULT_SURFACE, coordinates: coords },
+        ];
+      } else if (isSamePoint(newStart, chainStart)) {
+        next = [
+          { id, surface: DEFAULT_SURFACE, coordinates: [...coords].reverse() },
+          ...chain,
+        ];
+      }
+
+      if (next) {
+        surfaceMapRef.current.set(id, DEFAULT_SURFACE);
+        setSegments(next);
+        setMapMessageRef.current(MSG_DRAW_CONTINUE);
+      } else {
+        draw.removeFeatures([id]);
+        showTemporaryError(MSG_INVALID_SEGMENT);
+      }
+    },
+    [showTemporaryError],
+  );
 
   // Cycle de vie Terra Draw.
   useEffect(() => {
@@ -100,12 +249,55 @@ export function useRuralPathDrawer(
       if (cancelled) return;
 
       const nativeMap = mapRef.getMap();
+      // Style neutre et discret : le rendu "réel" (halo blanc + couleur par
+      // revêtement) est assuré séparément par CheminsRurauxMap à partir de
+      // l'état `segments`, pas par Terra Draw lui-même.
+      // Invisible : le tracé "réel" (halo blanc + couleur par revêtement, y
+      // compris l'aperçu en cours de dessin) est enti\u00e8rement pris en charge
+      // par CheminsRurauxMap, sans risque de conflit d'ordre d'empilement
+      // avec les couches internes de l'adaptateur MapLibre de Terra Draw.
+      const neutralLineStyle = {
+        lineStringColor: "#3f97e0" as const,
+        lineStringWidth: 2,
+        lineStringOpacity: 0,
+      };
       const instance = new TerraDraw({
         adapter: new adapterMod.TerraDrawMapLibreGLAdapter({
           map: nativeMap,
         }),
         modes: [
-          new TerraDrawLineStringMode(),
+          new TerraDrawLineStringMode({
+            styles: neutralLineStyle,
+            snapping: {
+              // N'aimante que le premier point d'un nouveau segment, vers
+              // l'une des deux extrémités du chemin déjà tracé.
+              toCustom: (
+                event: TerraDrawMouseEvent,
+                context: SnappableContext,
+              ) => {
+                if (context.currentCoordinate !== 0) return undefined;
+                const chain = segmentsRef.current;
+                if (chain.length === 0) return undefined;
+                const candidates: Position[] = [
+                  chain[0].coordinates[0],
+                  chain[chain.length - 1].coordinates.at(-1)!,
+                ];
+                let best: Position | undefined;
+                let bestDist = Infinity;
+                for (const c of candidates) {
+                  const p = context.project(c[0], c[1]);
+                  const dx = p.x - event.containerX;
+                  const dy = p.y - event.containerY;
+                  const d = Math.sqrt(dx * dx + dy * dy);
+                  if (d < bestDist) {
+                    bestDist = d;
+                    best = c;
+                  }
+                }
+                return bestDist <= SNAP_PIXEL_DISTANCE ? best : undefined;
+              },
+            },
+          }),
           new TerraDrawSelectMode({
             flags: {
               linestring: {
@@ -119,15 +311,29 @@ export function useRuralPathDrawer(
                 },
               },
             },
+            styles: {
+              selectedLineStringColor: neutralLineStyle.lineStringColor,
+              selectedLineStringWidth: neutralLineStyle.lineStringWidth,
+              selectedLineStringOpacity: neutralLineStyle.lineStringOpacity,
+            },
           }),
         ],
       }) as unknown as TerraDrawInstance;
       draw = instance;
       drawRef.current = instance;
 
-      const onChange = () => rebuildFromSnapshot();
-      instance.on("change", onChange);
-      instance.on("finish", onChange);
+      instance.on("change", (...args: unknown[]) => {
+        const [ids, type] = args as [(string | number)[], string];
+        if (modeRef.current === "select" && type === "update") {
+          updateSegmentsFromIds(ids);
+        } else if (modeRef.current === "draw") {
+          updatePreviewFromSnapshot();
+        }
+      });
+      instance.on("finish", (...args: unknown[]) => {
+        const [id] = args as [string | number];
+        handleFinish(String(id));
+      });
 
       instance.start();
       instance.setMode("linestring");
@@ -136,14 +342,22 @@ export function useRuralPathDrawer(
       // Chargement de l'état initial (edit mode)
       if (initial?.path && !initialAppliedRef.current) {
         initialAppliedRef.current = true;
-        const features = initial.path.coordinates.map((coords, i) => {
-          const id = crypto.randomUUID();
-          const surface = initial.surfaces[i] ?? DEFAULT_SURFACE;
-          surfaceMapRef.current.set(id, surface);
-          return toLineStringFeature(id, coords);
-        });
-        if (features.length > 0) instance.addFeatures(features);
+        const initSegments: Segment[] = initial.path.coordinates.map(
+          (coords, i) => {
+            const id = crypto.randomUUID();
+            const surface = initial.surfaces[i] ?? DEFAULT_SURFACE;
+            surfaceMapRef.current.set(id, surface);
+            return { id, surface, coordinates: coords };
+          },
+        );
+        if (initSegments.length > 0) {
+          instance.addFeatures(
+            initSegments.map((s) => toLineStringFeature(s.id, s.coordinates)),
+          );
+          setSegments(initSegments);
+        }
       }
+      setMapMessageRef.current(guidanceMessage());
     })().catch((err) => {
       console.error("Terra Draw init failed", err);
     });
@@ -157,15 +371,23 @@ export function useRuralPathDrawer(
       }
       drawRef.current = null;
       setIsReady(false);
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      setMapMessageRef.current(null);
     };
     // On veut initialiser une seule fois par mapRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapRef]);
 
-  const setMode = useCallback((m: DrawMode) => {
-    setModeState(m);
-    drawRef.current?.setMode(m === "draw" ? "linestring" : "select");
-  }, []);
+  const setMode = useCallback(
+    (m: DrawMode) => {
+      setModeState(m);
+      drawRef.current?.setMode(m === "draw" ? "linestring" : "select");
+      modeRef.current = m;
+      setPreviewCoordinates(null);
+      setMapMessageRef.current(guidanceMessage());
+    },
+    [guidanceMessage],
+  );
 
   const setSurface = useCallback((id: string, surface: RuralPathSurface) => {
     surfaceMapRef.current.set(id, surface);
@@ -174,11 +396,22 @@ export function useRuralPathDrawer(
     );
   }, []);
 
-  const removeSegment = useCallback((id: string) => {
-    surfaceMapRef.current.delete(id);
-    drawRef.current?.removeFeatures([id]);
-    setSegments((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+  const removeSegment = useCallback(
+    (id: string) => {
+      const chain = segmentsRef.current;
+      const idx = chain.findIndex((s) => s.id === id);
+      if (idx === -1) return;
+      const isOuterSegment = idx === 0 || idx === chain.length - 1;
+      if (!isOuterSegment) {
+        showTemporaryError(MSG_INVALID_DELETE);
+        return;
+      }
+      surfaceMapRef.current.delete(id);
+      drawRef.current?.removeFeatures([id]);
+      setSegments((prev) => prev.filter((s) => s.id !== id));
+    },
+    [showTemporaryError],
+  );
 
   const toMultiLineString = useCallback((): GeoJSON.MultiLineString | null => {
     if (segments.length === 0) return null;
@@ -196,6 +429,7 @@ export function useRuralPathDrawer(
   return useMemo(
     () => ({
       segments,
+      previewCoordinates,
       mode,
       setMode,
       setSurface,
@@ -206,6 +440,7 @@ export function useRuralPathDrawer(
     }),
     [
       segments,
+      previewCoordinates,
       mode,
       setMode,
       setSurface,

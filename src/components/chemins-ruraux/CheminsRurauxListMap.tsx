@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RuralPath } from "@/components/chemins-ruraux/types";
 import { useRouter } from "next/navigation";
 import {
@@ -13,13 +13,16 @@ import {
 } from "react-map-gl/maplibre";
 import type { ExpressionSpecification } from "maplibre-gl";
 import type { FeatureCollection, MultiLineString } from "geojson";
-import CheminsRurauxContext from "@/contexts/CheminsRurauxContext";
-import { RuralPathStatus } from "@/components/chemins-ruraux/types";
-import styles from "./CheminsRurauxMap.module.css";
+import {
+  RuralPathStatus,
+  SURFACE_COLORS,
+} from "@/components/chemins-ruraux/types";
+import styles from "./CheminsRurauxListMap.module.css";
 
 const SOURCE_ID = "chemins-ruraux";
 const LINE_LAYER_ID = "chemins-ruraux-line";
 const HALO_LAYER_ID = "chemins-ruraux-halo";
+const CASING_LAYER_ID = "chemins-ruraux-casing";
 
 const STATUS_LABEL: Record<RuralPathStatus, string> = {
   [RuralPathStatus.DRAFT]: "Brouillon",
@@ -43,6 +46,16 @@ const STATUS_COLOR_MATCH: ExpressionSpecification = [
   "#4b4bcb",
 ];
 
+const SURFACE_COLOR_MATCH: ExpressionSpecification = [
+  "match",
+  ["get", "surface"],
+  ...Object.entries(SURFACE_COLORS).flatMap(([surface, color]) => [
+    surface,
+    color,
+  ]),
+  "#4b4bcb",
+] as unknown as ExpressionSpecification;
+
 type HoverState = {
   id: string;
   lng: number;
@@ -51,7 +64,7 @@ type HoverState = {
   statut: RuralPathStatus;
 };
 
-export function CheminsRurauxMap({
+export function CheminsRurauxListMap({
   codeCommune,
   ruralPaths,
 }: {
@@ -60,15 +73,11 @@ export function CheminsRurauxMap({
 }) {
   const map = useMap();
   const router = useRouter();
-  const { isEditing } = useContext(CheminsRurauxContext);
 
   const [hover, setHover] = useState<HoverState | null>(null);
   const hoveredIdRef = useRef<string | null>(null);
 
   const featureCollection = useMemo<FeatureCollection<MultiLineString>>(() => {
-    if (isEditing) {
-      return { type: "FeatureCollection", features: [] };
-    }
     return {
       type: "FeatureCollection",
       features: ruralPaths
@@ -82,7 +91,7 @@ export function CheminsRurauxMap({
           geometry: p.path,
         })),
     };
-  }, [ruralPaths, isEditing]);
+  }, [ruralPaths]);
 
   useEffect(() => {
     const m = map.current?.getMap();
@@ -159,8 +168,6 @@ export function CheminsRurauxMap({
       ? hover
       : null;
 
-  if (isEditing) return null;
-
   return (
     <>
       <Source
@@ -169,6 +176,18 @@ export function CheminsRurauxMap({
         data={featureCollection}
         promoteId="id"
       >
+        <Layer
+          {...({
+            id: CASING_LAYER_ID,
+            type: "line",
+            layout: { "line-join": "round", "line-cap": "round" },
+            paint: {
+              "line-color": "#ffffff",
+              "line-width": 5,
+              "line-opacity": 0.9,
+            },
+          } as LayerProps)}
+        />
         <Layer
           {...({
             id: HALO_LAYER_ID,

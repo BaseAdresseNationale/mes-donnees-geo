@@ -11,6 +11,7 @@ import { MapContextProvider } from "@/contexts/MapContext";
 import { CadastreContextProvider } from "@/contexts/CadastreContext";
 import { PanoramaxContextProvider } from "@/contexts/PanoramaxContext";
 import { LocalStorageContextProvider } from "@/contexts/LocalStorageContext";
+import { DrawContextProvider } from "@/contexts/DrawContext";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -54,11 +55,13 @@ export default async function CommuneLayout({
         }}
       >
         <MapContextProvider>
-          <CadastreContextProvider>
-            <PanoramaxContextProvider>
-              <MapRootLayout session={session}>{children}</MapRootLayout>
-            </PanoramaxContextProvider>
-          </CadastreContextProvider>
+          <DrawContextProvider>
+            <CadastreContextProvider>
+              <PanoramaxContextProvider>
+                <MapRootLayout session={session}>{children}</MapRootLayout>
+              </PanoramaxContextProvider>
+            </CadastreContextProvider>
+          </DrawContextProvider>
         </MapContextProvider>
       </CommuneProvider>
     </LocalStorageContextProvider>

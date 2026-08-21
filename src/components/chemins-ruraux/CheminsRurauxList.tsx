@@ -6,7 +6,7 @@ import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
 import styles from "./CheminsRurauxList.module.css";
 import { RuralPath, RuralPathStatus } from "@/components/chemins-ruraux/types";
 import MapContext from "@/contexts/MapContext";
-import { CheminsRurauxMap } from "./CheminsRurauxMap";
+import { CheminsRurauxListMap } from "./CheminsRurauxListMap";
 
 interface RuralPathListProps {
   codeCommune: string;
@@ -53,7 +53,10 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
 
   useEffect(() => {
     setMapChildren(
-      <CheminsRurauxMap codeCommune={codeCommune} ruralPaths={ruralPaths} />,
+      <CheminsRurauxListMap
+        codeCommune={codeCommune}
+        ruralPaths={ruralPaths}
+      />,
     );
 
     return () => {
