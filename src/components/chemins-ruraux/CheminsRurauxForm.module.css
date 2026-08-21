@@ -30,6 +30,15 @@
   font-size: 0.8125rem;
 }
 
+.successMessage {
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #2e7d32;
+  background: #e6f4ea;
+  color: #2e7d32;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+
 .modeSwitch {
   display: flex;
   gap: 0.25rem;
@@ -60,6 +69,10 @@
 
 .pathNumber {
   flex-basis: 150px;
+
+  input {
+    width: 100%;
+  }
 }
 
 .modeBtnActive {
@@ -198,12 +211,6 @@
   padding: 0.125rem 0.375rem;
   color: #ce0500;
   font: inherit;
-}
-
-.segmentRemove:hover,
-.segmentRemove:focus-visible {
-  background: #fff4f4;
-  border-color: #ce0500;
 }
 
 .actions {

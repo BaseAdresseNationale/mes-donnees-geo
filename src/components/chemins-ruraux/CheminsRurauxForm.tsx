@@ -49,7 +49,9 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const router = useRouter();
   const { mapRef, setMapMessage, setMapChildren } = useContext(MapContext);
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "success" | "error"
+  >("idle");
 
   const [nom, setNom] = useState(initial?.nom ?? "");
   const [statut, setStatut] = useState<RuralPathStatus>(
@@ -63,6 +65,15 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   );
   const [commentaire, setCommentaire] = useState(initial?.commentaire ?? "");
   const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (submitStatus !== "idle") {
+      const timeout = setTimeout(() => {
+        setSubmitStatus("idle");
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [submitStatus]);
 
   // Fly to the initial path if provided
   useEffect(() => {
@@ -141,7 +152,6 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const isEdit = Boolean(initial);
 
   function submit() {
-    setError(null);
     const parsedNumero = Number(numero);
 
     const validation = validateRuralPathInput({
@@ -153,7 +163,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
       segments: drawer.toSegmentsInput(),
     });
     if (!validation.ok) {
-      setError(validation.error);
+      setSubmitStatus("error");
       return;
     }
 
@@ -171,16 +181,15 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           const payload = (await res.json().catch(() => null)) as {
             error?: string;
           } | null;
-          setError(
-            payload?.error ?? `Échec de l'enregistrement (${res.status})`,
-          );
+          setSubmitStatus("error");
           return;
         }
         const saved = (await res.json()) as RuralPath;
         router.refresh();
         router.push(`/${codeCommune}/chemins-ruraux/${saved.id}`);
+        setSubmitStatus("success");
       } catch {
-        setError("Erreur réseau lors de l'enregistrement.");
+        setSubmitStatus("error");
       }
     });
   }
@@ -194,20 +203,20 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     ) {
       return;
     }
-    setError(null);
+    setSubmitStatus("idle");
     startTransition(async () => {
       try {
         const res = await fetch(`/api/chemins-ruraux/${initial.id}`, {
           method: "DELETE",
         });
         if (!res.ok) {
-          setError(`Échec de la suppression (${res.status}).`);
+          setSubmitStatus("error");
           return;
         }
         router.refresh();
         router.push(`/${codeCommune}/chemins-ruraux`);
       } catch {
-        setError("Erreur réseau lors de la suppression.");
+        setSubmitStatus("error");
       }
     });
   }
@@ -228,12 +237,6 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
         Tracez le chemin sur la carte. Chaque segment porte son propre
         revêtement.
       </p>
-
-      {error && (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      )}
 
       <div className={styles.pathIdentifier}>
         <Select
@@ -364,6 +367,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
                   </details>
                   <Button
                     type="button"
+                    variant="tertiary"
                     className={styles.segmentRemove}
                     onClick={() => drawer.removeSegment(seg.id)}
                     aria-label={
@@ -385,6 +389,18 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           </ul>
         )}
       </section>
+
+      {submitStatus === "error" && (
+        <p className={styles.error} role="alert">
+          Une erreur est survenue.
+        </p>
+      )}
+
+      {submitStatus === "success" && (
+        <p className={styles.successMessage} role="status">
+          Chemin enregistré avec succès.
+        </p>
+      )}
 
       <div className={styles.actions}>
         <Button
