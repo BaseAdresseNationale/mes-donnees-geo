@@ -146,6 +146,17 @@ export function useRuralPathDrawer(
     [guidanceMessage],
   );
 
+  const setMode = useCallback(
+    (m: DrawMode) => {
+      setModeState(m);
+      drawRef.current?.setMode(m === "draw" ? "linestring" : "select");
+      modeRef.current = m;
+      setPreviewCoordinates(null);
+      setMapMessageRef.current(guidanceMessage());
+    },
+    [guidanceMessage],
+  );
+
   const updateSegmentsFromIds = useCallback((ids: (string | number)[]) => {
     const draw = drawRef.current;
     if (!draw) return;
@@ -164,6 +175,9 @@ export function useRuralPathDrawer(
   }, []);
 
   // Aperçu en direct du segment en cours de tracé (pas encore finalisé).
+  // Annule immédiatement le tracé si son premier point n'est pas (ou plus,
+  // une fois aimanté) sur une extrémité du chemin existant, plutôt que
+  // d'attendre la fin du tracé pour le rejeter.
   const updatePreviewFromSnapshot = useCallback(() => {
     const draw = drawRef.current;
     if (!draw) return;
@@ -178,8 +192,31 @@ export function useRuralPathDrawer(
       return;
     }
     const coords = (wip.geometry as GeoLineString).coordinates;
-    setPreviewCoordinates(coords && coords.length >= 2 ? coords : null);
-  }, []);
+    if (!coords || coords.length === 0) {
+      setPreviewCoordinates(null);
+      return;
+    }
+
+    const chain = segmentsRef.current;
+    if (chain.length > 0) {
+      const chainStart = chain[0].coordinates[0];
+      const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
+      const firstPoint = coords[0];
+      if (
+        !isSamePoint(firstPoint, chainStart) &&
+        !isSamePoint(firstPoint, chainEnd)
+      ) {
+        setPreviewCoordinates(null);
+        showTemporaryError(MSG_INVALID_SEGMENT);
+        // Différé : on est encore dans la pile d'appel du clic qui vient de
+        // créer ce tracé ; annuler ici casserait l'état interne du mode.
+        setTimeout(() => drawRef.current?.setMode("linestring"), 0);
+        return;
+      }
+    }
+
+    setPreviewCoordinates(coords.length >= 2 ? coords : null);
+  }, [showTemporaryError]);
 
   const handleFinish = useCallback(
     (id: string) => {
@@ -237,6 +274,7 @@ export function useRuralPathDrawer(
     if (!mapRef) return;
     let cancelled = false;
     let draw: TerraDrawInstance | null = null;
+    let removeContextMenuListener: (() => void) | null = null;
 
     (async () => {
       const [
@@ -249,17 +287,22 @@ export function useRuralPathDrawer(
       if (cancelled) return;
 
       const nativeMap = mapRef.getMap();
-      // Style neutre et discret : le rendu "réel" (halo blanc + couleur par
-      // revêtement) est assuré séparément par CheminsRurauxMap à partir de
-      // l'état `segments`, pas par Terra Draw lui-même.
-      // Invisible : le tracé "réel" (halo blanc + couleur par revêtement, y
-      // compris l'aperçu en cours de dessin) est enti\u00e8rement pris en charge
-      // par CheminsRurauxMap, sans risque de conflit d'ordre d'empilement
-      // avec les couches internes de l'adaptateur MapLibre de Terra Draw.
+      // Ligne invisible : le tracé "réel" (halo blanc + couleur par
+      // revêtement, y compris l'aperçu en cours de dessin) est entièrement
+      // pris en charge par CheminsRurauxMap, sans risque de conflit d'ordre
+      // d'empilement avec les couches internes de l'adaptateur MapLibre.
       const neutralLineStyle = {
         lineStringColor: "#3f97e0" as const,
         lineStringWidth: 2,
         lineStringOpacity: 0,
+      };
+      // Points de manipulation (sommets, points de fermeture/aimantation) :
+      // blanc à contour noir, quel que soit le mode.
+      const pointStyle = {
+        color: "#ffffff" as const,
+        outlineColor: "#1a1a1a" as const,
+        outlineWidth: 2,
+        width: 6,
       };
       const instance = new TerraDraw({
         adapter: new adapterMod.TerraDrawMapLibreGLAdapter({
@@ -267,7 +310,21 @@ export function useRuralPathDrawer(
         }),
         modes: [
           new TerraDrawLineStringMode({
-            styles: neutralLineStyle,
+            styles: {
+              ...neutralLineStyle,
+              closingPointColor: pointStyle.color,
+              closingPointOutlineColor: pointStyle.outlineColor,
+              closingPointOutlineWidth: pointStyle.outlineWidth,
+              closingPointWidth: pointStyle.width,
+              snappingPointColor: pointStyle.color,
+              snappingPointOutlineColor: pointStyle.outlineColor,
+              snappingPointOutlineWidth: pointStyle.outlineWidth,
+              snappingPointWidth: pointStyle.width,
+              coordinatePointColor: pointStyle.color,
+              coordinatePointOutlineColor: pointStyle.outlineColor,
+              coordinatePointOutlineWidth: pointStyle.outlineWidth,
+              coordinatePointWidth: pointStyle.width,
+            },
             snapping: {
               // N'aimante que le premier point d'un nouveau segment, vers
               // l'une des deux extrémités du chemin déjà tracé.
@@ -315,6 +372,14 @@ export function useRuralPathDrawer(
               selectedLineStringColor: neutralLineStyle.lineStringColor,
               selectedLineStringWidth: neutralLineStyle.lineStringWidth,
               selectedLineStringOpacity: neutralLineStyle.lineStringOpacity,
+              selectionPointColor: pointStyle.color,
+              selectionPointOutlineColor: pointStyle.outlineColor,
+              selectionPointOutlineWidth: pointStyle.outlineWidth,
+              selectionPointWidth: pointStyle.width,
+              midPointColor: pointStyle.color,
+              midPointOutlineColor: pointStyle.outlineColor,
+              midPointOutlineWidth: pointStyle.outlineWidth,
+              midPointWidth: pointStyle.width,
             },
           }),
         ],
@@ -331,15 +396,34 @@ export function useRuralPathDrawer(
         }
       });
       instance.on("finish", (...args: unknown[]) => {
+        // Le mode select émet aussi "finish" après un glisser de sommet
+        // (dragCoordinate/dragCoordinateResize/dragFeature) : ce n'est pas
+        // un nouveau segment tracé, sinon il serait dupliqué dans la chaîne.
+        if (modeRef.current !== "draw") return;
         const [id] = args as [string | number];
         handleFinish(String(id));
       });
+
+      // Clic droit = annuler le segment en cours de tracé (comme la touche
+      // Echap), sans changer de mode ni le menu contextuel du navigateur.
+      const onContextMenu = (e: { preventDefault: () => void }) => {
+        e.preventDefault();
+        if (modeRef.current !== "draw") return;
+        setPreviewCoordinates(null);
+        // Différé : re-déclencher le même mode force terra-draw à nettoyer
+        // (stop+cleanup+start) le tracé en cours sans casser son état interne.
+        setTimeout(() => drawRef.current?.setMode("linestring"), 0);
+      };
+      nativeMap.on("contextmenu", onContextMenu);
+      removeContextMenuListener = () =>
+        nativeMap.off("contextmenu", onContextMenu);
 
       instance.start();
       instance.setMode("linestring");
       setIsReady(true);
 
       // Chargement de l'état initial (edit mode)
+      let hasInitialSegments = false;
       if (initial?.path && !initialAppliedRef.current) {
         initialAppliedRef.current = true;
         const initSegments: Segment[] = initial.path.coordinates.map(
@@ -355,9 +439,14 @@ export function useRuralPathDrawer(
             initSegments.map((s) => toLineStringFeature(s.id, s.coordinates)),
           );
           setSegments(initSegments);
+          hasInitialSegments = true;
         }
       }
-      setMapMessageRef.current(guidanceMessage());
+      // `segmentsRef` n'est pas encore synchronisé (le setSegments ci-dessus
+      // n'a pas encore re-rendu) : on calcule le message directement.
+      setMapMessageRef.current(
+        hasInitialSegments ? MSG_DRAW_CONTINUE : MSG_DRAW_START,
+      );
     })().catch((err) => {
       console.error("Terra Draw init failed", err);
     });
@@ -369,25 +458,19 @@ export function useRuralPathDrawer(
       } catch {
         // ignore
       }
+      removeContextMenuListener?.();
       drawRef.current = null;
       setIsReady(false);
+      // React StrictMode invoque cet effet deux fois au montage (dev) : sans
+      // cette remise à zéro, la 2e invocation (celle qui survit) trouverait le
+      // flag déjà à `true` et ne rechargerait jamais le tracé existant.
+      initialAppliedRef.current = false;
       if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
       setMapMessageRef.current(null);
     };
     // On veut initialiser une seule fois par mapRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapRef]);
-
-  const setMode = useCallback(
-    (m: DrawMode) => {
-      setModeState(m);
-      drawRef.current?.setMode(m === "draw" ? "linestring" : "select");
-      modeRef.current = m;
-      setPreviewCoordinates(null);
-      setMapMessageRef.current(guidanceMessage());
-    },
-    [guidanceMessage],
-  );
 
   const setSurface = useCallback((id: string, surface: RuralPathSurface) => {
     surfaceMapRef.current.set(id, surface);

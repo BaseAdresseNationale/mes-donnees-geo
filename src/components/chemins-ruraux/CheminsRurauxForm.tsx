@@ -45,6 +45,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const [statut, setStatut] = useState<RuralPathStatus>(
     initial?.statut ?? RuralPathStatus.DRAFT,
   );
+  const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
 
   const drawer = useRuralPathDrawer(
     mapRef,
@@ -69,12 +70,22 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
       : [];
 
     const displaySegments = [...drawer.segments, ...preview];
-    setMapChildren(<CheminsRurauxFormMap drawSegments={displaySegments} />);
+    setMapChildren(
+      <CheminsRurauxFormMap
+        drawSegments={displaySegments}
+        hoveredSegmentId={hoveredSegmentId}
+      />,
+    );
 
     return () => {
       setMapChildren(null);
     };
-  }, [setMapChildren, drawer.segments, drawer.previewCoordinates]);
+  }, [
+    setMapChildren,
+    drawer.segments,
+    drawer.previewCoordinates,
+    hoveredSegmentId,
+  ]);
 
   const segmentLengths = useMemo(
     () =>
@@ -253,7 +264,16 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
               const isOuterSegment =
                 i === 0 || i === drawer.segments.length - 1;
               return (
-                <li key={seg.id} className={styles.segmentItem}>
+                <li
+                  key={seg.id}
+                  className={styles.segmentItem}
+                  onMouseEnter={() => setHoveredSegmentId(seg.id)}
+                  onMouseLeave={() =>
+                    setHoveredSegmentId((current) =>
+                      current === seg.id ? null : current,
+                    )
+                  }
+                >
                   <span className={styles.segmentLabel}>
                     Segment {i + 1}
                     <span className={styles.segmentLength}>
