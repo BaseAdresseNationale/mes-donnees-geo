@@ -53,14 +53,9 @@ export function PanoramaxLensDrag() {
     codeCommune: string;
     plugin: string;
   }>();
-  const {
-    showPanoramax,
-    setShowPanoramax,
-    isDiving,
-    setIsDiving,
-    setSavedView,
-  } = useContext(PanoramaxContext);
-  const { setMapMessage } = useContext(MapContext);
+  const { showPanoramax, setShowPanoramax, isDiving, setIsDiving } =
+    useContext(PanoramaxContext);
+  const { setMapMessage, setSavedFlyToBounds } = useContext(MapContext);
 
   const dragRef = useRef<DragState | null>(null);
   const justDraggedRef = useRef(false);
@@ -269,13 +264,9 @@ export function PanoramaxLensDrag() {
         const sequenceId = feature.sequenceId;
 
         // Save current view to restore later (from the viewer page)
-        const center = m.getCenter();
-        setSavedView({
-          center: { lng: center.lng, lat: center.lat },
-          zoom: m.getZoom(),
-          pitch: m.getPitch(),
-          bearing: m.getBearing(),
-        });
+        setSavedFlyToBounds(
+          m.getBounds().toArray() as [[number, number], [number, number]],
+        );
         setIsDiving(true);
         const onMoveEnd = async () => {
           m.off("moveend", onMoveEnd);
@@ -346,7 +337,6 @@ export function PanoramaxLensDrag() {
     map,
     queryFeatureAt,
     setShowPanoramax,
-    setSavedView,
     setIsDiving,
     setMapMessage,
     router,
@@ -355,6 +345,7 @@ export function PanoramaxLensDrag() {
     endDrag,
     enterScanMode,
     exitScanMode,
+    setSavedFlyToBounds,
   ]);
 
   // Delegate pointerdown on the (imperatively-created) #panoramax-toggle button.

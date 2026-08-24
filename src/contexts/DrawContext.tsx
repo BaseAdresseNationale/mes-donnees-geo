@@ -1,6 +1,6 @@
 "use client";
 
-import type { Segment } from "@/components/chemins-ruraux/useCheminsRurauxDrawer";
+import type { Segment } from "@/components/chemins-ruraux/useRuralPathDrawer";
 import React, { createContext, useMemo, useState } from "react";
 
 interface DrawContextProviderProps {

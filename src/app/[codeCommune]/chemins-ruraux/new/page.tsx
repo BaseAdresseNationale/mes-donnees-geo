@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/auth/session";
-import { RuralPathForm } from "@/components/chemins-ruraux/CheminsRurauxForm";
+import { RuralPathForm } from "@/components/chemins-ruraux/form/RuralPathForm";
 
 export default async function RuralPathNewPage() {
   const session = await requireSession();

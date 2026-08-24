@@ -5,7 +5,7 @@ import { getEnabledPlugins } from "@/plugins/registry";
 import { PluginNotFound } from "@/components/plugin-workspace/PluginNotFound";
 import { getCommuneFlag } from "@/lib/api/blason-commune";
 import { PluginLayout } from "@/layouts/PluginLayout";
-import { RuralPathToolbar } from "@/components/chemins-ruraux/CheminsRurauxToolbar";
+import { RuralPathToolbar } from "@/components/chemins-ruraux/list/RuralPathsToolbar";
 import { CommuneSettings } from "@/components/plugin-workspace/CommuneSettings";
 
 const PLUGIN_ID = "chemins-ruraux";

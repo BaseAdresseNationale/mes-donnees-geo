@@ -69,6 +69,11 @@ body {
   font-size: 1.2rem;
 }
 
+/* --- LaSuiteUI overrides --- */
+div[id^="c__modals-portal"] {
+  z-index: 1000;
+}
+
 /* --- Panoramax --- */
 
 @keyframes panoramax-dive-flash {

@@ -1,12 +1,5 @@
 import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useContext, useMemo, useState } from "react";
 import { CadastreContext } from "../contexts/CadastreContext";
 import { AppLayout, AppLayoutProps } from "./AppLayout";
 import styles from "./MapLayout.module.css";
@@ -23,7 +16,6 @@ import {
 } from "@/components/map/layers/cadastre.layers";
 import { PANORAMAX_SEQUENCE_LAYER_ID } from "@/components/map/layers/panoramax.layers";
 import { useCommune } from "@/contexts/CommuneContext";
-import { geometryBounds } from "@/lib/geo/bounds";
 import { buildInvertedMask } from "@/lib/geo/mask";
 import {
   COMMUNE_MASK_SOURCE,
@@ -48,7 +40,8 @@ export function MapLayout({
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => setCursor(null), []);
 
-  const { mapRefCb, mapRef, mapChildren, mapMessage } = useContext(MapContext);
+  const { mapRefCb, mapChildren, mapMessage, mapToolChildren } =
+    useContext(MapContext);
   const { showCadastre, setShowCadastre } = useContext(CadastreContext);
   const { contour: communeContour } = useCommune();
   const { basemapId } = useLocalStorageContext();
@@ -62,18 +55,6 @@ export function MapLayout({
     () => (communeContour ? buildInvertedMask(communeContour.geometry) : null),
     [communeContour],
   );
-
-  const initialFitDoneRef = useRef(false);
-  useEffect(() => {
-    if (!mapRef || !communeContour) return;
-    if (!initialFitDoneRef.current) {
-      const bounds = geometryBounds(communeContour.geometry);
-      if (bounds) {
-        mapRef.fitBounds(bounds, { padding: 40, duration: 0, maxZoom: 16 });
-        initialFitDoneRef.current = true;
-      }
-    }
-  }, [communeContour, mapRef]);
 
   return (
     <AppLayout {...props}>
@@ -150,6 +131,7 @@ export function MapLayout({
           <ControlGroupPortal position="bottom-left">
             <StylesSwitch styles={mapStyles} />
             <PanoramaxToggle />
+            {mapToolChildren}
             <CadastreControl
               showCadastre={showCadastre}
               setShowCadastre={setShowCadastre}

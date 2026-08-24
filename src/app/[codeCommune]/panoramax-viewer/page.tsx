@@ -2,22 +2,16 @@
 
 import { PANORAMAX_VIEWER_URL } from "@/components/map/layers/panoramax.layers";
 import { PanoramaxViewer } from "@/components/panoramax/PanoramaxViewer";
-import PanoramaxContext from "@/contexts/PanoramaxContext";
-import { useCallback, useContext, useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useDOMRef } from "@/hooks/useDOMRef";
-import MapContext from "@/contexts/MapContext";
 import { createPortal } from "react-dom";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-
-const RESTORE_DURATION_MS = 700;
 
 export default function PanoramaxViewerPage() {
   const router = useRouter();
   const { codeCommune } = useParams<{ codeCommune: string }>();
   const searchParams = useSearchParams();
   const pictureId = searchParams.get("pictureID");
-  const { mapRef } = useContext(MapContext);
-  const { savedView, setSavedView } = useContext(PanoramaxContext);
   const [mainElRef, setMainElRef] = useDOMRef<HTMLElement>();
 
   useEffect(() => {
@@ -59,20 +53,8 @@ export default function PanoramaxViewerPage() {
   }, [setMainElRef]);
 
   const handleClose = useCallback(() => {
-    const m = mapRef?.getMap();
-    if (m && savedView) {
-      m.easeTo({
-        center: [savedView.center.lng, savedView.center.lat],
-        zoom: savedView.zoom,
-        pitch: savedView.pitch,
-        bearing: savedView.bearing,
-        duration: RESTORE_DURATION_MS,
-        essential: true,
-      });
-    }
-    setSavedView(null);
     router.back();
-  }, [mapRef, savedView, setSavedView, router]);
+  }, [router]);
 
   // Safety: if the user lands on this page directly (no pictureID), go home.
   useEffect(() => {

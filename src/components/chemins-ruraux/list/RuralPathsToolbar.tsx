@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@gouvfr-lasuite/ui-components";
-import styles from "./CheminsRurauxToolbar.module.css";
+import styles from "./RuralPathsToolbar.module.css";
 
 interface RuralPathToolbarProps {
   codeCommune: string;

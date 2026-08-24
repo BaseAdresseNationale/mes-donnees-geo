@@ -5,24 +5,20 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Select } from "@gouvfr-lasuite/ui-components";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
-import MapContext, {
-  FLY_TO_DURATION_MS,
-  FLY_TO_MAX_ZOOM,
-  FLY_TO_PADDING,
-} from "@/contexts/MapContext";
-import styles from "./CheminsRurauxForm.module.css";
-import { useRuralPathDrawer } from "./useCheminsRurauxDrawer";
+import styles from "./RuralPathForm.module.css";
+import { useRuralPathDrawer } from "../useRuralPathDrawer";
 import { RuralPathSegmentForm } from "./RuralPathSegmentForm";
-import { validateRuralPathInput } from "./validation";
-import type { RuralPath } from "./types";
-import { CLASSEMENT_LABELS } from "./types";
+import { validateRuralPathInput } from "../validation";
+import type { RuralPath } from "../types";
+import { CLASSEMENT_LABELS } from "../types";
 import {
   RuralPathClassement,
   RuralPathStatus,
   RuralPathSurface,
 } from "@/generated/prisma/browser";
-import { CheminsRurauxFormMap } from "./CheminsRurauxFormMap";
+import { CheminsRurauxFormMap } from "./RuralPathFormMap";
 import { geometryBounds } from "@/lib/geo/bounds";
+import MapContext from "@/contexts/MapContext";
 
 interface RuralPathFormProps {
   codeCommune: string;
@@ -47,7 +43,8 @@ function formatLength(meters: number): string {
 
 export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
   const router = useRouter();
-  const { mapRef, setMapMessage, setMapChildren } = useContext(MapContext);
+  const { mapRef, setMapMessage, setMapChildren, flyToBounds } =
+    useContext(MapContext);
   const [pending, startTransition] = useTransition();
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "success" | "error"
@@ -77,24 +74,14 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
 
   // Fly to the initial path if provided
   useEffect(() => {
-    const m = mapRef?.getMap();
-    if (!m || !initial?.segments.length) return;
+    if (!initial?.segments.length) return;
     const bounds = geometryBounds({
       type: "MultiLineString",
       coordinates: initial.segments.map((s) => s.path.coordinates),
     });
     if (!bounds) return;
-    const camera = m.cameraForBounds(bounds, {
-      padding: FLY_TO_PADDING,
-      maxZoom: FLY_TO_MAX_ZOOM,
-    });
-    if (!camera) return;
-    m.flyTo({
-      center: camera.center,
-      zoom: camera.zoom,
-      duration: FLY_TO_DURATION_MS,
-    });
-  }, [mapRef, initial]);
+    flyToBounds(bounds);
+  }, [flyToBounds, initial]);
 
   const drawer = useRuralPathDrawer(
     mapRef,

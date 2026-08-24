@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/auth/session";
-import { RuralPathList } from "@/components/chemins-ruraux/CheminsRurauxList";
+import { RuralPathList } from "@/components/chemins-ruraux/list/RuralPathsList";
 import { getRuralPaths } from "@/plugins/chemins-ruraux";
 
 export default async function RuralPathsListPage() {

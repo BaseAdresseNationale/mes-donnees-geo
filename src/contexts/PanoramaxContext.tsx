@@ -2,20 +2,11 @@
 
 import React, { createContext, useMemo, useState } from "react";
 
-export interface PanoramaxSavedView {
-  center: { lng: number; lat: number };
-  zoom: number;
-  pitch: number;
-  bearing: number;
-}
-
 interface PanoramaxContextValue {
   showPanoramax: boolean;
   setShowPanoramax: (show: boolean) => void;
   isDiving: boolean;
   setIsDiving: (diving: boolean) => void;
-  savedView: PanoramaxSavedView | null;
-  setSavedView: (view: PanoramaxSavedView | null) => void;
 }
 
 export const PanoramaxContext = createContext<PanoramaxContextValue>({
@@ -23,8 +14,6 @@ export const PanoramaxContext = createContext<PanoramaxContextValue>({
   setShowPanoramax: () => {},
   isDiving: false,
   setIsDiving: () => {},
-  savedView: null,
-  setSavedView: () => {},
 });
 
 export function PanoramaxContextProvider({
@@ -34,7 +23,6 @@ export function PanoramaxContextProvider({
 }) {
   const [showPanoramax, setShowPanoramax] = useState(false);
   const [isDiving, setIsDiving] = useState(false);
-  const [savedView, setSavedView] = useState<PanoramaxSavedView | null>(null);
 
   const value = useMemo(
     () => ({
@@ -42,10 +30,8 @@ export function PanoramaxContextProvider({
       setShowPanoramax,
       isDiving,
       setIsDiving,
-      savedView,
-      setSavedView,
     }),
-    [showPanoramax, isDiving, savedView],
+    [showPanoramax, isDiving],
   );
 
   return (

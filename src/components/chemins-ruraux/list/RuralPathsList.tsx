@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useContext, useMemo, useState, useEffect } from "react";
-import ThemeContext from "@/contexts/ThemeContext";
+import { useMemo, useState } from "react";
 import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
-import styles from "./CheminsRurauxList.module.css";
+import styles from "./RuralPathsList.module.css";
 import { RuralPath, RuralPathStatus } from "@/components/chemins-ruraux/types";
-import MapContext from "@/contexts/MapContext";
-import { CheminsRurauxListMap } from "./CheminsRurauxListMap";
-import { RuralPathToolbar } from "./CheminsRurauxToolbar";
+import { useRuralPathsListEffects } from "./useRuralPathsListEffects";
 
 interface RuralPathListProps {
   codeCommune: string;
@@ -28,13 +25,10 @@ const STATUS_CLASS: Record<RuralPathStatus, string> = {
 };
 
 export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
-  const { setMapChildren } = useContext(MapContext);
-  const { setToolbarChildren } = useContext(ThemeContext);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<RuralPathStatus | null>(
     null,
   );
-  const [hoveredPathId, setHoveredPathId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
@@ -55,27 +49,7 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
     [],
   );
 
-  useEffect(() => {
-    setToolbarChildren(<RuralPathToolbar codeCommune={codeCommune} />);
-
-    return () => {
-      setToolbarChildren(null);
-    };
-  }, [codeCommune, setToolbarChildren]);
-
-  useEffect(() => {
-    setMapChildren(
-      <CheminsRurauxListMap
-        codeCommune={codeCommune}
-        ruralPaths={ruralPaths}
-        hoveredPathId={hoveredPathId}
-      />,
-    );
-
-    return () => {
-      setMapChildren(null);
-    };
-  }, [setMapChildren, ruralPaths, codeCommune, hoveredPathId]);
+  const { setHoveredPathId } = useRuralPathsListEffects({ ruralPaths });
 
   return (
     <section className={styles.container} aria-label="Liste des chemins ruraux">

@@ -6,8 +6,8 @@ import {
   RuralPathEtat,
   RuralPathSurface,
 } from "@/generated/prisma/browser";
-import { DOMANIALITE_LABELS, ETAT_LABELS, SURFACE_LABELS } from "./types";
-import type { Segment, SegmentAttributes } from "./useCheminsRurauxDrawer";
+import { DOMANIALITE_LABELS, ETAT_LABELS, SURFACE_LABELS } from "../types";
+import type { Segment, SegmentAttributes } from "../useRuralPathDrawer";
 import styles from "./RuralPathSegmentForm.module.css";
 
 const SURFACE_OPTIONS = Object.values(RuralPathSurface).map((value) => ({

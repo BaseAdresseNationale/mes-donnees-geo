@@ -17,7 +17,7 @@ import {
   RuralPathStatus,
   SURFACE_COLORS,
 } from "@/components/chemins-ruraux/types";
-import styles from "./CheminsRurauxListMap.module.css";
+import styles from "./RuralPathsListMap.module.css";
 
 const SOURCE_ID = "chemins-ruraux";
 const LINE_LAYER_ID = "chemins-ruraux-line";

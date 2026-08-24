@@ -5,7 +5,6 @@ import {
   LayerProps,
   MapLayerMouseEvent,
   Source,
-  useMap,
 } from "react-map-gl/maplibre";
 import {
   PANORAMAX_LAYERS_SOURCE,
@@ -17,20 +16,19 @@ import {
   resolveNearestPictureAfterDive,
   snapPointToSequenceGeometry,
 } from "../layers/panoramax.layers";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import MapContext from "@/contexts/MapContext";
+import { useCommune } from "@/contexts/CommuneContext";
 
 const DIVE_TARGET_ZOOM = 20;
 const DIVE_DURATION_MS = 900;
 
 export function PanoramaxMap() {
-  const map = useMap();
   const router = useRouter();
-  const { codeCommune, plugin } = useParams<{
-    codeCommune: string;
-    plugin: string;
-  }>();
-  const { showPanoramax, isDiving, setIsDiving, setSavedView } =
-    useContext(PanoramaxContext);
+
+  const { codeInsee: codeCommune } = useCommune();
+  const { showPanoramax, isDiving, setIsDiving } = useContext(PanoramaxContext);
+  const { setSavedFlyToBounds, mapRef } = useContext(MapContext);
   const hoveredSequenceIdRef = useRef<string | null>(null);
 
   const handleClick = useCallback(
@@ -47,33 +45,28 @@ export function PanoramaxMap() {
         (feature.id != null ? String(feature.id) : undefined);
       if (!sequenceId) return;
 
-      const m = map.current?.getMap();
-      if (!m) return;
+      if (!mapRef) return;
 
       // Snap the click to the nearest point on the sequence polyline so the
       // dive lands on the line itself — guaranteeing that picture features
       // from that sequence are queryable around the viewport center after
       // the zoom-in completes.
-      const target = snapPointToSequenceGeometry(m, feature, [
+      const target = snapPointToSequenceGeometry(mapRef, feature, [
         e.lngLat.lng,
         e.lngLat.lat,
       ]);
 
       // Save current view to restore later (from the viewer page)
-      const center = m.getCenter();
-      setSavedView({
-        center: { lng: center.lng, lat: center.lat },
-        zoom: m.getZoom(),
-        pitch: m.getPitch(),
-        bearing: m.getBearing(),
-      });
+      setSavedFlyToBounds(
+        mapRef.getBounds().toArray() as [[number, number], [number, number]],
+      );
 
       setIsDiving(true);
 
       const onMoveEnd = async () => {
-        m.off("moveend", onMoveEnd);
+        mapRef.off("moveend", onMoveEnd);
         const resolved = await resolveNearestPictureAfterDive(
-          m,
+          mapRef,
           target,
           sequenceId,
         );
@@ -85,22 +78,21 @@ export function PanoramaxMap() {
           );
         }
       };
-      m.on("moveend", onMoveEnd);
+      mapRef.on("moveend", onMoveEnd);
 
       // "Plunge" effect: rapid zoom-in to the target location
-      m.easeTo({
+      mapRef.easeTo({
         center: target,
         zoom: DIVE_TARGET_ZOOM,
         duration: DIVE_DURATION_MS,
         essential: true,
       });
     },
-    [map, router, codeCommune, setIsDiving, setSavedView],
+    [mapRef, router, codeCommune, setIsDiving, setSavedFlyToBounds],
   );
 
   useEffect(() => {
-    const m = map.current?.getMap();
-    if (!m || !showPanoramax) {
+    if (!mapRef || !showPanoramax) {
       return;
     }
 
@@ -108,7 +100,7 @@ export function PanoramaxMap() {
       const prev = hoveredSequenceIdRef.current;
       if (prev === id) return;
       if (prev) {
-        m.setFeatureState(
+        mapRef.setFeatureState(
           {
             source: PANORAMAX_SOURCE_ID,
             sourceLayer: PANORAMAX_LAYERS_SOURCE.SEQUENCES,
@@ -118,7 +110,7 @@ export function PanoramaxMap() {
         );
       }
       if (id) {
-        m.setFeatureState(
+        mapRef.setFeatureState(
           {
             source: PANORAMAX_SOURCE_ID,
             sourceLayer: PANORAMAX_LAYERS_SOURCE.SEQUENCES,
@@ -137,33 +129,32 @@ export function PanoramaxMap() {
         (f?.id != null ? String(f.id) : undefined);
       if (!id) return;
       setHover(id);
-      m.getCanvas().style.cursor = "pointer";
+      mapRef.getCanvas().style.cursor = "pointer";
     };
     const onLeave = () => {
       setHover(null);
-      m.getCanvas().style.cursor = "";
+      mapRef.getCanvas().style.cursor = "";
     };
 
-    m.on("click", PANORAMAX_SEQUENCE_LAYER_ID, handleClick);
-    m.on("mousemove", PANORAMAX_SEQUENCE_LAYER_ID, onMove);
-    m.on("mouseleave", PANORAMAX_SEQUENCE_LAYER_ID, onLeave);
+    mapRef.on("click", PANORAMAX_SEQUENCE_LAYER_ID, handleClick);
+    mapRef.on("mousemove", PANORAMAX_SEQUENCE_LAYER_ID, onMove);
+    mapRef.on("mouseleave", PANORAMAX_SEQUENCE_LAYER_ID, onLeave);
 
     return () => {
-      m.off("click", PANORAMAX_SEQUENCE_LAYER_ID, handleClick);
-      m.off("mousemove", PANORAMAX_SEQUENCE_LAYER_ID, onMove);
-      m.off("mouseleave", PANORAMAX_SEQUENCE_LAYER_ID, onLeave);
-      m.getCanvas().style.cursor = "";
+      mapRef.off("click", PANORAMAX_SEQUENCE_LAYER_ID, handleClick);
+      mapRef.off("mousemove", PANORAMAX_SEQUENCE_LAYER_ID, onMove);
+      mapRef.off("mouseleave", PANORAMAX_SEQUENCE_LAYER_ID, onLeave);
+      mapRef.getCanvas().style.cursor = "";
       setHover(null);
     };
-  }, [map, showPanoramax, handleClick]);
+  }, [mapRef, showPanoramax, handleClick]);
 
   // Force a re-render when toggled on, so tiles refresh
   useEffect(() => {
-    const m = map.current;
-    if (m && showPanoramax) {
-      m.zoomTo(m.getZoom(), { duration: 0 });
+    if (mapRef && showPanoramax) {
+      mapRef.zoomTo(mapRef.getZoom(), { duration: 0 });
     }
-  }, [map, showPanoramax]);
+  }, [mapRef, showPanoramax]);
 
   if (!process.env.NEXT_PUBLIC_PANORAMAX_API_URL) {
     return null;

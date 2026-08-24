@@ -5,7 +5,7 @@ import { Layer, LayerProps, Source, useMap } from "react-map-gl/maplibre";
 import type { ExpressionSpecification } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import { SURFACE_COLORS } from "@/components/chemins-ruraux/types";
-import { Segment } from "./useCheminsRurauxDrawer";
+import { Segment } from "../useRuralPathDrawer";
 
 const EDIT_SOURCE_ID = "chemins-ruraux-edit";
 const EDIT_CASING_LAYER_ID = "chemins-ruraux-edit-casing";
