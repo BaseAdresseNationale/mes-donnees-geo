@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { Feature, Position, LineString as GeoLineString } from "geojson";
 import {
@@ -9,6 +16,7 @@ import {
   RuralPathSurface,
 } from "@/generated/prisma/browser";
 import type { RuralPathSegment } from "./types";
+import DrawContext from "@/contexts/DrawContext";
 
 type CartesianPoint = { x: number; y: number };
 
@@ -139,6 +147,7 @@ export function useRuralPathDrawer(
   >(null);
   const [mode, setModeState] = useState<DrawMode>("draw");
   const [isReady, setIsReady] = useState(false);
+  const { setIsDrawing } = useContext(DrawContext);
 
   const segmentsRef = useRef<Segment[]>([]);
   const modeRef = useRef<DrawMode>("draw");
@@ -154,6 +163,12 @@ export function useRuralPathDrawer(
   useEffect(() => {
     setMapMessageRef.current = setMapMessage;
   }, [setMapMessage]);
+
+  useEffect(() => {
+    setIsDrawing(true);
+
+    return () => setIsDrawing(false);
+  }, [setIsDrawing]);
 
   const guidanceMessage = useCallback(() => {
     if (modeRef.current === "select") return MSG_SELECT;

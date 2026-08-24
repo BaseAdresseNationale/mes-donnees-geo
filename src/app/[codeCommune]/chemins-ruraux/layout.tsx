@@ -7,6 +7,7 @@ import { getCommuneFlag } from "@/lib/api/blason-commune";
 import { PluginLayout } from "@/layouts/PluginLayout";
 import { RuralPathToolbar } from "@/components/chemins-ruraux/list/RuralPathsToolbar";
 import { CommuneSettings } from "@/components/plugin-workspace/CommuneSettings";
+import { LayersSwitch } from "@/components/map/controls/LayersSwitch";
 
 const PLUGIN_ID = "chemins-ruraux";
 
@@ -41,6 +42,7 @@ export default async function CheminsRurauxLayout({
           communeFlagUrl={communeFlagUrl}
         />
       }
+      mapToolChildren={<LayersSwitch />}
     >
       {children}
     </PluginLayout>

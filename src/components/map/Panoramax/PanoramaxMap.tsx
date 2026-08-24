@@ -15,7 +15,7 @@ import {
   panoramaxSequenceLayer,
   resolveNearestPictureAfterDive,
   snapPointToSequenceGeometry,
-} from "../layers/panoramax.layers";
+} from "./panoramax.layers";
 import { useRouter } from "next/navigation";
 import MapContext from "@/contexts/MapContext";
 import { useCommune } from "@/contexts/CommuneContext";

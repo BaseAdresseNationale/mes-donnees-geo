@@ -1,6 +1,6 @@
 "use client";
 
-import { PANORAMAX_VIEWER_URL } from "@/components/map/layers/panoramax.layers";
+import { PANORAMAX_VIEWER_URL } from "@/components/map/Panoramax/panoramax.layers";
 import { PanoramaxViewer } from "@/components/panoramax/PanoramaxViewer";
 import { useCallback, useEffect } from "react";
 import { useDOMRef } from "@/hooks/useDOMRef";

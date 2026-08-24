@@ -105,6 +105,7 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
       : [];
 
     const displaySegments = [...drawer.segments, ...preview];
+
     setMapChildren(
       <CheminsRurauxFormMap
         drawSegments={displaySegments}

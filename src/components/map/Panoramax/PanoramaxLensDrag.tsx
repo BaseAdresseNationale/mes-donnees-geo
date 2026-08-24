@@ -11,7 +11,7 @@ import {
   PANORAMAX_SEQUENCE_LAYER_ID,
   resolveNearestPictureAfterDive,
   snapPointToSequenceGeometry,
-} from "../layers/panoramax.layers";
+} from "./panoramax.layers";
 import styles from "./PanoramaxLensDrag.module.css";
 import Image from "next/image";
 

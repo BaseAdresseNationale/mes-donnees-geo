@@ -4,7 +4,7 @@ import PanoramaxContext from "@/contexts/PanoramaxContext";
 import {
   PANORAMAX_LAYERS_SOURCE,
   PANORAMAX_SOURCE_ID,
-} from "../layers/panoramax.layers";
+} from "./panoramax.layers";
 import cssStyles from "./PanoramaxToggle.module.css";
 
 const ENABLED_TITLE = "Masquer Panoramax";

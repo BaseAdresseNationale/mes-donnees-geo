@@ -134,11 +134,12 @@ export const toponymeLayer = {
   },
 };
 
-const BANLayers = [
+export const BANLayers: Array<{
+  layer: any;
+  interactive: boolean;
+}> = [
   { layer: adresseCircleLayer, interactive: true },
-  { layer: adresseLabelLayer },
-  { layer: voieLayer, interactive: true },
-  { layer: toponymeLayer, interactive: true },
+  { layer: adresseLabelLayer, interactive: false },
+  { layer: voieLayer, interactive: false },
+  { layer: toponymeLayer, interactive: false },
 ];
-
-export default BANLayers;

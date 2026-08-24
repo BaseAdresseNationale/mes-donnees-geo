@@ -8,13 +8,13 @@ import { PanoramaxMap } from "@/components/map/Panoramax/PanoramaxMap";
 import { PanoramaxLensDrag } from "@/components/map/Panoramax/PanoramaxLensDrag";
 import { StylesSwitch } from "@/components/map/controls/StylesSwitch";
 import { mapStyles } from "@/components/map/styles";
-import MapContext from "@/contexts/MapContext";
+import MapContext, { AvailableDataLayer } from "@/contexts/MapContext";
 import { useLocalStorageContext } from "@/contexts/LocalStorageContext";
 import {
   parcelleHoveredLayer,
   staticCadastreLayers,
-} from "@/components/map/layers/cadastre.layers";
-import { PANORAMAX_SEQUENCE_LAYER_ID } from "@/components/map/layers/panoramax.layers";
+} from "@/components/map/cadastre/cadastre.layers";
+import { PANORAMAX_SEQUENCE_LAYER_ID } from "@/components/map/Panoramax/panoramax.layers";
 import { useCommune } from "@/contexts/CommuneContext";
 import { buildInvertedMask } from "@/lib/geo/mask";
 import {
@@ -24,8 +24,10 @@ import {
   communeOutlineCasingLayer,
   communeOutlineLayer,
 } from "@/components/map/layers/commune.layers";
-import { CadastreControl } from "@/components/map/controls/cadastre/CadastreControl";
+import { CadastreControl } from "@/components/map/cadastre/CadastreControl";
 import { ControlGroupPortal } from "@/components/map/controls/ControlGroupPortal";
+import { BANMap } from "@/components/map/ban/BANMap";
+import { BANLayers } from "@/components/map/ban/ban.layers";
 
 type MapLayoutProps = {
   toolbarChildren?: React.ReactNode;
@@ -40,8 +42,13 @@ export function MapLayout({
   const onMouseEnter = useCallback(() => setCursor("pointer"), []);
   const onMouseLeave = useCallback(() => setCursor(null), []);
 
-  const { mapRefCb, mapChildren, mapMessage, mapToolChildren } =
-    useContext(MapContext);
+  const {
+    mapRefCb,
+    mapChildren,
+    mapMessage,
+    mapToolChildren,
+    activeDataLayers,
+  } = useContext(MapContext);
   const { showCadastre, setShowCadastre } = useContext(CadastreContext);
   const { contour: communeContour } = useCommune();
   const { basemapId } = useLocalStorageContext();
@@ -74,9 +81,17 @@ export function MapLayout({
           interactiveLayerIds={[
             parcelleHoveredLayer.id,
             PANORAMAX_SEQUENCE_LAYER_ID,
+            ...(BANLayers.filter((layer) => layer.interactive).map(
+              ({ layer }) => layer.id,
+            ) || []),
           ]}
           {...(cursor ? { cursor } : {})}
         >
+          {mapMessage && (
+            <div className={styles.mapMessage} role="status">
+              {mapMessage}
+            </div>
+          )}
           <Source
             id="cadastre"
             type="vector"
@@ -118,20 +133,16 @@ export function MapLayout({
           </Source>
           <PanoramaxMap />
 
-          {mapChildren}
+          {activeDataLayers.includes(AvailableDataLayer.BAN) && <BANMap />}
 
-          {mapMessage && (
-            <div className={styles.mapMessage} role="status">
-              {mapMessage}
-            </div>
-          )}
+          {mapChildren}
 
           <PanoramaxLensDrag />
           <NavigationControl position="bottom-right" />
           <ControlGroupPortal position="bottom-left">
             <StylesSwitch styles={mapStyles} />
-            <PanoramaxToggle />
             {mapToolChildren}
+            <PanoramaxToggle />
             <CadastreControl
               showCadastre={showCadastre}
               setShowCadastre={setShowCadastre}

@@ -15,6 +15,14 @@ export const FLY_TO_DURATION_MS = 1500;
 export const FLY_TO_PADDING = 64;
 export const FLY_TO_MAX_ZOOM = 17;
 
+export enum AvailableDataLayer {
+  BAN = "ban",
+}
+
+export const availableDataLayerOptions = [
+  { value: AvailableDataLayer.BAN, label: "Adresses" },
+];
+
 interface MapContextValue {
   mapRef: MapRef | null;
   mapRefCb: (instance: MapRef | null) => void;
@@ -31,6 +39,10 @@ interface MapContextValue {
   setSavedFlyToBounds: React.Dispatch<
     React.SetStateAction<[[number, number], [number, number]] | null>
   >;
+  activeDataLayers: AvailableDataLayer[];
+  setActiveDataLayers: React.Dispatch<
+    React.SetStateAction<AvailableDataLayer[]>
+  >;
 }
 
 export const MapContext = createContext<MapContextValue>({
@@ -45,6 +57,8 @@ export const MapContext = createContext<MapContextValue>({
   flyToBounds: () => {},
   savedFlyToBounds: null,
   setSavedFlyToBounds: () => {},
+  activeDataLayers: [],
+  setActiveDataLayers: () => {},
 });
 
 export function MapContextProvider(props: { children: React.ReactNode }) {
@@ -61,6 +75,9 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
     [[number, number], [number, number]] | null
   >(null);
   const [isStyleLoaded, setIsStyleLoaded] = useState(false);
+  const [activeDataLayers, setActiveDataLayers] = useState<
+    AvailableDataLayer[]
+  >([]);
   const { contour: communeContour } = useCommune();
 
   useEffect(() => {
@@ -123,6 +140,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
       flyToBounds,
       savedFlyToBounds,
       setSavedFlyToBounds,
+      activeDataLayers,
+      setActiveDataLayers,
     }),
     [
       mapRef,
@@ -136,6 +155,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
       flyToBounds,
       savedFlyToBounds,
       setSavedFlyToBounds,
+      activeDataLayers,
+      setActiveDataLayers,
     ],
   );
 
