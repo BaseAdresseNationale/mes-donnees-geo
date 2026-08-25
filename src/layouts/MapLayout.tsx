@@ -65,7 +65,7 @@ export function MapLayout({
 
   return (
     <AppLayout {...props}>
-      <div className={styles.mapWrapper}>
+      <main className={styles.mapWrapper}>
         <div
           className={`${styles.toolbar} ${toolbarChildren ? styles.toolbarOpen : ""}`}
           role="toolbar"
@@ -149,7 +149,7 @@ export function MapLayout({
             />
           </ControlGroupPortal>
         </Map>
-      </div>
+      </main>
     </AppLayout>
   );
 }

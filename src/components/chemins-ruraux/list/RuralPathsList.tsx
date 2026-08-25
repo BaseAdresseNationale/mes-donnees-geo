@@ -57,6 +57,7 @@ export function RuralPathList({ codeCommune, ruralPaths }: RuralPathListProps) {
         <div className={styles.toolbarRow}>
           <div className={styles.search}>
             <Input
+              aria-label="Rechercher un chemin rural"
               hideLabel
               fullWidth
               className={styles.searchInput}

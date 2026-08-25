@@ -79,7 +79,6 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
       type: "MultiLineString",
       coordinates: initial.segments.map((s) => s.path.coordinates),
     });
-    if (!bounds) return;
     flyToBounds(bounds);
   }, [flyToBounds, initial]);
 

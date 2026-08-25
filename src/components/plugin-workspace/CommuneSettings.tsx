@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
-  Icon,
   Modal,
   ModalSize,
   Switch,
@@ -12,7 +11,7 @@ import {
 import { useCommune } from "@/contexts/CommuneContext";
 import { formatCommuneName } from "@/lib/geo/commune";
 import styles from "./CommuneSettings.module.css";
-import Image from "next/image";
+import ResponsiveImage from "../common/responsive-image";
 
 interface CommuneSettingsProps {
   currentPluginId?: string;
@@ -90,11 +89,10 @@ export function CommuneSettings({
         variant="tertiary"
         size="small"
         icon={
-          <Image
+          <ResponsiveImage
             src={communeFlagUrl}
             alt={`Blason de ${communeName}`}
-            width={24}
-            height={24}
+            style={{ height: 24 }}
           />
         }
         aria-label={`Paramètres de ${communeName} (${commune.codeInsee})`}

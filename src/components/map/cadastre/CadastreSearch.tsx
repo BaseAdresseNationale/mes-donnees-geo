@@ -48,6 +48,7 @@ function CadastreSearch({ visible }: CadastreSearchProps) {
       }
     >
       <AutocompleteInput
+        label="Rechercher une parcelle cadastrale"
         key={String(visible)}
         onSearch={handleSearchParcelle}
         onSelect={handleSelectParcelle}

@@ -33,7 +33,7 @@ interface MapContextValue {
   mapToolChildren: React.ReactNode | null;
   setMapToolChildren: (children: React.ReactNode) => void;
   flyToBounds: (
-    bounds?: [[number, number], [number, number]],
+    bounds?: [[number, number], [number, number]] | null,
   ) => boolean | void;
   savedFlyToBounds: [[number, number], [number, number]] | null;
   setSavedFlyToBounds: React.Dispatch<
@@ -93,7 +93,7 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
   }, [mapRef, isStyleLoaded]);
 
   const flyToBounds = useCallback(
-    (bounds?: [[number, number], [number, number]]): boolean | void => {
+    (bounds?: [[number, number], [number, number]] | null): boolean | void => {
       const m = mapRef?.getMap();
       const communeBounds = communeContour
         ? geometryBounds(communeContour.geometry)
