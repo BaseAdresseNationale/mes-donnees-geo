@@ -172,7 +172,6 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           return;
         }
         const saved = (await res.json()) as RuralPath;
-        router.refresh();
         router.push(`/${codeCommune}/chemins-ruraux/${saved.id}`);
         setSubmitStatus("success");
       } catch {
@@ -200,7 +199,6 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           setSubmitStatus("error");
           return;
         }
-        router.refresh();
         router.push(`/${codeCommune}/chemins-ruraux`);
       } catch {
         setSubmitStatus("error");
