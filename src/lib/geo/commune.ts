@@ -35,66 +35,88 @@ export function formatCommuneName(nom: string): string {
     );
 }
 
-interface EntrepriseSearchResult {
-  results: Array<{
-    siren: string;
-    nom_complet?: string;
-    nom_raison_sociale?: string;
-    nature_juridique?: string;
-    siege?: {
-      siret?: string;
-      commune?: string;
-      libelle_commune?: string;
+interface InseeSiretResponse {
+  etablissement?: {
+    siren?: string;
+    siret?: string;
+    uniteLegale?: {
+      denominationUniteLegale?: string | null;
+      nomUniteLegale?: string | null;
+      prenomUsuelUniteLegale?: string | null;
+      categorieJuridiqueUniteLegale?: string | null;
     };
-  }>;
+    adresseEtablissement?: {
+      codeCommuneEtablissement?: string | null;
+    };
+  };
+}
+
+function inseeSettings(): { apiUrl: string; apiKey: string } {
+  const apiUrl = process.env.INSEE_API_URL;
+  const apiKey = process.env.INSEE_API_KEY_INTEGRATION;
+  if (!apiUrl || !apiKey) {
+    throw new Error(
+      "Configuration API Sirene incomplète (INSEE_API_URL, INSEE_API_KEY_INTEGRATION requis).",
+    );
+  }
+  return { apiUrl, apiKey };
 }
 
 /**
- * Résout un SIRET vers ses métadonnées via l'API publique
- * https://recherche-entreprises.api.gouv.fr (INSEE / annuaire des entreprises).
+ * Résout un SIRET vers ses métadonnées via l'API Sirene de l'INSEE
+ * (https://portail-api.insee.fr, endpoint /siret/{siret}).
  * Lève NotACommuneError si l'organisation n'est pas une commune (catégorie 7210).
  */
 export async function resolveCommuneFromSiret(
   siret: string,
 ): Promise<CommuneInfo> {
   const normalized = siret.replace(/\s+/g, "");
-  const url = new URL("https://recherche-entreprises.api.gouv.fr/search");
-  url.searchParams.set("q", normalized);
-  url.searchParams.set("per_page", "1");
+  const { apiUrl, apiKey } = inseeSettings();
 
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  const res = await fetch(`${apiUrl}/siret/${normalized}`, {
+    headers: {
+      "X-INSEE-Api-Key-Integration": apiKey,
+      Accept: "application/json",
+    },
+  });
+  if (res.status === 404) {
+    throw new NotACommuneError("SIRET introuvable dans le répertoire Sirene.");
+  }
   if (!res.ok) {
     throw new Error(`Recherche SIRET échouée (${res.status}).`);
   }
-  const data = (await res.json()) as EntrepriseSearchResult;
-  const hit = data.results?.[0];
-  if (!hit) {
-    throw new NotACommuneError(
-      "SIRET introuvable dans le répertoire des entreprises.",
-    );
+  const data = (await res.json()) as InseeSiretResponse;
+  const etablissement = data.etablissement;
+  const uniteLegale = etablissement?.uniteLegale;
+  if (!etablissement || !uniteLegale) {
+    throw new NotACommuneError("SIRET introuvable dans le répertoire Sirene.");
   }
 
-  const natureJuridique = hit.nature_juridique ?? "";
+  const natureJuridique = uniteLegale.categorieJuridiqueUniteLegale ?? "";
   if (natureJuridique !== COMMUNE_LEGAL_CATEGORY) {
     throw new NotACommuneError(
       `L'organisation rattachée à ce SIRET n'est pas une commune (catégorie juridique ${natureJuridique || "inconnue"}, attendu ${COMMUNE_LEGAL_CATEGORY}).`,
     );
   }
 
-  const codeInsee = hit.siege?.commune;
+  const codeInsee =
+    etablissement.adresseEtablissement?.codeCommuneEtablissement;
   if (!codeInsee) {
     throw new NotACommuneError("Code INSEE de la commune introuvable.");
   }
 
+  const nom =
+    uniteLegale.denominationUniteLegale ||
+    (uniteLegale.nomUniteLegale
+      ? `${uniteLegale.prenomUsuelUniteLegale ?? ""} ${uniteLegale.nomUniteLegale}`.trim()
+      : null) ||
+    "Commune";
+
   return {
-    siret: hit.siege?.siret ?? normalized,
-    siren: hit.siren,
+    siret: etablissement.siret ?? normalized,
+    siren: etablissement.siren ?? normalized.slice(0, 9),
     codeInsee,
-    nom:
-      hit.siege?.libelle_commune ??
-      hit.nom_complet ??
-      hit.nom_raison_sociale ??
-      "Commune",
+    nom,
     natureJuridique,
   };
 }
