@@ -24,6 +24,26 @@ export class NotACommuneError extends Error {
   }
 }
 
+// `fetch` (undici) ne remonte que le message générique "fetch failed" ; la
+// vraie cause (DNS, TLS, connexion refusée/timeout...) est dans `err.cause`.
+// On la journalise + on la répercute dans le message pour permettre un vrai
+// diagnostic depuis les logs serveur (ex. Scalingo).
+function describeFetchError(context: string, err: unknown): string {
+  const cause =
+    err instanceof Error ? (err as { cause?: unknown }).cause : undefined;
+  const causeDetail =
+    cause instanceof Error
+      ? `${cause.name}: ${cause.message}${
+          "code" in cause && (cause as NodeJS.ErrnoException).code
+            ? ` (${(cause as NodeJS.ErrnoException).code})`
+            : ""
+        }`
+      : undefined;
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`[commune] ${context} a échoué:`, err);
+  return causeDetail ? `${message} — cause: ${causeDetail}` : message;
+}
+
 /** Met en forme un nom de commune : "SAINT-DENIS" -> "Saint-Denis", "LA ROCHELLE" -> "La Rochelle". */
 export function formatCommuneName(nom: string): string {
   return nom
@@ -62,7 +82,17 @@ export async function resolveCommuneFromSiret(
   url.searchParams.set("q", normalized);
   url.searchParams.set("per_page", "1");
 
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    throw new Error(
+      `Recherche SIRET impossible: ${describeFetchError("recherche-entreprises.api.gouv.fr", err)}`,
+    );
+  }
   if (!res.ok) {
     throw new Error(`Recherche SIRET échouée (${res.status}).`);
   }
@@ -116,7 +146,17 @@ export async function fetchCommuneContour(
   url.searchParams.set("format", "geojson");
   url.searchParams.set("geometry", "contour");
 
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    throw new Error(
+      `Contour de la commune indisponible: ${describeFetchError("geo.api.gouv.fr", err)}`,
+    );
+  }
   if (!res.ok) {
     throw new Error(`Contour de la commune indisponible (${res.status}).`);
   }
