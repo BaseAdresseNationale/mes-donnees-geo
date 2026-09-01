@@ -69,55 +69,6 @@ interface EntrepriseSearchResult {
   }>;
 }
 
-// recherche-entreprises.api.gouv.fr limite à 7 req/s par IP (30/s par ASN) et
-// avertit explicitement que cette limite est probable "sur les cloud publics"
-// (IP sortante mutualisée entre apps, ex. Scalingo) : dépassement -> 429, ou
-// simple absence de réponse (connexion qui traîne jusqu'au timeout côté
-// client) en cas de forte charge. On retente donc quelques fois avant
-// d'abandonner, en respectant `Retry-After` s'il est présent.
-async function fetchWithRetry(
-  url: URL,
-  context: string,
-  attempts = 3,
-): Promise<Response> {
-  let lastErr: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10_000),
-      });
-    } catch (err) {
-      lastErr = err;
-      console.error(
-        `[commune] ${context} tentative ${attempt}/${attempts} a échoué:`,
-        err,
-      );
-      if (attempt < attempts) await sleep(500 * attempt);
-      continue;
-    }
-    if (res.status === 429 && attempt < attempts) {
-      const retryAfter = Number(res.headers.get("retry-after")) || 1;
-      console.error(
-        `[commune] ${context} 429 (tentative ${attempt}/${attempts}), retry-after ${retryAfter}s`,
-      );
-      await sleep(retryAfter * 1000);
-      continue;
-    }
-    return res;
-  }
-  throw new Error(
-    `${context} injoignable après ${attempts} tentatives: ${describeFetchError(context, lastErr)}`,
-  );
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-const siretCache = new Map<string, CommuneInfo>();
-
 /**
  * Résout un SIRET vers ses métadonnées via l'API publique
  * https://recherche-entreprises.api.gouv.fr (INSEE / annuaire des entreprises).
@@ -127,19 +78,19 @@ export async function resolveCommuneFromSiret(
   siret: string,
 ): Promise<CommuneInfo> {
   const normalized = siret.replace(/\s+/g, "");
-  const cached = siretCache.get(normalized);
-  if (cached) return cached;
-
   const url = new URL("https://recherche-entreprises.api.gouv.fr/search");
   url.searchParams.set("q", normalized);
   url.searchParams.set("per_page", "1");
 
   let res: Response;
   try {
-    res = await fetchWithRetry(url, "recherche-entreprises.api.gouv.fr");
+    res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
   } catch (err) {
     throw new Error(
-      `Recherche SIRET impossible: ${err instanceof Error ? err.message : String(err)}`,
+      `Recherche SIRET impossible: ${describeFetchError("recherche-entreprises.api.gouv.fr", err)}`,
     );
   }
   if (!res.ok) {
@@ -165,7 +116,7 @@ export async function resolveCommuneFromSiret(
     throw new NotACommuneError("Code INSEE de la commune introuvable.");
   }
 
-  const info: CommuneInfo = {
+  return {
     siret: hit.siege?.siret ?? normalized,
     siren: hit.siren,
     codeInsee,
@@ -176,8 +127,6 @@ export async function resolveCommuneFromSiret(
       "Commune",
     natureJuridique,
   };
-  siretCache.set(normalized, info);
-  return info;
 }
 
 const contourCache = new Map<string, Feature<Polygon | MultiPolygon>>();
@@ -199,10 +148,13 @@ export async function fetchCommuneContour(
 
   let res: Response;
   try {
-    res = await fetchWithRetry(url, "geo.api.gouv.fr");
+    res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
   } catch (err) {
     throw new Error(
-      `Contour de la commune indisponible: ${err instanceof Error ? err.message : String(err)}`,
+      `Contour de la commune indisponible: ${describeFetchError("geo.api.gouv.fr", err)}`,
     );
   }
   if (!res.ok) {
