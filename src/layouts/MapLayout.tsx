@@ -72,6 +72,11 @@ export function MapLayout({
           aria-label="Outils d'édition"
         >
           {toolbarChildren}
+          {mapMessage && (
+            <div className={styles.mapMessage} role="status">
+              {mapMessage}
+            </div>
+          )}
         </div>
         <Map
           ref={mapRefCb}
@@ -87,11 +92,6 @@ export function MapLayout({
           ]}
           {...(cursor ? { cursor } : {})}
         >
-          {mapMessage && (
-            <div className={styles.mapMessage} role="status">
-              {mapMessage}
-            </div>
-          )}
           <Source
             id="cadastre"
             type="vector"
