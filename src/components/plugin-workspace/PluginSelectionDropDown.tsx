@@ -1,4 +1,6 @@
 import { useCommune } from "@/contexts/CommuneContext";
+import { useContext } from "react";
+import { MapContext } from "@/contexts/MapContext";
 import {
   Button,
   DropdownMenu,
@@ -20,6 +22,7 @@ export function PluginSelectionDropDown({
 }: PluginSelectionDropDownProps) {
   const router = useRouter();
   const commune = useCommune();
+  const { setActiveDataLayers } = useContext(MapContext);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const currentPlugin = useMemo(
@@ -55,6 +58,7 @@ export function PluginSelectionDropDown({
         onOpenChange={setIsDropdownOpen}
         onSelectValue={(selectedId) => {
           if (selectedId && selectedId !== pluginId) {
+            setActiveDataLayers([]);
             router.push(`/${commune.codeInsee}/${selectedId}`);
           }
         }}
