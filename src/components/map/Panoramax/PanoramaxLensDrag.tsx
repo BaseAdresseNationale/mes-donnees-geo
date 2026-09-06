@@ -431,8 +431,9 @@ export function PanoramaxLensDrag() {
           width={100}
           height={100}
           src={thumbUrl}
-          alt=""
+          alt="Aperçu"
           className={styles.thumb}
+          unoptimized
         />
       )}
     </div>,
