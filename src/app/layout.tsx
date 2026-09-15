@@ -10,8 +10,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Mes données géo",
-    template: "%s · Mes données géo",
+    default: "Mes Adresses",
+    template: "%s · Mes Adresses",
   },
   description:
     "Outil cartographique pour les communes françaises : édition modulaire des adresses, contours, chemins ruraux, etc.",

@@ -40,11 +40,11 @@ export function AppLayout({
         <span className="headerLogo">
           <Image
             src={`/images/logo.svg`}
-            alt="Logo Mes données géo"
+            alt="Logo Mes Adresses"
             width={32}
             height={32}
           />
-          <b>Mes données géo</b>
+          <b>Mes Adresses</b>
         </span>
       }
       rightHeaderContent={

@@ -19,7 +19,7 @@ export function HomePageContent() {
             logo={
               <Image
                 src={`/images/logo.svg`}
-                alt="Logo Mes données géo"
+                alt="Logo Mes Adresses"
                 width={64}
                 height={64}
               />
