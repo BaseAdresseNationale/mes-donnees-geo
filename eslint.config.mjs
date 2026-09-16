@@ -5,6 +5,12 @@ const eslintConfig = [
   {
     ignores: ["prisma/migrations/**", "src/generated/**"],
   },
+  {
+    rules: {
+      // Utiliser les modales de @gouvfr-lasuite/ui-components (useModals) à la place.
+      "no-alert": "error",
+    },
+  },
 ];
 
 export default eslintConfig;

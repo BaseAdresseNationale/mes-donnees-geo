@@ -15,7 +15,7 @@ import {
   RuralPathEtat,
   RuralPathSurface,
 } from "@/generated/prisma/browser";
-import type { RuralPathSegment } from "./types";
+import type { RuralPath, RuralPathSegment } from "./types";
 import DrawContext from "@/contexts/DrawContext";
 
 type CartesianPoint = { x: number; y: number };
@@ -79,6 +79,8 @@ export interface UseRuralPathDrawerResult {
   removeSegment: (id: string) => void;
   toSegmentsInput: () => SegmentInput[];
   isReady: boolean;
+  mergedPathIds: string[];
+  mergePath: (otherPath: RuralPath) => void;
 }
 
 const DEFAULT_ATTRIBUTES: SegmentAttributes = {
@@ -94,6 +96,10 @@ const DEFAULT_ATTRIBUTES: SegmentAttributes = {
 const SNAP_PIXEL_DISTANCE = 25;
 // Tolérance, en mètres, pour considérer que deux points coïncident.
 const SNAP_TOLERANCE_METERS = 2;
+// Distance max, en mètres, entre deux extrémités pour autoriser la fusion de
+// deux chemins (plus tolérant que SNAP_TOLERANCE_METERS : les tronçons importés
+// ne se touchent pas toujours exactement).
+export const MERGE_TOLERANCE_METERS = 15;
 
 const MSG_DRAW_START =
   "Cliquez sur la carte pour commencer à tracer le chemin, double-cliquez pour terminer le segment.";
@@ -104,9 +110,12 @@ const MSG_INVALID_SEGMENT =
   "Le nouveau segment doit partir d'une extrémité du chemin existant.";
 const MSG_INVALID_DELETE =
   "Seuls le premier et le dernier segment du chemin peuvent être supprimés.";
+const MSG_MERGE_TOO_FAR = `Ce chemin est trop éloigné (> ${MERGE_TOLERANCE_METERS} m) pour être fusionné.`;
+const MSG_MERGE_SUCCESS =
+  "Chemin fusionné : enregistrez pour valider la fusion.";
 const ERROR_MESSAGE_DURATION_MS = 3500;
 
-function metersBetween(a: Position, b: Position): number {
+export function metersBetween(a: Position, b: Position): number {
   const [lng1, lat1] = a;
   const [lng2, lat2] = b;
   const latRad = ((lat1 + lat2) / 2) * (Math.PI / 180);
@@ -147,6 +156,7 @@ export function useRuralPathDrawer(
   >(null);
   const [mode, setModeState] = useState<DrawMode>("draw");
   const [isReady, setIsReady] = useState(false);
+  const [mergedPathIds, setMergedPathIds] = useState<string[]>([]);
   const { setIsDrawing } = useContext(DrawContext);
 
   const segmentsRef = useRef<Segment[]>([]);
@@ -545,6 +555,74 @@ export function useRuralPathDrawer(
     [showTemporaryError],
   );
 
+  // Fusionne un autre chemin (RuralPath) dans la chaîne en cours : ses segments
+  // deviennent des segments du chemin édité, accolés à l'extrémité la plus
+  // proche. Un éventuel petit écart entre les deux tracés est comblé en
+  // amenant le point de jonction exactement au contact (pas de trou).
+  const mergePath = useCallback(
+    (otherPath: RuralPath) => {
+      const chain = segmentsRef.current;
+      if (chain.length === 0 || otherPath.segments.length === 0) return;
+
+      const chainStart = chain[0].coordinates[0];
+      const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
+      const otherStart = otherPath.segments[0].path.coordinates[0];
+      const otherEnd = otherPath.segments.at(-1)!.path.coordinates.at(-1)!;
+
+      const candidates = [
+        { dist: metersBetween(chainEnd, otherStart), place: "append" as const, reverse: false },
+        { dist: metersBetween(chainEnd, otherEnd), place: "append" as const, reverse: true },
+        { dist: metersBetween(chainStart, otherEnd), place: "prepend" as const, reverse: false },
+        { dist: metersBetween(chainStart, otherStart), place: "prepend" as const, reverse: true },
+      ];
+      const best = candidates.reduce((a, b) => (b.dist < a.dist ? b : a));
+
+      if (best.dist > MERGE_TOLERANCE_METERS) {
+        showTemporaryError(MSG_MERGE_TOO_FAR);
+        return;
+      }
+
+      let toAdd: Segment[] = otherPath.segments.map((s) => ({
+        id: s.id,
+        coordinates: s.path.coordinates,
+        surface: s.surface,
+        largeurMoyenne: s.largeurMoyenne ?? null,
+        etatEntretien: s.etatEntretien ?? null,
+        etatConservation: s.etatConservation ?? null,
+        domanialite: s.domanialite ?? null,
+      }));
+      if (best.reverse) {
+        toAdd = [...toAdd]
+          .reverse()
+          .map((s) => ({ ...s, coordinates: [...s.coordinates].reverse() }));
+      }
+
+      // Snap : remplace le point de jonction pour supprimer tout écart résiduel.
+      if (best.place === "append") {
+        toAdd[0] = {
+          ...toAdd[0],
+          coordinates: [chainEnd, ...toAdd[0].coordinates.slice(1)],
+        };
+      } else {
+        const lastIdx = toAdd.length - 1;
+        toAdd[lastIdx] = {
+          ...toAdd[lastIdx],
+          coordinates: [...toAdd[lastIdx].coordinates.slice(0, -1), chainStart],
+        };
+      }
+
+      drawRef.current?.addFeatures(
+        toAdd.map((s) => toLineStringFeature(s.id, s.coordinates)),
+      );
+      setSegments((prev) =>
+        best.place === "append" ? [...prev, ...toAdd] : [...toAdd, ...prev],
+      );
+      setMergedPathIds((prev) => [...prev, otherPath.id]);
+      showTemporaryError(MSG_MERGE_SUCCESS);
+    },
+    [showTemporaryError],
+  );
+
   const toSegmentsInput = useCallback(
     (): SegmentInput[] =>
       segments.map((s) => ({
@@ -568,6 +646,8 @@ export function useRuralPathDrawer(
       removeSegment,
       toSegmentsInput,
       isReady,
+      mergedPathIds,
+      mergePath,
     }),
     [
       segments,
@@ -578,6 +658,8 @@ export function useRuralPathDrawer(
       removeSegment,
       toSegmentsInput,
       isReady,
+      mergedPathIds,
+      mergePath,
     ],
   );
 }

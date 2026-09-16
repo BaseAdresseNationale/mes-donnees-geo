@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
-import { getRuralPathById } from "@/lib/db/chemins-ruraux";
+import { getRuralPathById, getRuralPaths } from "@/lib/db/chemins-ruraux";
 import { RuralPathForm } from "@/components/chemins-ruraux/form/RuralPathForm";
 
 const UUID_RE =
@@ -18,7 +18,14 @@ export default async function RuralPathDetailPage({
   const ruralPath = await getRuralPathById(session.communeInsee, pathId);
   if (!ruralPath) notFound();
 
+  const allPaths = await getRuralPaths(session.communeInsee);
+  const otherPaths = allPaths.filter((p) => p.id !== ruralPath.id);
+
   return (
-    <RuralPathForm codeCommune={session.communeInsee} initial={ruralPath} />
+    <RuralPathForm
+      codeCommune={session.communeInsee}
+      initial={ruralPath}
+      otherPaths={otherPaths}
+    />
   );
 }

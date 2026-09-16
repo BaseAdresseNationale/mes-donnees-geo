@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Select } from "@gouvfr-lasuite/ui-components";
+import { Button, Input, Select, useModals } from "@gouvfr-lasuite/ui-components";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
 import styles from "./RuralPathForm.module.css";
@@ -19,10 +19,12 @@ import {
 import { CheminsRurauxFormMap } from "./RuralPathFormMap";
 import { geometryBounds } from "@/lib/geo/bounds";
 import MapContext from "@/contexts/MapContext";
+import { MERGE_TOLERANCE_METERS, metersBetween } from "../useRuralPathDrawer";
 
 interface RuralPathFormProps {
   codeCommune: string;
   initial?: RuralPath;
+  otherPaths?: RuralPath[];
 }
 
 const STATUS_OPTIONS = [
@@ -41,10 +43,15 @@ function formatLength(meters: number): string {
   return `${Math.round(meters)} m`;
 }
 
-export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
+export function RuralPathForm({
+  codeCommune,
+  initial,
+  otherPaths = [],
+}: RuralPathFormProps) {
   const router = useRouter();
   const { mapRef, setMapMessage, setMapChildren, flyToBounds } =
     useContext(MapContext);
+  const modals = useModals();
   const [pending, startTransition] = useTransition();
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "success" | "error"
@@ -88,6 +95,26 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     initial ? { segments: initial.segments } : null,
   );
 
+  // Autres chemins dont une extrémité touche (à ~15m près) une extrémité
+  // du chemin en cours d'édition : proposés à la fusion.
+  const mergeablePaths = useMemo(() => {
+    if (drawer.segments.length === 0) return [];
+    const chainStart = drawer.segments[0].coordinates[0];
+    const chainEnd = drawer.segments.at(-1)!.coordinates.at(-1)!;
+    return otherPaths.filter((p) => {
+      if (drawer.mergedPathIds.includes(p.id)) return false;
+      if (p.segments.length === 0) return false;
+      const otherStart = p.segments[0].path.coordinates[0];
+      const otherEnd = p.segments.at(-1)!.path.coordinates.at(-1)!;
+      return (
+        metersBetween(chainStart, otherStart) <= MERGE_TOLERANCE_METERS ||
+        metersBetween(chainStart, otherEnd) <= MERGE_TOLERANCE_METERS ||
+        metersBetween(chainEnd, otherStart) <= MERGE_TOLERANCE_METERS ||
+        metersBetween(chainEnd, otherEnd) <= MERGE_TOLERANCE_METERS
+      );
+    });
+  }, [drawer.segments, drawer.mergedPathIds, otherPaths]);
+
   useEffect(() => {
     const preview = drawer.previewCoordinates
       ? [
@@ -109,6 +136,8 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
       <CheminsRurauxFormMap
         drawSegments={displaySegments}
         hoveredSegmentId={hoveredSegmentId}
+        mergeablePaths={mergeablePaths}
+        onMergePath={drawer.mergePath}
       />,
     );
 
@@ -119,6 +148,8 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     setMapChildren,
     drawer.segments,
     drawer.previewCoordinates,
+    drawer.mergePath,
+    mergeablePaths,
     hoveredSegmentId,
   ]);
 
@@ -172,6 +203,15 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
           return;
         }
         const saved = (await res.json()) as RuralPath;
+        // Les chemins fusionnés n'existent plus en tant que chemins distincts :
+        // leurs segments viennent d'être absorbés dans `saved`.
+        if (drawer.mergedPathIds.length > 0) {
+          await Promise.allSettled(
+            drawer.mergedPathIds.map((id) =>
+              fetch(`/api/chemins-ruraux/${id}`, { method: "DELETE" }),
+            ),
+          );
+        }
         router.push(`/${codeCommune}/chemins-ruraux/${saved.id}`);
         setSubmitStatus("success");
       } catch {
@@ -180,15 +220,13 @@ export function RuralPathForm({ codeCommune, initial }: RuralPathFormProps) {
     });
   }
 
-  function remove() {
+  async function remove() {
     if (!initial) return;
-    if (
-      !window.confirm(
-        `Supprimer définitivement le chemin "${initial.nom || "sans nom"}" ?`,
-      )
-    ) {
-      return;
-    }
+    const decision = await modals.deleteConfirmationModal({
+      title: "Supprimer ce chemin ?",
+      children: `Supprimer définitivement le chemin "${initial.nom || "sans nom"}" ?`,
+    });
+    if (decision !== "delete") return;
     setSubmitStatus("idle");
     startTransition(async () => {
       try {
