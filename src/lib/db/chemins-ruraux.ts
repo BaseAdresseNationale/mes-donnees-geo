@@ -1,5 +1,8 @@
 import "server-only";
-import { Prisma } from "@/generated/prisma/client";
+import {
+  Prisma,
+  RuralPathStatus as RuralPathStatusEnum,
+} from "@/generated/prisma/client";
 import { prisma } from "./prisma";
 import type {
   RuralPath,
@@ -7,6 +10,7 @@ import type {
   RuralPathDomanialite,
   RuralPathEtat,
   RuralPathSegment,
+  RuralPathSource,
   RuralPathStatus,
   RuralPathSurface,
 } from "@/components/chemins-ruraux/types";
@@ -19,6 +23,7 @@ const SELECT = {
   classement: true,
   numero: true,
   commentaire: true,
+  source: true,
   createdAt: true,
   updatedAt: true,
   segments: {
@@ -56,6 +61,7 @@ type Row = {
   classement: RuralPathClassement;
   numero: number;
   commentaire: string | null;
+  source: RuralPathSource;
   segments: SegmentRow[];
   createdAt: Date;
   updatedAt: Date;
@@ -87,6 +93,7 @@ function toDomain(row: Row): RuralPath {
     classement: row.classement,
     numero: row.numero,
     ...(row.commentaire != null ? { commentaire: row.commentaire } : {}),
+    source: row.source,
     segments: row.segments.map(toDomainSegment),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -209,4 +216,64 @@ export async function softDeleteRuralPath(
     data: { deletedAt: new Date() },
   });
   return result.count > 0;
+}
+
+/** Références externes (ex. cleabs BD TOPO) déjà importées et non supprimées pour cette commune/source. */
+export async function getImportedSourceRefs(
+  codeCommune: string,
+  source: RuralPathSource,
+): Promise<Set<string>> {
+  const rows = await prisma.ruralPath.findMany({
+    where: { codeInsee: codeCommune, source, deletedAt: null },
+    select: { sourceRef: true },
+  });
+  return new Set(
+    rows.map((r) => r.sourceRef).filter((ref): ref is string => ref != null),
+  );
+}
+
+export interface RuralPathImportInput {
+  sourceRef: string;
+  nom: string | null;
+  classement: RuralPathClassement;
+  segment: RuralPathSegmentWriteInput;
+}
+
+/**
+ * Crée un lot de chemins brouillon (1 segment chacun) à partir d'une source externe.
+ * `numero` est attribué séquentiellement à partir du plus grand numéro existant de la commune,
+ * l'utilisateur le corrige ensuite lors de la qualification.
+ */
+export async function createRuralPathsFromImport(
+  codeCommune: string,
+  source: RuralPathSource,
+  inputs: RuralPathImportInput[],
+): Promise<RuralPath[]> {
+  if (inputs.length === 0) return [];
+
+  const maxNumero = await prisma.ruralPath.aggregate({
+    where: { codeInsee: codeCommune, deletedAt: null },
+    _max: { numero: true },
+  });
+  let nextNumero = (maxNumero._max.numero ?? 0) + 1;
+
+  return prisma
+    .$transaction(
+      inputs.map((input) =>
+        prisma.ruralPath.create({
+          data: {
+            codeInsee: codeCommune,
+            nom: input.nom,
+            statut: RuralPathStatusEnum.DRAFT,
+            classement: input.classement,
+            numero: nextNumero++,
+            source,
+            sourceRef: input.sourceRef,
+            segments: { create: segmentsCreateData([input.segment]) },
+          },
+          select: SELECT,
+        }),
+      ),
+    )
+    .then((rows) => rows.map((r) => toDomain(r as unknown as Row)));
 }

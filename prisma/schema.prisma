@@ -37,10 +37,8 @@ enum RuralPathSurface {
 }
 
 enum RuralPathClassement {
-  CHEMIN_RURAL          @map("chemin_rural")
-  VOIE_COMMUNALE        @map("voie_communale")
-  CHEMIN_D_EXPLOITATION @map("chemin_d_exploitation")
-  VOIE_COMMUNAUTAIRE    @map("voie_communautaire")
+  CHEMIN_RURAL   @map("chemin_rural")
+  VOIE_COMMUNALE @map("voie_communale")
 
   @@map("rural_path_classement")
 }
@@ -63,6 +61,13 @@ enum RuralPathDomanialite {
   @@map("rural_path_domanialite")
 }
 
+enum RuralPathSource {
+  MANUEL  @map("manuel")
+  BD_TOPO @map("bd_topo")
+
+  @@map("rural_path_source")
+}
+
 model RuralPath {
   id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   codeInsee   String              @map("code_insee") @db.VarChar(5)
@@ -71,6 +76,9 @@ model RuralPath {
   classement  RuralPathClassement
   numero      Int
   commentaire String?
+  source      RuralPathSource     @default(MANUEL)
+  // Identifiant de l'objet dans la source externe (ex. "cleabs" BD TOPO), pour éviter les doublons au réimport.
+  sourceRef   String?             @map("source_ref")
   segments    RuralPathSegment[]
   createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
@@ -78,6 +86,7 @@ model RuralPath {
 
   @@index([codeInsee])
   @@index([deletedAt])
+  @@index([codeInsee, source, sourceRef])
   @@map("rural_paths")
 }
 

@@ -4,6 +4,7 @@ export {
   RuralPathClassement,
   RuralPathEtat,
   RuralPathDomanialite,
+  RuralPathSource,
 } from "@/generated/prisma/browser";
 import type {
   RuralPathStatus,
@@ -11,6 +12,7 @@ import type {
   RuralPathClassement,
   RuralPathEtat,
   RuralPathDomanialite,
+  RuralPathSource,
 } from "@/generated/prisma/browser";
 
 export type RuralPathSegment = {
@@ -32,6 +34,7 @@ export type RuralPath = {
   classement: RuralPathClassement;
   numero: number;
   commentaire?: string;
+  source: RuralPathSource;
   segments: RuralPathSegment[];
   createdAt: string;
   updatedAt: string;
@@ -48,8 +51,6 @@ export const SURFACE_LABELS: Record<RuralPathSurface, string> = {
 export const CLASSEMENT_LABELS: Record<RuralPathClassement, string> = {
   CHEMIN_RURAL: "Chemin rural",
   VOIE_COMMUNALE: "Voie communale",
-  CHEMIN_D_EXPLOITATION: "Chemin d'exploitation",
-  VOIE_COMMUNAUTAIRE: "Voie communautaire",
 };
 
 export const ETAT_LABELS: Record<RuralPathEtat, string> = {
@@ -72,4 +73,9 @@ export const SURFACE_COLORS: Record<RuralPathSurface, string> = {
   PAVED: "#2b2b2b",
   STONED: "#c98a3f",
   GRASS: "#3f8a3f",
+};
+
+export const SOURCE_LABELS: Record<RuralPathSource, string> = {
+  MANUEL: "Saisie manuelle",
+  BD_TOPO: "Import BD TOPO",
 };
