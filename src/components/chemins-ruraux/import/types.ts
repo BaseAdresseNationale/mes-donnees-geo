@@ -11,6 +11,8 @@ export interface BdTopoCandidateResponse {
   longueur: number;
   path: GeoJSON.LineString;
   suggestedClassement: RuralPathClassement;
+  /** Numéro cadastral du chemin rural correspondant (géométrie coïncidente), si trouvé. */
+  suggestedNumero: number | null;
   suggestedSurface: RuralPathSurface;
   suggestedLargeurMoyenne: number | null;
   suggestedDomanialite: RuralPathDomanialite | null;

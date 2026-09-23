@@ -37,7 +37,7 @@ export const cadastralRuralPathsLabelLayer: LayerProps = {
   layout: {
     "symbol-placement": "line",
     "symbol-spacing": 350,
-    "text-field": ["get", "nom"],
+    "text-field": ["get", "libelle"],
     "text-font": ["Noto Sans Bold"],
     "text-size": 12,
   },

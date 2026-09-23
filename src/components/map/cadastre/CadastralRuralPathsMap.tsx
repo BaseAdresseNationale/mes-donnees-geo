@@ -11,7 +11,7 @@ import {
 } from "./cadastral-rural-paths.layers";
 
 interface CadastralRuralPathProperties {
-  nom: string;
+  libelle: string;
 }
 
 const EMPTY_FEATURE_COLLECTION: FeatureCollection<

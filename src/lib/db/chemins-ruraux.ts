@@ -236,12 +236,15 @@ export interface RuralPathImportInput {
   sourceRef: string;
   nom: string | null;
   classement: RuralPathClassement;
+  /** Numéro cadastral du chemin rural correspondant, sinon attribution séquentielle. */
+  numero?: number | null;
   segment: RuralPathSegmentWriteInput;
 }
 
 /**
  * Crée un lot de chemins brouillon (1 segment chacun) à partir d'une source externe.
- * `numero` est attribué séquentiellement à partir du plus grand numéro existant de la commune,
+ * `numero` est repris de `input.numero` (ex. numéro cadastral) s'il est fourni, sinon
+ * attribué séquentiellement à partir du plus grand numéro existant de la commune,
  * l'utilisateur le corrige ensuite lors de la qualification.
  */
 export async function createRuralPathsFromImport(
@@ -266,7 +269,7 @@ export async function createRuralPathsFromImport(
             nom: input.nom,
             statut: RuralPathStatusEnum.DRAFT,
             classement: input.classement,
-            numero: nextNumero++,
+            numero: input.numero ?? nextNumero++,
             source,
             sourceRef: input.sourceRef,
             segments: { create: segmentsCreateData([input.segment]) },

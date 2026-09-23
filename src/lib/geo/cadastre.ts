@@ -29,7 +29,11 @@ interface ZonCommuniCollection {
 }
 
 export interface CadastralRuralPathProperties {
-  nom: string;
+  /** Libellé brut tel qu'affiché sur le plan (ex. "Chemin rural n° 108 dit de la Barosserie"). */
+  libelle: string;
+  numero: number | null;
+  /** Partie nominale seule (ex. "de la Barosserie"), sans "Chemin rural n°X dit". */
+  nom: string | null;
 }
 
 // "Chemin rural" est un statut juridique, pas un type de voie unique : on ne
@@ -40,6 +44,39 @@ function isRuralPathLabel(parts: string[] | undefined): boolean {
   if (!parts) return false;
   const lowerParts = parts.map((part) => part.toLowerCase());
   return RURAL_PATH_LABEL_WORDS.every((word) => lowerParts.includes(word));
+}
+
+const RURAL_PATH_NUMERO_PATTERN = /^n[°o]\.?(\d+)$/i;
+
+// Un libellé cadastral "chemin rural" suit le patron "Chemin rural [n°X] [dit] [nom]"
+// (chaque mot pouvant être glué ou séparé selon les communes, cf. rural-paths.md).
+function parseRuralPathLabel(parts: string[]): {
+  numero: number | null;
+  nom: string | null;
+} {
+  const words = parts.flatMap((part) => part.split(/\s+/)).filter(Boolean);
+  let i = 0;
+  while (i < words.length && /^(chemin|rural)$/i.test(words[i])) i++;
+
+  let numero: number | null = null;
+  if (i < words.length) {
+    const glued = RURAL_PATH_NUMERO_PATTERN.exec(words[i]);
+    if (glued) {
+      numero = Number(glued[1]);
+      i++;
+    } else if (/^n[°o]\.?$/i.test(words[i]) && /^\d+$/.test(words[i + 1] ?? "")) {
+      numero = Number(words[i + 1]);
+      i += 2;
+    }
+  }
+
+  if (i < words.length && /^dit$/i.test(words[i])) i++;
+
+  const rest = words.slice(i).join(" ").trim();
+  // Un "reste" qui recontient "chemin rural" trahit un libellé dupliqué/mal formé (vu en pratique).
+  const nom = rest && !/chemin.*rural/i.test(rest) ? rest : null;
+
+  return { numero, nom };
 }
 
 // Codes commune DOM (971-978, 986-988) sur 3 chiffres, sinon 2 (dont Corse "2A"/"2B").
@@ -110,13 +147,15 @@ export class CadastreService {
       .filter((feature) =>
         isRuralPathLabel(feature.extraProperties?.labels?.parts),
       )
-      .map((feature) => ({
-        type: "Feature",
-        id: feature.id,
-        properties: {
-          nom: feature.extraProperties!.labels!.parts!.join(" "),
-        },
-        geometry: feature.geometry,
-      }));
+      .map((feature) => {
+        const parts = feature.extraProperties!.labels!.parts!;
+        const { numero, nom } = parseRuralPathLabel(parts);
+        return {
+          type: "Feature",
+          id: feature.id,
+          properties: { libelle: parts.join(" "), numero, nom },
+          geometry: feature.geometry,
+        };
+      });
   }
 }

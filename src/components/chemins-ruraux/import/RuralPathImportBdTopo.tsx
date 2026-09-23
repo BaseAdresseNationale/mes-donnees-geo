@@ -254,6 +254,9 @@ export function RuralPathImportBdTopo({
                       <span className={styles.itemMeta}>
                         <span>{c.nature}</span>
                         <span>{CLASSEMENT_LABELS[c.suggestedClassement]}</span>
+                        {c.suggestedNumero != null && (
+                          <span>Cadastre n°{c.suggestedNumero}</span>
+                        )}
                         <span>{formatLength(c.longueur)}</span>
                       </span>
                     </span>
