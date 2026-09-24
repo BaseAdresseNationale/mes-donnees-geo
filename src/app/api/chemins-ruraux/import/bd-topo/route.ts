@@ -38,6 +38,7 @@ async function assembleForCommune(
       path: feature.geometry,
       numero: feature.properties.numero,
       nom: feature.properties.nom,
+      libelle: feature.properties.libelle,
     })),
   );
 }

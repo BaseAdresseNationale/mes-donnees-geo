@@ -21,11 +21,16 @@ const GAP_FILL_MIN_METERS = 2;
 // Écart d'orientation max (mod 180°) entre un tronçon et le tracé cadastral local :
 // au-delà, le tronçon est jugé transversal (intersection/amorce) et écarté.
 const MAX_BEARING_DIFF_DEGREES = 45;
+// Dédoublonnage : une portion dont ≥ DEDUP_COVER_RATIO des points sont à ≤ DEDUP_TOL_METERS
+// d'une portion plus longue déjà retenue est jugée redondante (doublon/superposition BD TOPO).
+const DEDUP_TOL_METERS = 5;
+const DEDUP_COVER_RATIO = 0.7;
 
 export interface CadastralRuralPathGeometry {
   path: LineString;
   numero: number | null;
   nom: string | null;
+  libelle: string;
 }
 
 export interface AssembledSegment {
@@ -142,19 +147,15 @@ function nearestCadastral(
   return best;
 }
 
-// Regroupe les chemins ruraux cadastraux par identité légale : numéro d'abord
-// (unique dans la commune), sinon nom, sinon chaque feature isolément.
+// Regroupe les chemins ruraux cadastraux par identité : numéro + libellé (le numéro
+// seul fusionnait des chemins distincts). Fallback sur l'index de feature si pas de libellé.
 function groupCadastralPaths(
   cadastralPaths: CadastralRuralPathGeometry[],
 ): CadastralGroup[] {
   const groups = new Map<string, CadastralGroup>();
   cadastralPaths.forEach((cadastral, index) => {
-    const key =
-      cadastral.numero != null
-        ? `num:${cadastral.numero}`
-        : cadastral.nom
-          ? `nom:${cadastral.nom.toLocaleLowerCase()}`
-          : `feat:${index}`;
+    const label = cadastral.libelle.trim().toLocaleLowerCase();
+    const key = label ? `${cadastral.numero ?? ""}|${label}` : `feat:${index}`;
     const lineBbox = bbox(cadastral.path) as Bbox;
     const existing = groups.get(key);
     if (existing) {
@@ -318,6 +319,43 @@ function bdTopoSegment(portion: Portion): AssembledSegment {
   };
 }
 
+// Fraction des points de `path` situés à ≤ DEDUP_TOL_METERS de `cover`.
+function coverageRatio(path: LineString, cover: LineString): number {
+  const line = lineString(path.coordinates);
+  const length = turfLength(line, { units: "meters" });
+  const coverLine = lineString(cover.coordinates);
+  const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
+  let inside = 0;
+  for (let i = 0; i <= count; i++) {
+    const coord = along(line, (length * i) / count, { units: "meters" }).geometry
+      .coordinates as Position;
+    const dist =
+      nearestPointOnLine(coverLine, coord, { units: "meters" }).properties
+        .dist ?? Infinity;
+    if (dist <= DEDUP_TOL_METERS) inside++;
+  }
+  return inside / (count + 1);
+}
+
+// Écarte les portions redondantes (doublons/superpositions) qui produiraient des
+// allers-retours dans la chaîne : on garde les plus longues et on retire celles
+// largement recouvertes par une portion déjà conservée.
+function dedupePortions(portions: Portion[]): Portion[] {
+  const sorted = [...portions].sort(
+    (a, b) =>
+      turfLength(lineString(b.path.coordinates), { units: "meters" }) -
+      turfLength(lineString(a.path.coordinates), { units: "meters" }),
+  );
+  const kept: Portion[] = [];
+  for (const portion of sorted) {
+    const redundant = kept.some(
+      (k) => coverageRatio(portion.path, k.path) >= DEDUP_COVER_RATIO,
+    );
+    if (!redundant) kept.push(portion);
+  }
+  return kept;
+}
+
 /**
  * Assemble des chemins ruraux « prêts à importer » à partir des tronçons BD TOPO qui
  * coïncident géométriquement avec l'habillage cadastral. Chaque chemin cadastral
@@ -346,7 +384,7 @@ export function assembleRuralPathsFromCadastre(
     }
     if (portions.length === 0) continue;
 
-    const ordered = chainPortions(portions);
+    const ordered = chainPortions(dedupePortions(portions));
     const segments: AssembledSegment[] = [];
     for (let i = 0; i < ordered.length; i++) {
       if (i > 0) {

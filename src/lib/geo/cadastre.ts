@@ -61,6 +61,13 @@ function normalizePartsOrder(parts: string[]): string[] {
 
 const RURAL_PATH_NUMERO_PATTERN = /^n[°o]\.?(\d+)$/i;
 
+// Un nom réduit à un complément ("de la Barosserie") se lit mieux préfixé de "Chemin".
+function prefixCheminIfLiaison(nom: string): string {
+  return /^(de|des|du)\b/i.test(nom) || /^d['’]/i.test(nom)
+    ? `Chemin ${nom}`
+    : nom;
+}
+
 // Un libellé cadastral "chemin rural" suit le patron "Chemin rural [n°X] [dit] [nom]"
 // (chaque mot pouvant être glué ou séparé selon les communes, cf. rural-paths.md).
 function parseRuralPathLabel(parts: string[]): {
@@ -90,7 +97,8 @@ function parseRuralPathLabel(parts: string[]): {
 
   const rest = words.slice(i).join(" ").trim();
   // Un "reste" qui recontient "chemin rural" trahit un libellé dupliqué/mal formé (vu en pratique).
-  const nom = rest && !/chemin.*rural/i.test(rest) ? rest : null;
+  const nom =
+    rest && !/chemin.*rural/i.test(rest) ? prefixCheminIfLiaison(rest) : null;
 
   return { numero, nom };
 }

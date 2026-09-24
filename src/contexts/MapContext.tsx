@@ -27,10 +27,6 @@ export const availableDataLayerOptions = [
     value: AvailableDataLayer.CHEMINS_RURAUX,
     label: "Chemins Ruraux (Cadastre)",
   },
-  {
-    value: AvailableDataLayer.BD_TOPO,
-    label: "BD TOPO",
-  },
 ];
 
 interface MapContextValue {

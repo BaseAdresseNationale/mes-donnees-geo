@@ -223,7 +223,6 @@ export function RuralPathImportBdTopo({
                     <span className={styles.itemBody}>
                       <span className={styles.itemTitle}>{pathLabel(p)}</span>
                       <span className={styles.itemMeta}>
-                        {p.numero != null && <span>Cadastre n°{p.numero}</span>}
                         <span>
                           {p.segments.length} segment
                           {p.segments.length > 1 ? "s" : ""}
