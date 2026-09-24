@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import turfLength from "@turf/length";
+import { lineString } from "@turf/helpers";
 import { requireSession } from "@/lib/auth/session";
-import { BdTopoService, type BdTopoTronconCandidate } from "@/lib/geo/bd-topo";
+import { BdTopoService } from "@/lib/geo/bd-topo";
 import { CadastreService } from "@/lib/geo/cadastre";
 import {
-  matchTronconsWithCadastre,
-  type CadastralMatch,
+  assembleRuralPathsFromCadastre,
+  type AssembledRuralPath,
 } from "@/lib/geo/rural-path-cadastre-matching";
 import {
   createRuralPathsFromImport,
@@ -15,27 +17,49 @@ import {
   RuralPathClassement,
   RuralPathSource,
 } from "@/components/chemins-ruraux/types";
-import type { BdTopoCandidateResponse } from "@/components/chemins-ruraux/import/types";
+import type { AssembledRuralPathResponse } from "@/components/chemins-ruraux/import/types";
 
-// Format observé des identifiants BD TOPO (ex. "TRONROUT0000000243955677") :
-// validé strictement avant réutilisation dans un CQL_FILTER (défense contre l'injection CQL).
-const CLEABS_RE = /^[A-Za-z0-9]{1,64}$/;
-const MAX_SELECTION = 2000;
+const MAX_SELECTION = 500;
 
-async function matchCandidatesWithCadastre(
+/**
+ * Assemble côté serveur les chemins ruraux cadastraux à partir de la voirie BD TOPO
+ * (jamais de confiance à une géométrie fournie par le client — tout est recalculé ici).
+ */
+async function assembleForCommune(
   codeInsee: string,
-  candidates: BdTopoTronconCandidate[],
-): Promise<Map<string, CadastralMatch>> {
-  const cadastralRuralPaths =
-    await CadastreService.findRuralPathToponymsForCommune(codeInsee);
-  return matchTronconsWithCadastre(
+): Promise<AssembledRuralPath[]> {
+  const [candidates, cadastralPaths] = await Promise.all([
+    BdTopoService.findTronconsForCommune(codeInsee),
+    CadastreService.findRuralPathToponymsForCommune(codeInsee),
+  ]);
+  return assembleRuralPathsFromCadastre(
     candidates,
-    cadastralRuralPaths.map((feature) => ({
+    cadastralPaths.map((feature) => ({
       path: feature.geometry,
       numero: feature.properties.numero,
       nom: feature.properties.nom,
+      libelle: feature.properties.libelle,
     })),
   );
+}
+
+function totalLength(assembled: AssembledRuralPath): number {
+  return assembled.segments.reduce(
+    (sum, seg) =>
+      sum + turfLength(lineString(seg.path.coordinates), { units: "meters" }),
+    0,
+  );
+}
+
+// Un chemin est considéré « déjà importé » si toutes ses références BD TOPO le sont.
+function isAlreadyImported(
+  assembled: AssembledRuralPath,
+  importedRefs: Set<string>,
+): boolean {
+  const refs = assembled.segments
+    .map((seg) => seg.sourceRef)
+    .filter((ref): ref is string => ref != null);
+  return refs.length > 0 && refs.every((ref) => importedRefs.has(ref));
 }
 
 export async function GET(): Promise<Response> {
@@ -46,33 +70,23 @@ export async function GET(): Promise<Response> {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const [candidates, importedRefs] = await Promise.all([
-    BdTopoService.findTronconsForCommune(session.communeInsee),
+  const [assembled, importedRefs] = await Promise.all([
+    assembleForCommune(session.communeInsee),
     getImportedSourceRefs(session.communeInsee, RuralPathSource.BD_TOPO),
   ]);
-  const cadastralMatches = await matchCandidatesWithCadastre(
-    session.communeInsee,
-    candidates,
-  );
 
-  const response: BdTopoCandidateResponse[] = candidates.map((c) => {
-    const cadastral = cadastralMatches.get(c.cleabs);
-    return {
-      cleabs: c.cleabs,
-      nature: c.nature,
-      nomVoie: cadastral?.nom ?? c.nomVoie,
-      longueur: c.longueur,
-      path: c.path,
-      suggestedClassement: cadastral
-        ? RuralPathClassement.CHEMIN_RURAL
-        : c.suggestedClassement,
-      suggestedNumero: cadastral?.numero ?? null,
-      suggestedSurface: c.suggestedSurface,
-      suggestedLargeurMoyenne: c.suggestedLargeurMoyenne,
-      suggestedDomanialite: c.suggestedDomanialite,
-      alreadyImported: importedRefs.has(c.cleabs),
-    };
-  });
+  const response: AssembledRuralPathResponse[] = assembled.map((path) => ({
+    key: path.key,
+    numero: path.numero,
+    nom: path.nom,
+    segments: path.segments.map((seg) => ({
+      path: seg.path,
+      source: seg.source,
+      surface: seg.surface,
+    })),
+    longueur: totalLength(path),
+    alreadyImported: isAlreadyImported(path, importedRefs),
+  }));
 
   return NextResponse.json(response);
 }
@@ -92,65 +106,56 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "JSON invalide" }, { status: 400 });
   }
 
-  const cleabs = (body as { cleabs?: unknown } | null)?.cleabs;
+  const keys = (body as { keys?: unknown } | null)?.keys;
   if (
-    !Array.isArray(cleabs) ||
-    cleabs.length === 0 ||
-    cleabs.length > MAX_SELECTION ||
-    !cleabs.every(
-      (c): c is string => typeof c === "string" && CLEABS_RE.test(c),
+    !Array.isArray(keys) ||
+    keys.length === 0 ||
+    keys.length > MAX_SELECTION ||
+    !keys.every(
+      (k): k is string =>
+        typeof k === "string" && k.length > 0 && k.length <= 200,
     )
   ) {
     return NextResponse.json(
-      { error: "Sélection invalide (identifiants BD TOPO attendus)." },
+      { error: "Sélection invalide (clés de chemins attendues)." },
       { status: 422 },
     );
   }
 
-  const alreadyImported = await getImportedSourceRefs(
-    session.communeInsee,
-    RuralPathSource.BD_TOPO,
-  );
-  const toImport = cleabs.filter((c) => !alreadyImported.has(c));
+  const [assembled, importedRefs] = await Promise.all([
+    assembleForCommune(session.communeInsee),
+    getImportedSourceRefs(session.communeInsee, RuralPathSource.BD_TOPO),
+  ]);
 
-  // Ne jamais faire confiance à la géométrie/attributs éventuellement fournis par le client :
-  // on ré-interroge le WFS côté serveur à partir des seuls identifiants sélectionnés.
-  const candidates = await BdTopoService.findTronconsByCleabs(toImport);
-  const cadastralMatches = await matchCandidatesWithCadastre(
-    session.communeInsee,
-    candidates,
-  );
-
-  const inputs: RuralPathImportInput[] = candidates.map((c) => {
-    const cadastral = cadastralMatches.get(c.cleabs);
-    return {
-      sourceRef: c.cleabs,
-      nom: cadastral?.nom ?? c.nomVoie,
-      classement: cadastral
-        ? RuralPathClassement.CHEMIN_RURAL
-        : c.suggestedClassement,
-      numero: cadastral?.numero ?? null,
-      segment: {
-        path: c.path,
-        surface: c.suggestedSurface,
-        largeurMoyenne: c.suggestedLargeurMoyenne,
+  const selectedKeys = new Set(keys);
+  const inputs: RuralPathImportInput[] = assembled
+    .filter(
+      (path) =>
+        selectedKeys.has(path.key) && !isAlreadyImported(path, importedRefs),
+    )
+    .map((path) => ({
+      nom: path.nom,
+      classement: RuralPathClassement.CHEMIN_RURAL,
+      numero: path.numero,
+      segments: path.segments.map((seg) => ({
+        path: seg.path,
+        surface: seg.surface,
+        largeurMoyenne: seg.largeurMoyenne,
         etatEntretien: null,
         etatConservation: null,
-        domanialite: c.suggestedDomanialite,
-      },
-    };
-  });
+        domanialite: seg.domanialite,
+        source: seg.source,
+        sourceRef: seg.sourceRef,
+      })),
+    }));
 
   const created = await createRuralPathsFromImport(
     session.communeInsee,
-    RuralPathSource.BD_TOPO,
     inputs,
   );
 
   return NextResponse.json(
     { created: created.length, ruralPaths: created },
-    {
-      status: 201,
-    },
+    { status: 201 },
   );
 }

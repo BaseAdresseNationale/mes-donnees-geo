@@ -24,6 +24,8 @@ export type RuralPathSegment = {
   etatEntretien?: RuralPathEtat;
   etatConservation?: RuralPathEtat;
   domanialite?: RuralPathDomanialite;
+  source: RuralPathSource;
+  sourceRef?: string;
 };
 
 export type RuralPath = {
@@ -34,7 +36,6 @@ export type RuralPath = {
   classement: RuralPathClassement;
   numero: number;
   commentaire?: string;
-  source: RuralPathSource;
   segments: RuralPathSegment[];
   createdAt: string;
   updatedAt: string;

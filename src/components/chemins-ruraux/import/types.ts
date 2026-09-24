@@ -1,20 +1,20 @@
 import type {
-  RuralPathClassement,
-  RuralPathDomanialite,
+  RuralPathSource,
   RuralPathSurface,
 } from "@/generated/prisma/browser";
 
-export interface BdTopoCandidateResponse {
-  cleabs: string;
-  nature: string;
-  nomVoie: string | null;
-  longueur: number;
+export interface ImportSegmentResponse {
   path: GeoJSON.LineString;
-  suggestedClassement: RuralPathClassement;
-  /** Numéro cadastral du chemin rural correspondant (géométrie coïncidente), si trouvé. */
-  suggestedNumero: number | null;
-  suggestedSurface: RuralPathSurface;
-  suggestedLargeurMoyenne: number | null;
-  suggestedDomanialite: RuralPathDomanialite | null;
+  source: RuralPathSource;
+  surface: RuralPathSurface;
+}
+
+/** Chemin rural cadastral constitué (nom/numéro + N segments), prêt à importer. */
+export interface AssembledRuralPathResponse {
+  key: string;
+  numero: number | null;
+  nom: string | null;
+  segments: ImportSegmentResponse[];
+  longueur: number;
   alreadyImported: boolean;
 }
