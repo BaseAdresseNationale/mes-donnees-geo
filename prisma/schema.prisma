@@ -76,9 +76,6 @@ model RuralPath {
   classement  RuralPathClassement
   numero      Int
   commentaire String?
-  source      RuralPathSource     @default(MANUEL)
-  // Identifiant de l'objet dans la source externe (ex. "cleabs" BD TOPO), pour éviter les doublons au réimport.
-  sourceRef   String?             @map("source_ref")
   segments    RuralPathSegment[]
   createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
@@ -86,7 +83,6 @@ model RuralPath {
 
   @@index([codeInsee])
   @@index([deletedAt])
-  @@index([codeInsee, source, sourceRef])
   @@map("rural_paths")
 }
 
@@ -102,11 +98,15 @@ model RuralPathSegment {
   etatEntretien    RuralPathEtat?                             @map("etat_entretien")
   etatConservation RuralPathEtat?                             @map("etat_conservation")
   domanialite      RuralPathDomanialite?
+  source           RuralPathSource                            @default(MANUEL)
+  // Identifiant de l'objet dans la source externe (ex. "cleabs" BD TOPO), pour éviter les doublons au réimport.
+  sourceRef        String?                                    @map("source_ref")
   createdAt        DateTime                                   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime                                   @default(now()) @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime?                                  @map("deleted_at") @db.Timestamptz(6)
 
   @@unique([ruralPathId, ordre])
   @@index([deletedAt])
+  @@index([source, sourceRef])
   @@map("rural_path_segments")
 }

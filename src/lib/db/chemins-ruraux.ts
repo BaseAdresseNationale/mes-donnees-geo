@@ -1,6 +1,7 @@
 import "server-only";
 import {
   Prisma,
+  RuralPathSource as RuralPathSourceEnum,
   RuralPathStatus as RuralPathStatusEnum,
 } from "@/generated/prisma/client";
 import { prisma } from "./prisma";
@@ -23,7 +24,6 @@ const SELECT = {
   classement: true,
   numero: true,
   commentaire: true,
-  source: true,
   createdAt: true,
   updatedAt: true,
   segments: {
@@ -38,6 +38,8 @@ const SELECT = {
       etatEntretien: true,
       etatConservation: true,
       domanialite: true,
+      source: true,
+      sourceRef: true,
     },
   },
 } as const;
@@ -51,6 +53,8 @@ type SegmentRow = {
   etatEntretien: RuralPathEtat | null;
   etatConservation: RuralPathEtat | null;
   domanialite: RuralPathDomanialite | null;
+  source: RuralPathSource;
+  sourceRef: string | null;
 };
 
 type Row = {
@@ -61,7 +65,6 @@ type Row = {
   classement: RuralPathClassement;
   numero: number;
   commentaire: string | null;
-  source: RuralPathSource;
   segments: SegmentRow[];
   createdAt: Date;
   updatedAt: Date;
@@ -73,6 +76,7 @@ function toDomainSegment(row: SegmentRow): RuralPathSegment {
     ordre: row.ordre,
     path: row.path as GeoJSON.LineString,
     surface: row.surface,
+    source: row.source,
     ...(row.largeurMoyenne != null
       ? { largeurMoyenne: row.largeurMoyenne }
       : {}),
@@ -81,6 +85,7 @@ function toDomainSegment(row: SegmentRow): RuralPathSegment {
       ? { etatConservation: row.etatConservation }
       : {}),
     ...(row.domanialite != null ? { domanialite: row.domanialite } : {}),
+    ...(row.sourceRef != null ? { sourceRef: row.sourceRef } : {}),
   };
 }
 
@@ -93,7 +98,6 @@ function toDomain(row: Row): RuralPath {
     classement: row.classement,
     numero: row.numero,
     ...(row.commentaire != null ? { commentaire: row.commentaire } : {}),
-    source: row.source,
     segments: row.segments.map(toDomainSegment),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -127,6 +131,8 @@ export interface RuralPathSegmentWriteInput {
   etatEntretien: RuralPathEtat | null;
   etatConservation: RuralPathEtat | null;
   domanialite: RuralPathDomanialite | null;
+  source?: RuralPathSource;
+  sourceRef?: string | null;
 }
 
 export interface RuralPathWriteInput {
@@ -147,6 +153,8 @@ function segmentsCreateData(segments: RuralPathSegmentWriteInput[]) {
     etatEntretien: seg.etatEntretien,
     etatConservation: seg.etatConservation,
     domanialite: seg.domanialite,
+    source: seg.source ?? RuralPathSourceEnum.MANUEL,
+    sourceRef: seg.sourceRef ?? null,
   }));
 }
 
@@ -223,8 +231,12 @@ export async function getImportedSourceRefs(
   codeCommune: string,
   source: RuralPathSource,
 ): Promise<Set<string>> {
-  const rows = await prisma.ruralPath.findMany({
-    where: { codeInsee: codeCommune, source, deletedAt: null },
+  const rows = await prisma.ruralPathSegment.findMany({
+    where: {
+      source,
+      deletedAt: null,
+      ruralPath: { codeInsee: codeCommune, deletedAt: null },
+    },
     select: { sourceRef: true },
   });
   return new Set(
@@ -232,24 +244,28 @@ export async function getImportedSourceRefs(
   );
 }
 
+export interface RuralPathImportSegmentInput extends RuralPathSegmentWriteInput {
+  source: RuralPathSource;
+  sourceRef: string | null;
+}
+
 export interface RuralPathImportInput {
-  sourceRef: string;
   nom: string | null;
   classement: RuralPathClassement;
   /** Numéro cadastral du chemin rural correspondant, sinon attribution séquentielle. */
   numero?: number | null;
-  segment: RuralPathSegmentWriteInput;
+  segments: RuralPathImportSegmentInput[];
 }
 
 /**
- * Crée un lot de chemins brouillon (1 segment chacun) à partir d'une source externe.
- * `numero` est repris de `input.numero` (ex. numéro cadastral) s'il est fourni, sinon
- * attribué séquentiellement à partir du plus grand numéro existant de la commune,
- * l'utilisateur le corrige ensuite lors de la qualification.
+ * Crée un lot de chemins brouillon à partir d'une source externe. Chaque chemin porte
+ * N segments (portions de tronçons découpées + éventuels comblements), chaque segment
+ * conservant sa propre `source`/`sourceRef`. `numero` est repris de `input.numero`
+ * (ex. numéro cadastral) s'il est fourni, sinon attribué séquentiellement à partir du
+ * plus grand numéro existant de la commune.
  */
 export async function createRuralPathsFromImport(
   codeCommune: string,
-  source: RuralPathSource,
   inputs: RuralPathImportInput[],
 ): Promise<RuralPath[]> {
   if (inputs.length === 0) return [];
@@ -270,9 +286,7 @@ export async function createRuralPathsFromImport(
             statut: RuralPathStatusEnum.DRAFT,
             classement: input.classement,
             numero: input.numero ?? nextNumero++,
-            source,
-            sourceRef: input.sourceRef,
-            segments: { create: segmentsCreateData([input.segment]) },
+            segments: { create: segmentsCreateData(input.segments) },
           },
           select: SELECT,
         }),

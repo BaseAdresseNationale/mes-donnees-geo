@@ -11,9 +11,12 @@ import {
 } from "react-map-gl/maplibre";
 import type { ExpressionSpecification } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString } from "geojson";
-import { RuralPathClassement } from "@/generated/prisma/browser";
-import { CLASSEMENT_LABELS } from "@/components/chemins-ruraux/types";
-import type { BdTopoCandidateResponse } from "./types";
+import {
+  RuralPathSurface,
+  SURFACE_COLORS,
+} from "@/components/chemins-ruraux/types";
+import type { AssembledRuralPathResponse } from "./types";
+import { pathLabel } from "./RuralPathImportBdTopo";
 import styles from "./RuralPathImportMap.module.css";
 
 const SOURCE_ID = "chemins-ruraux-import-bd-topo";
@@ -21,96 +24,85 @@ const CASING_LAYER_ID = "chemins-ruraux-import-casing";
 const LINE_LAYER_ID = "chemins-ruraux-import-line";
 const ALREADY_IMPORTED_LAYER_ID = "chemins-ruraux-import-already";
 
-const CLASSEMENT_COLOR_MATCH: ExpressionSpecification = [
+const SURFACE_COLOR_MATCH: ExpressionSpecification = [
   "match",
-  ["get", "classement"],
-  RuralPathClassement.CHEMIN_RURAL,
-  "#3f8a3f",
-  RuralPathClassement.VOIE_COMMUNALE,
-  "#2b6cb0",
+  ["get", "surface"],
+  ...Object.entries(SURFACE_COLORS).flatMap(([surface, color]) => [
+    surface,
+    color,
+  ]),
   "#8a5a2b",
 ] as unknown as ExpressionSpecification;
 
-type CandidateProperties = {
-  cleabs: string;
-  nature: string;
-  nomVoie: string;
-  classement: RuralPathClassement;
+type SegmentProperties = {
+  key: string;
+  label: string;
+  surface: RuralPathSurface;
+  source: string;
   alreadyImported: boolean;
 };
 
 type HoverState = {
-  cleabs: string;
+  key: string;
+  label: string;
   lng: number;
   lat: number;
-  nature: string;
-  nomVoie: string;
 };
 
+function toFeatures(
+  paths: AssembledRuralPathResponse[],
+): Feature<LineString, SegmentProperties>[] {
+  return paths.flatMap((path) =>
+    path.segments.map(
+      (seg): Feature<LineString, SegmentProperties> => ({
+        type: "Feature",
+        properties: {
+          key: path.key,
+          label: pathLabel(path),
+          surface: seg.surface,
+          source: seg.source,
+          alreadyImported: path.alreadyImported,
+        },
+        geometry: seg.path,
+      }),
+    ),
+  );
+}
+
 export function RuralPathImportMap({
-  candidates,
+  paths,
   selected,
-  hoveredCleabs,
+  hoveredKey,
   onToggle,
 }: {
-  candidates: BdTopoCandidateResponse[];
+  paths: AssembledRuralPathResponse[];
   selected: Set<string>;
-  hoveredCleabs: string | null;
-  onToggle: (cleabs: string) => void;
+  hoveredKey: string | null;
+  onToggle: (key: string) => void;
 }) {
   const map = useMap();
   const [hover, setHover] = useState<HoverState | null>(null);
 
   const importable = useMemo(
-    () => candidates.filter((c) => !c.alreadyImported),
-    [candidates],
+    () => paths.filter((p) => !p.alreadyImported),
+    [paths],
   );
   const already = useMemo(
-    () => candidates.filter((c) => c.alreadyImported),
-    [candidates],
+    () => paths.filter((p) => p.alreadyImported),
+    [paths],
   );
 
   const featureCollection = useMemo<
-    FeatureCollection<LineString, CandidateProperties>
+    FeatureCollection<LineString, SegmentProperties>
   >(
-    () => ({
-      type: "FeatureCollection",
-      features: importable.map(
-        (c): Feature<LineString, CandidateProperties> => ({
-          type: "Feature",
-          properties: {
-            cleabs: c.cleabs,
-            nature: c.nature,
-            nomVoie: c.nomVoie ?? "",
-            classement: c.suggestedClassement,
-            alreadyImported: false,
-          },
-          geometry: c.path,
-        }),
-      ),
-    }),
+    () => ({ type: "FeatureCollection", features: toFeatures(importable) }),
     [importable],
   );
 
   const alreadyImportedCollection = useMemo<
-    FeatureCollection<LineString, CandidateProperties>
+    FeatureCollection<LineString, SegmentProperties>
   >(
-    () => ({
-      type: "FeatureCollection",
-      features: already.map(
-        (c): Feature<LineString, CandidateProperties> => ({
-          type: "Feature",
-          properties: {
-            cleabs: c.cleabs,
-            nature: c.nature,
-            nomVoie: c.nomVoie ?? "",
-            classement: c.suggestedClassement,
-            alreadyImported: true,
-          },
-          geometry: c.path,
-        }),
-      ),
-    }),
+    () => ({ type: "FeatureCollection", features: toFeatures(already) }),
     [already],
   );
 
@@ -119,16 +111,15 @@ export function RuralPathImportMap({
     if (!m) return;
 
     const onMove = (e: MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      const props = f?.properties as Partial<CandidateProperties> | null;
-      if (!props?.cleabs) return;
+      const props = e.features?.[0]
+        ?.properties as Partial<SegmentProperties> | null;
+      if (!props?.key) return;
       m.getCanvas().style.cursor = "pointer";
       setHover({
-        cleabs: props.cleabs,
+        key: props.key,
+        label: props.label ?? "",
         lng: e.lngLat.lng,
         lat: e.lngLat.lat,
-        nature: props.nature ?? "",
-        nomVoie: props.nomVoie ?? "",
       });
     };
     const onLeave = () => {
@@ -136,10 +127,10 @@ export function RuralPathImportMap({
       setHover(null);
     };
     const onClick = (e: MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      const cleabs = (f?.properties as Partial<CandidateProperties> | null)
-        ?.cleabs;
-      if (cleabs) onToggle(cleabs);
+      const key = (
+        e.features?.[0]?.properties as Partial<SegmentProperties> | null
+      )?.key;
+      if (key) onToggle(key);
     };
 
     m.on("mousemove", LINE_LAYER_ID, onMove);
@@ -154,7 +145,7 @@ export function RuralPathImportMap({
     };
   }, [map, onToggle]);
 
-  const effectiveHoveredCleabs = hoveredCleabs ?? hover?.cleabs ?? null;
+  const effectiveHoveredKey = hoveredKey ?? hover?.key ?? null;
 
   return (
     <>
@@ -187,7 +178,7 @@ export function RuralPathImportMap({
               "line-color": "#ffffff",
               "line-width": [
                 "case",
-                ["in", ["get", "cleabs"], ["literal", [...selected]]],
+                ["in", ["get", "key"], ["literal", [...selected]]],
                 7,
                 0,
               ],
@@ -201,18 +192,18 @@ export function RuralPathImportMap({
             type: "line",
             layout: { "line-join": "round", "line-cap": "round" },
             paint: {
-              "line-color": CLASSEMENT_COLOR_MATCH,
+              "line-color": SURFACE_COLOR_MATCH,
               "line-width": [
                 "case",
-                ["==", ["get", "cleabs"], effectiveHoveredCleabs ?? ""],
+                ["==", ["get", "key"], effectiveHoveredKey ?? ""],
                 6,
-                ["in", ["get", "cleabs"], ["literal", [...selected]]],
+                ["in", ["get", "key"], ["literal", [...selected]]],
                 5,
                 3,
               ],
               "line-opacity": [
                 "case",
-                ["in", ["get", "cleabs"], ["literal", [...selected]]],
+                ["in", ["get", "key"], ["literal", [...selected]]],
                 1,
                 0.55,
               ],
@@ -231,16 +222,7 @@ export function RuralPathImportMap({
           className={styles.popup}
         >
           <div className={styles.popupTitle}>
-            {hover.nomVoie.trim() || "Voie sans nom"}
-          </div>
-          <div className={styles.popupMeta}>
-            {hover.nature} ·{" "}
-            {
-              CLASSEMENT_LABELS[
-                importable.find((c) => c.cleabs === hover.cleabs)
-                  ?.suggestedClassement ?? RuralPathClassement.VOIE_COMMUNALE
-              ]
-            }
+            {hover.label || "Chemin rural"}
           </div>
         </Popup>
       )}

@@ -18,11 +18,19 @@ export const FLY_TO_MAX_ZOOM = 17;
 export enum AvailableDataLayer {
   BAN = "ban",
   CHEMINS_RURAUX = "chemins-ruraux",
+  BD_TOPO = "bd-topo",
 }
 
 export const availableDataLayerOptions = [
   { value: AvailableDataLayer.BAN, label: "Adresses" },
-  { value: AvailableDataLayer.CHEMINS_RURAUX, label: "Chemins Ruraux" },
+  {
+    value: AvailableDataLayer.CHEMINS_RURAUX,
+    label: "Chemins Ruraux (Cadastre)",
+  },
+  {
+    value: AvailableDataLayer.BD_TOPO,
+    label: "BD TOPO",
+  },
 ];
 
 interface MapContextValue {
