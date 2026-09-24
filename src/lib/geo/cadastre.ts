@@ -46,6 +46,19 @@ function isRuralPathLabel(parts: string[] | undefined): boolean {
   return RURAL_PATH_LABEL_WORDS.every((word) => lowerParts.includes(word));
 }
 
+// Certaines communes fournissent le libellé à l'envers (ex. finit par "Chemin" au lieu
+// de commencer par lui) : on remet le tableau dans le bon sens avant de le parser.
+function normalizePartsOrder(parts: string[]): string[] {
+  if (parts.length === 0) return parts;
+  const isCheminWord = (word: string) => /^(chemin|rural)$/i.test(word);
+  const startsWithChemin = isCheminWord(
+    parts[0].split(/\s+/).filter(Boolean)[0] ?? "",
+  );
+  const lastWords = parts[parts.length - 1].split(/\s+/).filter(Boolean);
+  const endsWithChemin = isCheminWord(lastWords[lastWords.length - 1] ?? "");
+  return !startsWithChemin && endsWithChemin ? [...parts].reverse() : parts;
+}
+
 const RURAL_PATH_NUMERO_PATTERN = /^n[°o]\.?(\d+)$/i;
 
 // Un libellé cadastral "chemin rural" suit le patron "Chemin rural [n°X] [dit] [nom]"
@@ -64,7 +77,10 @@ function parseRuralPathLabel(parts: string[]): {
     if (glued) {
       numero = Number(glued[1]);
       i++;
-    } else if (/^n[°o]\.?$/i.test(words[i]) && /^\d+$/.test(words[i + 1] ?? "")) {
+    } else if (
+      /^n[°o]\.?$/i.test(words[i]) &&
+      /^\d+$/.test(words[i + 1] ?? "")
+    ) {
       numero = Number(words[i + 1]);
       i += 2;
     }
@@ -148,7 +164,9 @@ export class CadastreService {
         isRuralPathLabel(feature.extraProperties?.labels?.parts),
       )
       .map((feature) => {
-        const parts = feature.extraProperties!.labels!.parts!;
+        const parts = normalizePartsOrder(
+          feature.extraProperties!.labels!.parts!,
+        );
         const { numero, nom } = parseRuralPathLabel(parts);
         return {
           type: "Feature",

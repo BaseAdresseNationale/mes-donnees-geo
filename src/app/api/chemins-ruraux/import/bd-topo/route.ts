@@ -11,7 +11,10 @@ import {
   getImportedSourceRefs,
   type RuralPathImportInput,
 } from "@/lib/db/chemins-ruraux";
-import { RuralPathClassement, RuralPathSource } from "@/components/chemins-ruraux/types";
+import {
+  RuralPathClassement,
+  RuralPathSource,
+} from "@/components/chemins-ruraux/types";
 import type { BdTopoCandidateResponse } from "@/components/chemins-ruraux/import/types";
 
 // Format observé des identifiants BD TOPO (ex. "TRONROUT0000000243955677") :
