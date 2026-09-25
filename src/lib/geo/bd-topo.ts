@@ -2,23 +2,27 @@ import type { LineString } from "geojson";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
 import {
-  RuralPathClassement,
-  RuralPathDomanialite,
-  RuralPathSurface,
+  LocalPathClassement,
+  LocalPathRevetement,
+  LocalPathType,
 } from "@/generated/prisma/browser";
 
 const URL_API_BD_TOPO_WFS: string =
   process.env.URL_API_BD_TOPO_WFS || "https://data.geopf.fr/wfs/ows";
 
 // Nature BD TOPO -> valeurs par défaut de qualification (l'utilisateur les corrige ensuite).
-const NATURE_CLASSEMENT: Record<string, RuralPathClassement> = {
-  Chemin: RuralPathClassement.CHEMIN_RURAL,
-  Sentier: RuralPathClassement.CHEMIN_RURAL,
+const NATURE_CLASSEMENT: Record<string, LocalPathClassement> = {
+  Chemin: LocalPathClassement.CHEMIN_RURAL,
+  Sentier: LocalPathClassement.CHEMIN_RURAL,
 };
-const NATURE_SURFACE: Record<string, RuralPathSurface> = {
-  Chemin: RuralPathSurface.EARTH,
-  Sentier: RuralPathSurface.EARTH,
-  "Route empierrée": RuralPathSurface.STONED,
+const NATURE_TYPE: Record<string, LocalPathType> = {
+  Chemin: LocalPathType.CHEMIN,
+  Sentier: LocalPathType.SENTIER,
+};
+const NATURE_REVETEMENT: Record<string, LocalPathRevetement> = {
+  Chemin: LocalPathRevetement.NON_REVETU,
+  Sentier: LocalPathRevetement.NON_REVETU,
+  "Route empierrée": LocalPathRevetement.EMPIERRE,
 };
 
 export interface BdTopoTronconCandidate {
@@ -27,10 +31,10 @@ export interface BdTopoTronconCandidate {
   nomVoie: string | null;
   longueur: number;
   path: LineString;
-  suggestedClassement: RuralPathClassement;
-  suggestedSurface: RuralPathSurface;
+  suggestedClassement: LocalPathClassement;
+  suggestedType: LocalPathType;
+  suggestedRevetement: LocalPathRevetement;
   suggestedLargeurMoyenne: number | null;
-  suggestedDomanialite: RuralPathDomanialite | null;
 }
 
 interface WfsProperties {
@@ -87,17 +91,13 @@ function toCandidate(
     longueur: turfLength(lineString(coordinates), { units: "meters" }),
     path,
     suggestedClassement:
-      NATURE_CLASSEMENT[nature] ?? RuralPathClassement.VOIE_COMMUNALE,
-    suggestedSurface: NATURE_SURFACE[nature] ?? RuralPathSurface.PAVED,
+      NATURE_CLASSEMENT[nature] ?? LocalPathClassement.VOIE_COMMUNALE,
+    suggestedType: NATURE_TYPE[nature] ?? LocalPathType.TRONCON,
+    suggestedRevetement:
+      NATURE_REVETEMENT[nature] ?? LocalPathRevetement.REVETU,
     suggestedLargeurMoyenne:
       typeof properties.largeur_de_chaussee === "number"
         ? Math.round(properties.largeur_de_chaussee)
-        : null,
-    suggestedDomanialite:
-      typeof properties.prive === "boolean"
-        ? properties.prive
-          ? RuralPathDomanialite.PRIVE
-          : RuralPathDomanialite.PUBLIC
         : null,
   };
 }

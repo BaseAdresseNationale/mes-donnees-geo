@@ -1,6 +1,6 @@
 # mes-donnees-geo
 
-Outil cartographique open source permettant aux communes françaises d'éditer leurs données géographiques (contours, chemins ruraux, adresses, etc.) via une architecture **plugin** modulaire.
+Outil cartographique open source permettant aux communes françaises d'éditer leurs données géographiques (contours, voies locales, adresses, etc.) via une architecture **plugin** modulaire.
 
 ## Objectifs
 
@@ -37,7 +37,7 @@ flowchart LR
     Reg --> Map
     Reg --> List
     P1[demo] --> Reg
-    P2[chemins-ruraux] --> Reg
+    P2[voies-locales] --> Reg
     P3[... futurs plugins] -.-> Reg
 ```
 
@@ -54,55 +54,66 @@ Le **registre** central charge dynamiquement les plugins activés pour la commun
 
 ## Plugins fournis (V1)
 
-- **`chemins-ruraux`** — Édition des chemins ruraux (lignes) avec attributs (nom, revêtement, statut).
+- **`voies-locales`** — Édition des voies locales (lignes) avec attributs (nom, revêtement, statut).
 
-### Plugin `chemins-ruraux`
+### Plugin `voies-locales`
 
-Le plugin gère la CRUD des **chemins ruraux** d'une commune. Chaque chemin est un
-`MultiLineString` GeoJSON dont **chaque `LineString` porte son propre revêtement**
-(le tableau `surfaces` a la même longueur que `path.coordinates` — cohérence
-vérifiée en base par un `CHECK`).
+Le plugin gère la CRUD des **voies locales** d'une commune. Un chemin est une
+chaîne ordonnée de **segments** contigus (modèle normalisé : 1 chemin → N
+segments) ; **chaque segment porte son propre tracé** (`LineString` GeoJSON) et
+ses propres attributs (revêtement, type, état…).
 
 Modèle métier :
 
-- `id` (UUID v4) · `codeInsee` · `statut` (`draft` / `published` / `certified`)
-- `nom?` · `path?: GeoJSON.MultiLineString` · `surfaces: RuralPathSurface[]`
+- `LocalPath` : `id` (UUID v4) · `codeInsee` · `statut` (`draft` / `published` /
+  `certified`) · `nom?` · `classement` (`chemin_rural` / `voie_communale`) ·
+  `numero` · `commentaire?` · `segments: LocalPathSegment[]`
+- `LocalPathSegment` : `path: GeoJSON.LineString` · `ordre` · `type`
+  (`chemin` / `impasse` / `tronçon` / `sentier` / `place` / `rue`, défaut
+  `tronçon`) · `revetement` (`Revêtu` / `Empierré` / `Non revêtu`) · `etat`
+  (`En projet` / `En construction` / `Bon` / `Moyen` / `Mauvais` /
+  `Très mauvais`, défaut `Bon`) · `largeurMoyenne?` · `fermeALaCirculation?` ·
+  `servitudes: LocalPathServitude[]` · `bornage?` (`total` / `unilatéral` /
+  `partiel` / `non borné`) · `source` (`manuel` / `bd_topo`) · `sourceRef?`
 - champs base entity (`createdAt`, `updatedAt`, `deletedAt?`)
 
 Persistance :
 
-- Table `rural_paths` avec :
+- Table `rural_paths` (niveau chemin) et table `rural_path_segments` (niveau
+  segment) avec :
   - colonne `path JSONB` (source de vérité, lecture/écriture Prisma) ;
-  - colonne dérivée `path_geom geometry(MultiLineString, 4326)` (PostGIS)
+  - colonne dérivée `path_geom geometry(LineString, 4326)` (PostGIS)
     maintenue par trigger et indexée en GIST — utilisée pour de futures
     requêtes spatiales (`$queryRaw` uniquement, `Unsupported` côté Prisma).
-- Enums PostgreSQL `rural_path_status` et `rural_path_surface`.
+- Enums PostgreSQL `rural_path_status`, `rural_path_classement`,
+  `rural_path_type`, `rural_path_revetement`, `rural_path_etat`,
+  `rural_path_servitude`, `rural_path_bornage` et `rural_path_source`.
 
 Routes Next :
 
-- `/[codeCommune]/chemins-ruraux` — **liste** des chemins (recherche par nom, filtre statut, bouton « Nouveau »).
-- `/[codeCommune]/chemins-ruraux/new` — **formulaire vierge**.
-- `/[codeCommune]/chemins-ruraux/[pathId]` — **formulaire pré-rempli**.
+- `/[codeCommune]/voies-locales` — **liste** des chemins (recherche par nom, filtre statut, bouton « Nouveau »).
+- `/[codeCommune]/voies-locales/new` — **formulaire vierge**.
+- `/[codeCommune]/voies-locales/[pathId]` — **formulaire pré-rempli**.
 
 API serveur :
 
-- `getRuralPaths(codeCommune)` / `getRuralPathById(codeCommune, id)` dans
-  `src/lib/db/chemins-ruraux.ts` (mapper Prisma → domaine, filtre `deleted_at IS NULL`).
-- Mutations : `createRuralPath`, `updateRuralPath`, `softDeleteRuralPath`
+- `getLocalPaths(codeCommune)` / `getLocalPathById(codeCommune, id)` dans
+  `src/lib/db/voies-locales.ts` (mapper Prisma → domaine, filtre `deleted_at IS NULL`).
+- Mutations : `createLocalPath`, `updateLocalPath`, `softDeleteLocalPath`
   (le `DELETE` est un soft-delete via `deleted_at`).
 
 Routes REST :
 
-- `POST   /api/plugins/chemins-ruraux` — créer un chemin.
-- `PUT    /api/plugins/chemins-ruraux/[pathId]` — mise à jour complète.
-- `DELETE /api/plugins/chemins-ruraux/[pathId]` — soft-delete.
+- `POST   /api/voies-locales` — créer un chemin.
+- `PUT    /api/voies-locales/[pathId]` — mise à jour complète.
+- `DELETE /api/voies-locales/[pathId]` — soft-delete.
 
 Toutes ces routes exigent une session (`requireSession`) et sont scopées au
 `codeInsee` de la session. La validation métier partagée
-(`src/components/rural-path/validation.ts`) est appelée en amont côté client
-_et_ ré-appliquée côté serveur (defense in depth) : cohérence
-`surfaces[].length === path.coordinates.length`, statut/surface dans les enums,
-`nom` ≤ 200 caractères, coordonnées dans WGS84.
+(`src/components/voies-locales/validation.ts`) est appelée en amont côté client
+_et_ ré-appliquée côté serveur (defense in depth) : chaque segment est un
+`LineString` valide, `type`/`revetement`/`etat`/`servitudes`/`bornage` dans les
+enums, `nom` ≤ 200 caractères, coordonnées dans WGS84.
 
 Édition cartographique :
 
@@ -110,10 +121,11 @@ _et_ ré-appliquée côté serveur (defense in depth) : cohérence
   `terra-draw-maplibre-gl-adapter`) attaché à l'instance MapLibre via
   `MapContext.mapRef`. Deux modes : `linestring` (tracer un nouveau segment)
   et `select` (déplacer/supprimer des vertices d'un segment existant).
-- Chaque `LineString` dessinée devient un segment du `MultiLineString`.
-  Le revêtement de chaque segment se choisit dans la liste du formulaire
-  (par défaut `terre`). La sauvegarde reconstruit le `MultiLineString`
-  à partir du snapshot Terra Draw et l'envoie via l'API REST ci-dessus.
+- Chaque `LineString` dessinée devient un **segment** du chemin. Les attributs
+  de chaque segment (type, revêtement, état, largeur, servitudes, bornage,
+  fermeture à la circulation) se saisissent dans l'accordéon du formulaire
+  (revêtement par défaut `Non revêtu`). La sauvegarde envoie la liste ordonnée
+  des segments via l'API REST ci-dessus.
 
 ## Authentification
 
@@ -173,7 +185,7 @@ src/
 └── plugins/                Plugins métier
     ├── registry.ts         Enregistrement des plugins
     ├── types.ts            Contrat GeoPlugin
-    └── chemins-ruraux/        Plugin chemins ruraux
+    └── voies-locales/        Plugin voies locales
 ```
 
 ## Licence

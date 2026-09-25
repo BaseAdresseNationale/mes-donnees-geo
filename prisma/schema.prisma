@@ -18,95 +18,153 @@ model CommuneSettings {
   @@map("commune_settings")
 }
 
-enum RuralPathStatus {
+enum LocalPathStatus {
   DRAFT     @map("draft")
   PUBLISHED @map("published")
   CERTIFIED @map("certified")
 
-  @@map("rural_path_status")
+  @@map("local_path_status")
 }
 
-enum RuralPathSurface {
-  EARTH  @map("terre")
-  GRAVEL @map("gravier")
-  PAVED  @map("enrobe")
-  STONED @map("empierre")
-  GRASS  @map("herbe")
+enum LocalPathRevetement {
+  REVETU     @map("revetu")
+  EMPIERRE   @map("empierre")
+  NON_REVETU @map("non_revetu")
 
-  @@map("rural_path_surface")
+  @@map("local_path_revetement")
 }
 
-enum RuralPathClassement {
+enum LocalPathType {
+  CHEMIN  @map("chemin")
+  IMPASSE @map("impasse")
+  TRONCON @map("troncon")
+  SENTIER @map("sentier")
+  PLACE   @map("place")
+  RUE     @map("rue")
+
+  @@map("local_path_type")
+}
+
+enum LocalPathClassement {
   CHEMIN_RURAL   @map("chemin_rural")
   VOIE_COMMUNALE @map("voie_communale")
 
-  @@map("rural_path_classement")
+  @@map("local_path_classement")
 }
 
-enum RuralPathEtat {
-  EXCELLENT @map("excellent")
-  BON       @map("bon")
-  MOYEN     @map("moyen")
-  MAUVAIS   @map("mauvais")
+enum LocalPathEtat {
+  EN_PROJET       @map("en_projet")
+  EN_CONSTRUCTION @map("en_construction")
+  BON             @map("bon")
+  MOYEN           @map("moyen")
+  MAUVAIS         @map("mauvais")
+  TRES_MAUVAIS    @map("tres_mauvais")
 
-  @@map("rural_path_etat")
+  @@map("local_path_etat")
 }
 
-enum RuralPathDomanialite {
-  INDETERMINE                   @map("indetermine")
-  PRIVE                         @map("prive")
-  PRIVE_OUVERT_A_LA_CIRCULATION @map("prive_ouvert_a_la_circulation")
-  PUBLIC                        @map("public")
+enum LocalPathServitude {
+  INTERET_COMMUNAUTAIRE @map("interet_communautaire")
+  PDIPR                 @map("pdipr")
+  DFCI                  @map("dfci")
+  DESSERTE_FORESTIERE   @map("desserte_forestiere")
+  HALAGE                @map("halage")
+  PASSAGE_LONGITUDINAL  @map("passage_longitudinal")
+  AUTRE_SERVITUDE       @map("autre_servitude")
 
-  @@map("rural_path_domanialite")
+  @@map("local_path_servitude")
 }
 
-enum RuralPathSource {
+enum LocalPathBornage {
+  TOTAL      @map("total")
+  UNILATERAL @map("unilateral")
+  PARTIEL    @map("partiel")
+  NON_BORNE  @map("non_borne")
+
+  @@map("local_path_bornage")
+}
+
+enum LocalPathSource {
   MANUEL  @map("manuel")
   BD_TOPO @map("bd_topo")
 
-  @@map("rural_path_source")
+  @@map("local_path_source")
 }
 
-model RuralPath {
-  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  codeInsee   String              @map("code_insee") @db.VarChar(5)
-  statut      RuralPathStatus     @default(DRAFT)
-  nom         String?
-  classement  RuralPathClassement
-  numero      Int
-  commentaire String?
-  segments    RuralPathSegment[]
-  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
-  deletedAt   DateTime?           @map("deleted_at") @db.Timestamptz(6)
+enum LocalPathGestionnaire {
+  COMMUNE                          @map("commune")
+  DEPARTEMENT                      @map("departement")
+  REGION                           @map("region")
+  ETAT                             @map("etat")
+  EPCI                             @map("epci")
+  VNF                              @map("vnf")
+  PRIVE                            @map("prive")
+  CONCESSIONNAIRE                  @map("concessionnaire")
+  ONF                              @map("onf")
+  GRAND_PORT_MARITIME              @map("grand_port_maritime")
+  PORT_AUTONOME                    @map("port_autonome")
+  SECTION_DE_COMMUNE               @map("section_de_commune")
+  COLLECTIVITE_STATUT_PARTICULIER  @map("collectivite_statut_particulier")
+  COLLECTIVITE_TERRITORIALE_UNIQUE @map("collectivite_territoriale_unique")
+  COLLECTIVITE_OUTRE_MER           @map("collectivite_outre_mer")
+  COLLECTIVITE_SUI_GENERIS         @map("collectivite_sui_generis")
+
+  @@map("local_path_gestionnaire")
+}
+
+enum LocalPathDeletionReason {
+  ANNEXE     @map("annexe")
+  ACCAPARE   @map("accapare")
+  APPROPRIE  @map("approprie")
+  DISPARU    @map("disparu")
+  INEXISTANT @map("inexistant")
+
+  @@map("local_path_deletion_reason")
+}
+
+model LocalPath {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeInsee      String                   @map("code_insee") @db.VarChar(5)
+  statut         LocalPathStatus          @default(DRAFT)
+  nom            String?
+  classement     LocalPathClassement
+  numero         Int
+  gestionnaire   LocalPathGestionnaire?
+  commentaire    String?
+  deletionReason LocalPathDeletionReason? @map("deletion_reason")
+  segments       LocalPathSegment[]
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?                @map("deleted_at") @db.Timestamptz(6)
 
   @@index([codeInsee])
   @@index([deletedAt])
-  @@map("rural_paths")
+  @@map("local_paths")
 }
 
-model RuralPathSegment {
-  id               String                                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ruralPathId      String                                     @map("rural_path_id") @db.Uuid
-  ruralPath        RuralPath                                  @relation(fields: [ruralPathId], references: [id])
-  ordre            Int
-  path             Json                                       @db.JsonB
-  pathGeom         Unsupported("geometry(LineString, 4326)")? @map("path_geom")
-  surface          RuralPathSurface
-  largeurMoyenne   Int?                                       @map("largeur_moyenne")
-  etatEntretien    RuralPathEtat?                             @map("etat_entretien")
-  etatConservation RuralPathEtat?                             @map("etat_conservation")
-  domanialite      RuralPathDomanialite?
-  source           RuralPathSource                            @default(MANUEL)
+model LocalPathSegment {
+  id                  String                                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  localPathId         String                                     @map("local_path_id") @db.Uuid
+  localPath           LocalPath                                  @relation(fields: [localPathId], references: [id])
+  ordre               Int
+  path                Json                                       @db.JsonB
+  pathGeom            Unsupported("geometry(LineString, 4326)")? @map("path_geom")
+  type                LocalPathType                              @default(TRONCON)
+  revetement          LocalPathRevetement
+  largeurMoyenne      Int?                                       @map("largeur_moyenne")
+  etat                LocalPathEtat                              @default(BON)
+  fermeALaCirculation Boolean?                                   @map("ferme_a_la_circulation")
+  servitudes          LocalPathServitude[]                       @default([])
+  bornage             LocalPathBornage?
+  source              LocalPathSource                            @default(MANUEL)
   // Identifiant de l'objet dans la source externe (ex. "cleabs" BD TOPO), pour éviter les doublons au réimport.
-  sourceRef        String?                                    @map("source_ref")
-  createdAt        DateTime                                   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime                                   @default(now()) @map("updated_at") @db.Timestamptz(6)
-  deletedAt        DateTime?                                  @map("deleted_at") @db.Timestamptz(6)
+  sourceRef           String?                                    @map("source_ref")
+  createdAt           DateTime                                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                                   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?                                  @map("deleted_at") @db.Timestamptz(6)
 
-  @@unique([ruralPathId, ordre])
+  @@unique([localPathId, ordre])
   @@index([deletedAt])
   @@index([source, sourceRef])
-  @@map("rural_path_segments")
+  @@map("local_path_segments")
 }

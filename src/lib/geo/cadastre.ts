@@ -103,6 +103,65 @@ function parseRuralPathLabel(parts: string[]): {
   return { numero, nom };
 }
 
+// Détection des voies communales (1re version simple : libellé contenant "voie" ET
+// "communale" ; à affiner avec une RegExp plus fine ensuite).
+const VOIE_COMMUNALE_LABEL_WORDS = ["voie", "communale"];
+
+function isVoieCommunaleLabel(parts: string[] | undefined): boolean {
+  if (!parts) return false;
+  const lowerParts = parts.map((part) => part.toLowerCase());
+  return VOIE_COMMUNALE_LABEL_WORDS.every((word) => lowerParts.includes(word));
+}
+
+function normalizeVoieCommunalePartsOrder(parts: string[]): string[] {
+  if (parts.length === 0) return parts;
+  const isLeadWord = (word: string) => /^(voie|communale)$/i.test(word);
+  const startsWithLead = isLeadWord(
+    parts[0].split(/\s+/).filter(Boolean)[0] ?? "",
+  );
+  const lastWords = parts[parts.length - 1].split(/\s+/).filter(Boolean);
+  const endsWithLead = isLeadWord(lastWords[lastWords.length - 1] ?? "");
+  return !startsWithLead && endsWithLead ? [...parts].reverse() : parts;
+}
+
+function prefixVoieIfLiaison(nom: string): string {
+  return /^(de|des|du)\b/i.test(nom) || /^d['’]/i.test(nom)
+    ? `Voie ${nom}`
+    : nom;
+}
+
+function parseVoieCommunaleLabel(parts: string[]): {
+  numero: number | null;
+  nom: string | null;
+} {
+  const words = parts.flatMap((part) => part.split(/\s+/)).filter(Boolean);
+  let i = 0;
+  while (i < words.length && /^(voie|communale)$/i.test(words[i])) i++;
+
+  let numero: number | null = null;
+  if (i < words.length) {
+    const glued = RURAL_PATH_NUMERO_PATTERN.exec(words[i]);
+    if (glued) {
+      numero = Number(glued[1]);
+      i++;
+    } else if (
+      /^n[°o]\.?$/i.test(words[i]) &&
+      /^\d+$/.test(words[i + 1] ?? "")
+    ) {
+      numero = Number(words[i + 1]);
+      i += 2;
+    }
+  }
+
+  if (i < words.length && /^dit$/i.test(words[i])) i++;
+
+  const rest = words.slice(i).join(" ").trim();
+  const nom =
+    rest && !/voie.*communale/i.test(rest) ? prefixVoieIfLiaison(rest) : null;
+
+  return { numero, nom };
+}
+
 // Codes commune DOM (971-978, 986-988) sur 3 chiffres, sinon 2 (dont Corse "2A"/"2B").
 function departementCodeFromCommune(codeCommune: string): string {
   return /^9[78]/.test(codeCommune)
@@ -176,6 +235,29 @@ export class CadastreService {
           feature.extraProperties!.labels!.parts!,
         );
         const { numero, nom } = parseRuralPathLabel(parts);
+        return {
+          type: "Feature",
+          id: feature.id,
+          properties: { libelle: parts.join(" "), numero, nom },
+          geometry: feature.geometry,
+        };
+      });
+  }
+
+  /** Habillage cadastral (zoncommuni) dont le libellé désigne une voie communale. */
+  public static async findVoieCommunaleToponymsForCommune(
+    codeCommune: string,
+  ): Promise<Feature<LineString, CadastralRuralPathProperties>[]> {
+    const { features } = await this.fetchZonCommuni(codeCommune);
+    return features
+      .filter((feature) =>
+        isVoieCommunaleLabel(feature.extraProperties?.labels?.parts),
+      )
+      .map((feature) => {
+        const parts = normalizeVoieCommunalePartsOrder(
+          feature.extraProperties!.labels!.parts!,
+        );
+        const { numero, nom } = parseVoieCommunaleLabel(parts);
         return {
           type: "Feature",
           id: feature.id,

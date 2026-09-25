@@ -2,12 +2,12 @@ import "server-only";
 
 import { getCommuneSettings } from "@/lib/db/commune-settings";
 import { GeoPlugin } from "./types";
-import { ruralPathsPlugin } from "./chemins-ruraux/config";
+import { localPathsPlugin } from "./voies-locales/config";
 import { adressesPlugin } from "./adresses/config";
 import { limitesAdministrativesPlugin } from "./limites-administratives/config";
 
 const ALL_PLUGINS: readonly GeoPlugin[] = [
-  ruralPathsPlugin,
+  localPathsPlugin,
   adressesPlugin,
   limitesAdministrativesPlugin,
 ];
