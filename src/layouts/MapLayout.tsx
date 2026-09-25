@@ -28,7 +28,7 @@ import { CadastreControl } from "@/components/map/cadastre/CadastreControl";
 import { ControlGroupPortal } from "@/components/map/controls/ControlGroupPortal";
 import { BANMap } from "@/components/map/ban/BANMap";
 import { BANLayers } from "@/components/map/ban/ban.layers";
-import { CadastralRuralPathsMap } from "@/components/map/cadastre/CadastralRuralPathsMap";
+import { CadastralLocalPathsMap } from "@/components/map/cadastre/CadastralLocalPathsMap";
 
 type MapLayoutProps = {
   toolbarChildren?: React.ReactNode;
@@ -135,8 +135,8 @@ export function MapLayout({
           <PanoramaxMap />
 
           {activeDataLayers.includes(AvailableDataLayer.BAN) && <BANMap />}
-          {activeDataLayers.includes(AvailableDataLayer.CHEMINS_RURAUX) && (
-            <CadastralRuralPathsMap />
+          {activeDataLayers.includes(AvailableDataLayer.VOIES_LOCALES) && (
+            <CadastralLocalPathsMap />
           )}
 
           {mapChildren}

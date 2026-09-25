@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
 import styles from "./LocalPathsList.module.css";
-import { LocalPath, LocalPathStatus } from "@/components/voies-locales/types";
+import {
+  LocalPath,
+  LocalPathStatus,
+  LocalPathClassement,
+  CLASSEMENT_LABELS,
+} from "@/components/voies-locales/types";
 import { useLocalPathsListEffects } from "./useLocalPathsListEffects";
 
 interface LocalPathListProps {
@@ -22,6 +27,16 @@ const STATUS_CLASS: Record<LocalPathStatus, string> = {
   [LocalPathStatus.DRAFT]: styles.statusDraft,
   [LocalPathStatus.PUBLISHED]: styles.statusPublished,
   [LocalPathStatus.CERTIFIED]: styles.statusCertified,
+};
+
+const CLASSEMENT_ABBR: Record<LocalPathClassement, string> = {
+  [LocalPathClassement.CHEMIN_RURAL]: "CR",
+  [LocalPathClassement.VOIE_COMMUNALE]: "VC",
+};
+
+const CLASSEMENT_CLASS: Record<LocalPathClassement, string> = {
+  [LocalPathClassement.CHEMIN_RURAL]: styles.classementCheminRural,
+  [LocalPathClassement.VOIE_COMMUNALE]: styles.classementVoieCommunale,
 };
 
 export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
@@ -52,7 +67,7 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
   const { setHoveredPathId } = useLocalPathsListEffects({ localPaths });
 
   return (
-    <section className={styles.container} aria-label="Liste des chemins ruraux">
+    <section className={styles.container} aria-label="Liste des voies locales">
       <div className={styles.toolbar}>
         <div className={styles.toolbarRow}>
           <div className={styles.search}>
@@ -99,6 +114,12 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
                   {p.nom?.trim() || "Chemin sans nom"}
                 </span>
                 <span className={styles.itemMeta}>
+                  <span
+                    className={`${styles.classementBadge} ${CLASSEMENT_CLASS[p.classement]}`}
+                    title={CLASSEMENT_LABELS[p.classement]}
+                  >
+                    {CLASSEMENT_ABBR[p.classement]}
+                  </span>
                   <span
                     className={`${styles.statusBadge} ${STATUS_CLASS[p.statut]}`}
                   >

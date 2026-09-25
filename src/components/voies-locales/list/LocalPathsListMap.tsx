@@ -15,7 +15,7 @@ import type { ExpressionSpecification } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import {
   LocalPathStatus,
-  REVETEMENT_COLORS,
+  CLASSEMENT_COLORS,
 } from "@/components/voies-locales/types";
 import styles from "./LocalPathsListMap.module.css";
 
@@ -36,11 +36,11 @@ const STATUS_BADGE_CLASS: Record<LocalPathStatus, string> = {
   [LocalPathStatus.CERTIFIED]: styles.statusCertified,
 };
 
-const REVETEMENT_COLOR_MATCH: ExpressionSpecification = [
+const CLASSEMENT_COLOR_MATCH: ExpressionSpecification = [
   "match",
-  ["get", "revetement"],
-  ...Object.entries(REVETEMENT_COLORS).flatMap(([revetement, color]) => [
-    revetement,
+  ["get", "classement"],
+  ...Object.entries(CLASSEMENT_COLORS).flatMap(([classement, color]) => [
+    classement,
     color,
   ]),
   "#4b4bcb",
@@ -50,7 +50,7 @@ type SegmentProperties = {
   pathId: string;
   nom: string;
   statut: LocalPathStatus;
-  revetement: string;
+  classement: string;
 };
 
 type HoverState = {
@@ -75,8 +75,7 @@ export function VoiesLocalesListMap({
 
   const [hover, setHover] = useState<HoverState | null>(null);
 
-  // Un feature par segment (pas par chemin) pour pouvoir colorer chaque
-  // tronçon selon son propre revêtement.
+  // Un feature par segment (pas par chemin), coloré selon le classement du chemin.
   const featureCollection = useMemo<
     FeatureCollection<LineString, SegmentProperties>
   >(() => {
@@ -91,7 +90,7 @@ export function VoiesLocalesListMap({
               pathId: p.id,
               nom: p.nom ?? "",
               statut: p.statut,
-              revetement: seg.revetement,
+              classement: p.classement,
             },
             geometry: seg.path,
           }),
@@ -178,7 +177,7 @@ export function VoiesLocalesListMap({
             type: "line",
             layout: { "line-join": "round", "line-cap": "round" },
             paint: {
-              "line-color": REVETEMENT_COLOR_MATCH,
+              "line-color": CLASSEMENT_COLOR_MATCH,
               "line-blur": 4,
               "line-width": [
                 "case",
@@ -201,7 +200,7 @@ export function VoiesLocalesListMap({
             type: "line",
             layout: { "line-join": "round", "line-cap": "round" },
             paint: {
-              "line-color": REVETEMENT_COLOR_MATCH,
+              "line-color": CLASSEMENT_COLOR_MATCH,
               "line-width": [
                 "case",
                 ["==", ["get", "pathId"], effectiveHoveredPathId ?? ""],

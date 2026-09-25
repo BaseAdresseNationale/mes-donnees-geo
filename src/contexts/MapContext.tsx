@@ -17,15 +17,15 @@ export const FLY_TO_MAX_ZOOM = 17;
 
 export enum AvailableDataLayer {
   BAN = "ban",
-  CHEMINS_RURAUX = "chemins-ruraux",
+  VOIES_LOCALES = "voies-locales",
   BD_TOPO = "bd-topo",
 }
 
 export const availableDataLayerOptions = [
   { value: AvailableDataLayer.BAN, label: "Adresses" },
   {
-    value: AvailableDataLayer.CHEMINS_RURAUX,
-    label: "Chemins Ruraux (Cadastre)",
+    value: AvailableDataLayer.VOIES_LOCALES,
+    label: "Voies Locales (Cadastre)",
   },
 ];
 

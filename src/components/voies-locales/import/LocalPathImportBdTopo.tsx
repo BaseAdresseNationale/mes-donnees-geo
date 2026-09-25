@@ -6,9 +6,19 @@ import { Button, Input } from "@gouvfr-lasuite/ui-components";
 import Link from "next/link";
 import MapContext from "@/contexts/MapContext";
 import type { AssembledLocalPathResponse } from "./types";
-import { CLASSEMENT_LABELS } from "../types";
+import { CLASSEMENT_LABELS, LocalPathClassement } from "../types";
 import { LocalPathImportMap } from "./LocalPathImportMap";
 import styles from "./LocalPathImportBdTopo.module.css";
+
+const CLASSEMENT_ABBR: Record<LocalPathClassement, string> = {
+  [LocalPathClassement.CHEMIN_RURAL]: "CR",
+  [LocalPathClassement.VOIE_COMMUNALE]: "VC",
+};
+
+const CLASSEMENT_CLASS: Record<LocalPathClassement, string> = {
+  [LocalPathClassement.CHEMIN_RURAL]: styles.classementCheminRural,
+  [LocalPathClassement.VOIE_COMMUNALE]: styles.classementVoieCommunale,
+};
 
 function formatLength(meters: number): string {
   if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
@@ -57,7 +67,7 @@ export function LocalPathImportBdTopo({
       .catch(() => {
         if (!cancelled) {
           setLoadError(
-            "Impossible de récupérer les chemins ruraux cadastraux.",
+            "Impossible de récupérer les voies locales issues du cadastre.",
           );
         }
       });
@@ -118,7 +128,7 @@ export function LocalPathImportBdTopo({
     }
 
     setMapMessage(
-      "Sélectionnez les chemins ruraux cadastraux à importer en brouillon.",
+      "Sélectionnez les voies locales issues du cadastre à importer en brouillon.",
     );
     return () => setMapMessage(null);
   }, [setMapMessage, paths, loadError]);
@@ -150,12 +160,11 @@ export function LocalPathImportBdTopo({
           <span className="material-icons">arrow_back</span>
           Retour à la liste
         </Link>
-        <h2 className={styles.title}>Importer des chemins ruraux</h2>
+        <h2 className={styles.title}>Importer des voies locales</h2>
         <p className={styles.description}>
-          Ces chemins ruraux ont été reconstitués à partir de la voirie BD TOPO
+          Ces voies locales ont été reconstituées à partir de la voirie BD TOPO
           coïncidant avec l&apos;habillage cadastral. Vous pourrez ensuite
-          qualifier chaque chemin importé (numéro, revêtement…)
-          individuellement.
+          qualifier chaque voie importée (numéro, revêtement…) individuellement.
         </p>
       </div>
 
@@ -164,7 +173,7 @@ export function LocalPathImportBdTopo({
       {!paths && !loadError && (
         <div className={styles.loading} role="status">
           <span className={styles.spinner} aria-hidden="true" />
-          <span>Reconstitution des chemins ruraux…</span>
+          <span>Reconstitution des voies locales…</span>
           <span className={styles.loadingHint}>
             Cette opération peut prendre plusieurs minutes selon la taille de la
             commune.
@@ -178,7 +187,7 @@ export function LocalPathImportBdTopo({
             <div className={styles.toolbarRow}>
               <div className={styles.search}>
                 <Input
-                  aria-label="Rechercher un chemin"
+                  aria-label="Rechercher une voie locale"
                   hideLabel
                   className={styles.searchInput}
                   fullWidth
@@ -225,6 +234,12 @@ export function LocalPathImportBdTopo({
                     <span className={styles.itemBody}>
                       <span className={styles.itemTitle}>{pathLabel(p)}</span>
                       <span className={styles.itemMeta}>
+                        <span
+                          className={`${styles.classementBadge} ${CLASSEMENT_CLASS[p.classement]}`}
+                          title={CLASSEMENT_LABELS[p.classement]}
+                        >
+                          {CLASSEMENT_ABBR[p.classement]}
+                        </span>
                         <span>
                           {p.segments.length} segment
                           {p.segments.length > 1 ? "s" : ""}

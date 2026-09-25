@@ -12,8 +12,8 @@ import {
 import type { ExpressionSpecification } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import {
-  LocalPathRevetement,
-  REVETEMENT_COLORS,
+  LocalPathClassement,
+  CLASSEMENT_COLORS,
 } from "@/components/voies-locales/types";
 import type { AssembledLocalPathResponse } from "./types";
 import { pathLabel } from "./LocalPathImportBdTopo";
@@ -24,11 +24,11 @@ const CASING_LAYER_ID = "voies-locales-import-casing";
 const LINE_LAYER_ID = "voies-locales-import-line";
 const ALREADY_IMPORTED_LAYER_ID = "voies-locales-import-already";
 
-const REVETEMENT_COLOR_MATCH: ExpressionSpecification = [
+const CLASSEMENT_COLOR_MATCH: ExpressionSpecification = [
   "match",
-  ["get", "revetement"],
-  ...Object.entries(REVETEMENT_COLORS).flatMap(([revetement, color]) => [
-    revetement,
+  ["get", "classement"],
+  ...Object.entries(CLASSEMENT_COLORS).flatMap(([classement, color]) => [
+    classement,
     color,
   ]),
   "#8a5a2b",
@@ -37,7 +37,7 @@ const REVETEMENT_COLOR_MATCH: ExpressionSpecification = [
 type SegmentProperties = {
   key: string;
   label: string;
-  revetement: LocalPathRevetement;
+  classement: LocalPathClassement;
   source: string;
   alreadyImported: boolean;
 };
@@ -59,7 +59,7 @@ function toFeatures(
         properties: {
           key: path.key,
           label: pathLabel(path),
-          revetement: seg.revetement,
+          classement: path.classement,
           source: seg.source,
           alreadyImported: path.alreadyImported,
         },
@@ -192,7 +192,7 @@ export function LocalPathImportMap({
             type: "line",
             layout: { "line-join": "round", "line-cap": "round" },
             paint: {
-              "line-color": REVETEMENT_COLOR_MATCH,
+              "line-color": CLASSEMENT_COLOR_MATCH,
               "line-width": [
                 "case",
                 ["==", ["get", "key"], effectiveHoveredKey ?? ""],

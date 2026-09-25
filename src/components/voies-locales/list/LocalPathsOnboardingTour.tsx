@@ -47,37 +47,37 @@ export function LocalPathsOnboardingTour({
   const steps: OnboardingStep[] = [
     {
       icon: <span className="material-icons">map</span>,
-      title: "Recensez les chemins ruraux de votre commune",
+      title: "Recensez les voies locales de votre commune",
       description:
-        "Ce module vous permet de recenser, cartographier et exporter les chemins ruraux de votre commune.",
+        "Ce module vous permet de recenser, cartographier et exporter les voies locales (voies communales et chemins ruraux) de votre commune.",
     },
     {
       icon: <span className="material-icons">cloud_download</span>,
-      title: "Commencez par importer les chemins ruraux existants",
+      title: "Commencez par importer les voies locales existantes",
       description: (
         <>
           <p>
             Gagnez du temps : importez automatiquement les tronçons candidats
-            depuis la base de données de l&apos;IGN, puis complétez les
-            informations manquantes.
+            des voies locales depuis la base de données de l&apos;IGN, puis
+            complétez les informations manquantes.
           </p>
           <Button color="brand" size="small" onClick={goToImport}>
-            Importer les chemins
+            Importer les voies locales
           </Button>
         </>
       ),
     },
     {
       icon: <span className="material-icons">edit</span>,
-      title: "Dessinez les chemins manquants sur la carte",
+      title: "Dessinez les voies manquantes sur la carte",
       description:
-        "Complétez l'import en traçant directement sur la carte les chemins ruraux qui n'existent pas encore dans les données de l'IGN.",
+        "Complétez l'import en traçant directement sur la carte les voies qui n'existent pas encore dans les données de l'IGN.",
     },
     {
       icon: <span className="material-icons">publish</span>,
       title: "Publiez les chemins dès que vous êtes prêt",
       description:
-        "Une fois les informations vérifiées, publiez vos chemins ruraux pour les rendre officiels.",
+        "Une fois les informations vérifiées, publiez vos voies locales pour les rendre officiels.",
     },
   ];
 
@@ -85,7 +85,7 @@ export function LocalPathsOnboardingTour({
     <OnboardingModal
       isOpen={isOpen}
       appName="Mes Adresses"
-      mainTitle="Bienvenue dans le module Chemins ruraux"
+      mainTitle="Bienvenue dans le module Voies locales"
       steps={steps}
       onSkip={dismiss}
       onComplete={dismiss}

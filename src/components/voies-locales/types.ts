@@ -132,6 +132,11 @@ export const REVETEMENT_COLORS: Record<LocalPathRevetement, string> = {
   NON_REVETU: "#8a5a2b",
 };
 
+export const CLASSEMENT_COLORS: Record<LocalPathClassement, string> = {
+  CHEMIN_RURAL: "#18753c",
+  VOIE_COMMUNALE: "#0063cb",
+};
+
 export const SOURCE_LABELS: Record<LocalPathSource, string> = {
   MANUEL: "Saisie manuelle",
   BD_TOPO: "Import BD TOPO",
