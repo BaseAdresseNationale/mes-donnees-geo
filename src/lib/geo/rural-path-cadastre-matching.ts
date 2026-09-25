@@ -18,6 +18,8 @@ const SAMPLE_STEP_METERS = 5;
 const BBOX_MARGIN_DEGREES = 0.005;
 // En-deçà de ce seuil, le trou entre deux portions est ignoré (l'éditeur tolère ~2 m).
 const GAP_FILL_MIN_METERS = 2;
+// Longueur max d'un raccordement en ligne droite ; au-delà, on scinde en 2 chemins distincts.
+const MAX_FILLER_METERS = 20;
 // Écart d'orientation max (mod 180°) entre un tronçon et le tracé cadastral local :
 // au-delà, le tronçon est jugé transversal (intersection/amorce) et écarté.
 const MAX_BEARING_DIFF_DEGREES = 45;
@@ -327,8 +329,8 @@ function coverageRatio(path: LineString, cover: LineString): number {
   const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
   let inside = 0;
   for (let i = 0; i <= count; i++) {
-    const coord = along(line, (length * i) / count, { units: "meters" }).geometry
-      .coordinates as Position;
+    const coord = along(line, (length * i) / count, { units: "meters" })
+      .geometry.coordinates as Position;
     const dist =
       nearestPointOnLine(coverLine, coord, { units: "meters" }).properties
         .dist ?? Infinity;
@@ -359,9 +361,10 @@ function dedupePortions(portions: Portion[]): Portion[] {
 /**
  * Assemble des chemins ruraux « prêts à importer » à partir des tronçons BD TOPO qui
  * coïncident géométriquement avec l'habillage cadastral. Chaque chemin cadastral
- * (regroupé par numéro) devient un chemin composé de segments : portions de tronçons
- * BD TOPO découpées au couloir de tolérance (`source=BD_TOPO`), et segments de
- * comblement en ligne droite là où subsiste un trou (`source=MANUEL`).
+ * (regroupé par numéro + libellé) devient un chemin composé de segments : portions de
+ * tronçons BD TOPO découpées au couloir de tolérance (`source=BD_TOPO`), et segments de
+ * comblement en ligne droite là où subsiste un trou ≤ 20 m (`source=MANUEL`). Un trou
+ * > 20 m scinde le groupe en chemins distincts (pas de longue ligne droite aberrante).
  */
 export function assembleRuralPathsFromCadastre(
   candidates: BdTopoTronconCandidate[],
@@ -385,33 +388,44 @@ export function assembleRuralPathsFromCadastre(
     if (portions.length === 0) continue;
 
     const ordered = chainPortions(dedupePortions(portions));
-    const segments: AssembledSegment[] = [];
+
+    // Découpe la chaîne en sous-chemins à chaque trou > MAX_FILLER_METERS : au-delà,
+    // un raccordement en ligne droite n'aurait pas de sens (chemins distincts).
+    const runs: AssembledSegment[][] = [];
+    let current: AssembledSegment[] = [];
     for (let i = 0; i < ordered.length; i++) {
       if (i > 0) {
         const previous = ordered[i - 1];
-        const filler = fillerGeometry(
-          end(previous.path),
-          start(ordered[i].path),
-        );
-        if (filler) {
-          segments.push({
-            path: filler,
-            source: RuralPathSource.MANUEL,
-            sourceRef: null,
-            surface: previous.candidate.suggestedSurface,
-            largeurMoyenne: null,
-            domanialite: null,
-          });
+        const from = end(previous.path);
+        const to = start(ordered[i].path);
+        if (haversineMeters(from, to) > MAX_FILLER_METERS) {
+          runs.push(current);
+          current = [];
+        } else {
+          const filler = fillerGeometry(from, to);
+          if (filler) {
+            current.push({
+              path: filler,
+              source: RuralPathSource.MANUEL,
+              sourceRef: null,
+              surface: previous.candidate.suggestedSurface,
+              largeurMoyenne: null,
+              domanialite: null,
+            });
+          }
         }
       }
-      segments.push(bdTopoSegment(ordered[i]));
+      current.push(bdTopoSegment(ordered[i]));
     }
+    if (current.length > 0) runs.push(current);
 
-    assembled.push({
-      key: group.key,
-      numero: group.numero,
-      nom: group.nom,
-      segments,
+    runs.forEach((segments, index) => {
+      assembled.push({
+        key: runs.length > 1 ? `${group.key}#${index}` : group.key,
+        numero: group.numero,
+        nom: group.nom,
+        segments,
+      });
     });
   }
   return assembled;
