@@ -14,6 +14,7 @@
     "start": "HOSTNAME=0.0.0.0 node .next/standalone/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "generate:api-bal": "openapi-ts",
     "prisma:generate-client": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
+    "@hey-api/openapi-ts": "0.99.0",
     "@types/geojson": "^7946.0.15",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.21.0",

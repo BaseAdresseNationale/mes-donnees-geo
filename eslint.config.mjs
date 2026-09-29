@@ -3,7 +3,11 @@ import nextConfig from "eslint-config-next";
 const eslintConfig = [
   ...nextConfig,
   {
-    ignores: ["prisma/migrations/**", "src/generated/**"],
+    ignores: [
+      "prisma/migrations/**",
+      "src/generated/**",
+      "src/lib/api-bal/generated/**",
+    ],
   },
   {
     rules: {
