@@ -2,10 +2,11 @@
 
 import { PANORAMAX_VIEWER_URL } from "@/components/map/Panoramax/panoramax.layers";
 import { PanoramaxViewer } from "@/components/panoramax/PanoramaxViewer";
-import { useCallback, useEffect } from "react";
+import { useCallback, useContext, useEffect } from "react";
 import { useDOMRef } from "@/hooks/useDOMRef";
 import { createPortal } from "react-dom";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import PanoramaxContext from "@/contexts/PanoramaxContext";
 
 export default function PanoramaxViewerPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function PanoramaxViewerPage() {
   const searchParams = useSearchParams();
   const pictureId = searchParams.get("pictureID");
   const [mainElRef, setMainElRef] = useDOMRef<HTMLElement>();
+  const { returnPath } = useContext(PanoramaxContext);
 
   useEffect(() => {
     const el =
@@ -53,8 +55,8 @@ export default function PanoramaxViewerPage() {
   }, [setMainElRef]);
 
   const handleClose = useCallback(() => {
-    router.back();
-  }, [router]);
+    router.replace(returnPath ?? `/${codeCommune}`);
+  }, [router, returnPath, codeCommune]);
 
   // Safety: if the user lands on this page directly (no pictureID), go home.
   useEffect(() => {

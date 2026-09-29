@@ -93,7 +93,7 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
       {filtered.length === 0 ? (
         <p className={styles.empty}>
           {localPaths.length === 0
-            ? "Aucun chemin rural pour cette commune."
+            ? "Aucune voie locale pour cette commune."
             : "Aucun résultat pour ces filtres."}
         </p>
       ) : (

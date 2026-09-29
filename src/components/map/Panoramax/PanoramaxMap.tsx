@@ -16,7 +16,7 @@ import {
   resolveNearestPictureAfterDive,
   snapPointToSequenceGeometry,
 } from "./panoramax.layers";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import MapContext from "@/contexts/MapContext";
 import { useCommune } from "@/contexts/CommuneContext";
 
@@ -25,9 +25,11 @@ const DIVE_DURATION_MS = 900;
 
 export function PanoramaxMap() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const { codeInsee: codeCommune } = useCommune();
-  const { showPanoramax, isDiving, setIsDiving } = useContext(PanoramaxContext);
+  const { showPanoramax, isDiving, setIsDiving, setReturnPath } =
+    useContext(PanoramaxContext);
   const { setSavedFlyToBounds, mapRef } = useContext(MapContext);
   const hoveredSequenceIdRef = useRef<string | null>(null);
 
@@ -60,6 +62,8 @@ export function PanoramaxMap() {
       setSavedFlyToBounds(
         mapRef.getBounds().toArray() as [[number, number], [number, number]],
       );
+      // Remember the module the user came from so the viewer returns there.
+      setReturnPath(pathname);
 
       setIsDiving(true);
 
@@ -88,7 +92,15 @@ export function PanoramaxMap() {
         essential: true,
       });
     },
-    [mapRef, router, codeCommune, setIsDiving, setSavedFlyToBounds],
+    [
+      mapRef,
+      router,
+      codeCommune,
+      pathname,
+      setIsDiving,
+      setSavedFlyToBounds,
+      setReturnPath,
+    ],
   );
 
   useEffect(() => {

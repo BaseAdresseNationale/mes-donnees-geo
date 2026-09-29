@@ -7,6 +7,9 @@ interface PanoramaxContextValue {
   setShowPanoramax: (show: boolean) => void;
   isDiving: boolean;
   setIsDiving: (diving: boolean) => void;
+  // Module route the user came from before opening the viewer, to return there.
+  returnPath: string | null;
+  setReturnPath: (path: string | null) => void;
 }
 
 export const PanoramaxContext = createContext<PanoramaxContextValue>({
@@ -14,6 +17,8 @@ export const PanoramaxContext = createContext<PanoramaxContextValue>({
   setShowPanoramax: () => {},
   isDiving: false,
   setIsDiving: () => {},
+  returnPath: null,
+  setReturnPath: () => {},
 });
 
 export function PanoramaxContextProvider({
@@ -23,6 +28,7 @@ export function PanoramaxContextProvider({
 }) {
   const [showPanoramax, setShowPanoramax] = useState(false);
   const [isDiving, setIsDiving] = useState(false);
+  const [returnPath, setReturnPath] = useState<string | null>(null);
 
   const value = useMemo(
     () => ({
@@ -30,8 +36,10 @@ export function PanoramaxContextProvider({
       setShowPanoramax,
       isDiving,
       setIsDiving,
+      returnPath,
+      setReturnPath,
     }),
-    [showPanoramax, isDiving],
+    [showPanoramax, isDiving, returnPath],
   );
 
   return (

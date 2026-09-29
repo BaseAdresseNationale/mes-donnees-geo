@@ -15,20 +15,20 @@ export function LocalPathToolbar({ codeCommune }: LocalPathToolbarProps) {
       <Button
         color="brand"
         icon={<span className="material-icons">add</span>}
-        aria-label="Créer un nouveau chemin rural"
+        aria-label="Créer une nouvelle voie"
         size="small"
         onClick={() => router.push(`/${codeCommune}/voies-locales/new`)}
       >
-        Nouveau chemin
+        Nouvelle voie
       </Button>
       <Button
         color="neutral"
         icon={<span className="material-icons">cloud_download</span>}
-        aria-label="Importer des chemins depuis la BD TOPO"
+        aria-label="Importer des voies depuis la BD TOPO"
         size="small"
         onClick={() => router.push(`/${codeCommune}/voies-locales/import`)}
       >
-        Importer des chemins
+        Importer des voies
       </Button>
     </div>
   );

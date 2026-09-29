@@ -53,7 +53,7 @@ export function PanoramaxLensDrag() {
     codeCommune: string;
     plugin: string;
   }>();
-  const { showPanoramax, setShowPanoramax, isDiving, setIsDiving } =
+  const { showPanoramax, setShowPanoramax, isDiving, setIsDiving, setReturnPath } =
     useContext(PanoramaxContext);
   const { setMapMessage, setSavedFlyToBounds } = useContext(MapContext);
 
@@ -73,6 +73,12 @@ export function PanoramaxLensDrag() {
   useEffect(() => {
     scanModeRef.current = scanMode;
   }, [scanMode]);
+  // Fresh pathname for the long-lived window listeners (module route to
+  // return to when closing the viewer).
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
   // Remembers showPanoramax value at the moment we entered scan mode, so we
   // can restore it cleanly on exit.
   const initialShowPanoramaxRef = useRef<boolean | null>(null);
@@ -267,6 +273,8 @@ export function PanoramaxLensDrag() {
         setSavedFlyToBounds(
           m.getBounds().toArray() as [[number, number], [number, number]],
         );
+        // Remember the module the user came from so the viewer returns there.
+        setReturnPath(pathnameRef.current);
         setIsDiving(true);
         const onMoveEnd = async () => {
           m.off("moveend", onMoveEnd);
@@ -346,6 +354,7 @@ export function PanoramaxLensDrag() {
     enterScanMode,
     exitScanMode,
     setSavedFlyToBounds,
+    setReturnPath,
   ]);
 
   // Delegate pointerdown on the (imperatively-created) #panoramax-toggle button.
