@@ -6,6 +6,7 @@ import {
   findCommuneBasesLocalesWithToken,
 } from "./generated/sdk.gen";
 import type { BaseLocale } from "./generated/types.gen";
+import { stripToken } from "./proxy";
 import { createTrustedClient, mesAdressesApiUrl } from "./server-client";
 
 // Durée pendant laquelle on réutilise la liste des BAL (et leurs tokens)
@@ -23,9 +24,7 @@ interface CacheEntry {
 // Les tokens restent côté serveur : ils ne vont jamais dans le cookie.
 const cache = new Map<string, CacheEntry>();
 
-async function fetchCommuneBals(
-  session: SessionUser,
-): Promise<BaseLocale[]> {
+async function fetchCommuneBals(session: SessionUser): Promise<BaseLocale[]> {
   const { data, error, response } = await findCommuneBasesLocalesWithToken({
     client: createTrustedClient(session.email),
     path: { codeCommune: session.communeInsee },
@@ -56,6 +55,20 @@ export async function listCommuneBals(
   bals.catch(() => cache.delete(key));
 
   return bals;
+}
+
+// BAL de la commune de la session, prêtes à être envoyées au navigateur :
+// tokens retirés, plus récentes en premier. null si l'API est indisponible.
+export async function getCommuneBalsForClient(
+  session: SessionUser,
+): Promise<BaseLocale[] | null> {
+  try {
+    const bals = stripToken(await listCommuneBals(session)) as BaseLocale[];
+    return bals.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  } catch (error) {
+    console.error("[api-bal] récupération des BAL de la commune", error);
+    return null;
+  }
 }
 
 // Token de la BAL si elle appartient à la commune de la session, sinon null.

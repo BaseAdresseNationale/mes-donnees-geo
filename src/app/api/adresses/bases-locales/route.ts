@@ -45,11 +45,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const nom =
     body && typeof body === "object" && "nom" in body ? body.nom : undefined;
-  if (
-    typeof nom !== "string" ||
-    !nom.trim() ||
-    nom.length > NOM_MAX_LENGTH
-  ) {
+  if (typeof nom !== "string" || !nom.trim() || nom.length > NOM_MAX_LENGTH) {
     return NextResponse.json({ error: "Nom invalide" }, { status: 422 });
   }
 
