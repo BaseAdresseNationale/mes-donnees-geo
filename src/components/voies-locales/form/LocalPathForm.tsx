@@ -9,7 +9,12 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Select, useModals } from "@gouvfr-lasuite/ui-components";
+import {
+  Button,
+  Input,
+  Select,
+  useModals,
+} from "@gouvfr-lasuite/ui-components";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
 import styles from "./LocalPathForm.module.css";
@@ -330,10 +335,6 @@ export function LocalPathForm({
       <h2 className={styles.title}>
         {isEdit ? initial?.nom || "Chemin sans nom" : "Nouveau chemin rural"}
       </h2>
-      <p className={styles.hint}>
-        Tracez le chemin sur la carte. Chaque segment porte son propre
-        revêtement.
-      </p>
 
       <div className={styles.pathIdentifier}>
         <Select
@@ -378,9 +379,7 @@ export function LocalPathForm({
         value={gestionnaire ?? undefined}
         onChange={(e) =>
           setGestionnaire(
-            e.target.value
-              ? (e.target.value as LocalPathGestionnaire)
-              : null,
+            e.target.value ? (e.target.value as LocalPathGestionnaire) : null,
           )
         }
         clearable

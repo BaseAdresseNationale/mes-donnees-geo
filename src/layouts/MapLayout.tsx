@@ -1,4 +1,9 @@
-import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
+import Map, {
+  Layer,
+  NavigationControl,
+  ScaleControl,
+  Source,
+} from "react-map-gl/maplibre";
 import { useCallback, useContext, useMemo, useState } from "react";
 import { CadastreContext } from "../contexts/CadastreContext";
 import { AppLayout, AppLayoutProps } from "./AppLayout";
@@ -142,6 +147,7 @@ export function MapLayout({
           {mapChildren}
 
           <PanoramaxLensDrag />
+          <ScaleControl position="bottom-right" />
           <NavigationControl position="bottom-right" />
           <ControlGroupPortal position="bottom-left">
             <StylesSwitch styles={mapStyles} />

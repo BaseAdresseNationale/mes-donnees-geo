@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 0.75rem;
+  padding-bottom: 0;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -13,12 +14,6 @@
   margin: 0 0 0.25rem;
   font-size: 1rem;
   font-weight: 600;
-}
-
-.hint {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--color-muted, #555);
 }
 
 .error {
@@ -220,6 +215,10 @@
   padding-top: 0.5rem;
   border-top: 1px solid var(--color-border, #e5e5e5);
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  background: #fafafa;
+  padding-bottom: 0.75rem;
 }
 
 .actionsSpacer {

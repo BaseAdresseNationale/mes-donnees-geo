@@ -13,14 +13,15 @@ import {
 import type { BdTopoTronconCandidate } from "./bd-topo";
 
 // Couloir de tolérance entre un tronçon BD TOPO et le tracé cadastral de référence.
-const MATCH_BUFFER_METERS = 5;
+const MATCH_BUFFER_METERS = 8;
+// Pas de tolérance pour l'échantillonnage des tronçons.
 const SAMPLE_STEP_METERS = 5;
 // Marge large (imprécision bbox/degrés) pour ne jamais écarter à tort un candidat au pré-filtre.
 const BBOX_MARGIN_DEGREES = 0.005;
 // En-deçà de ce seuil, le trou entre deux portions est ignoré (l'éditeur tolère ~2 m).
 const GAP_FILL_MIN_METERS = 2;
 // Longueur max d'un raccordement en ligne droite ; au-delà, on scinde en 2 chemins distincts.
-const MAX_FILLER_METERS = 20;
+const MAX_FILLER_METERS = 150;
 // Écart d'orientation max (mod 180°) entre un tronçon et le tracé cadastral local :
 // au-delà, le tronçon est jugé transversal (intersection/amorce) et écarté.
 const MAX_BEARING_DIFF_DEGREES = 45;

@@ -2,15 +2,7 @@ import "server-only";
 
 import { getCommuneSettings } from "@/lib/db/commune-settings";
 import { GeoPlugin } from "./types";
-import { localPathsPlugin } from "./voies-locales/config";
-import { adressesPlugin } from "./adresses/config";
-import { limitesAdministrativesPlugin } from "./limites-administratives/config";
-
-const ALL_PLUGINS: readonly GeoPlugin[] = [
-  localPathsPlugin,
-  adressesPlugin,
-  limitesAdministrativesPlugin,
-];
+import { ALL_PLUGINS } from "./config";
 
 export async function getEnabledPlugins(
   communeInsee: string,

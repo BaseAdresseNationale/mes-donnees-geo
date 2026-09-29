@@ -5,11 +5,14 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useCommune } from "@/contexts/CommuneContext";
 import { MapRef } from "react-map-gl/maplibre";
 import { geometryBounds } from "@/lib/geo/bounds";
+import { usePathname } from "next/navigation";
+import { ALL_PLUGINS } from "@/plugins/config";
 
 export const FLY_TO_DURATION_MS = 1500;
 export const FLY_TO_PADDING = 64;
@@ -69,6 +72,7 @@ export const MapContext = createContext<MapContextValue>({
 
 export function MapContextProvider(props: { children: React.ReactNode }) {
   const [mapRef, setMapRef] = useState<MapRef | null>(null);
+  const pathName = usePathname();
   const mapRefCb = useCallback((node: MapRef | null) => {
     if (node !== null) {
       setMapRef(node);
@@ -84,7 +88,12 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
   const [activeDataLayers, setActiveDataLayers] = useState<
     AvailableDataLayer[]
   >([]);
-  const { contour: communeContour } = useCommune();
+  const { contour: communeContour, codeInsee } = useCommune();
+
+  // Determine if the map should initially fly to the commune based on the current path and available plugins.
+  const shouldFlyToCommuneRef = useRef(
+    ALL_PLUGINS.map(({ id }) => `/${codeInsee}/${id}`).includes(pathName),
+  );
 
   useEffect(() => {
     if (mapRef && !isStyleLoaded) {
@@ -132,6 +141,14 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
     },
     [mapRef, isStyleLoaded, savedFlyToBounds, communeContour],
   );
+
+  useEffect(() => {
+    if (shouldFlyToCommuneRef.current) {
+      if (flyToBounds()) {
+        shouldFlyToCommuneRef.current = false;
+      }
+    }
+  }, [communeContour, flyToBounds, shouldFlyToCommuneRef]);
 
   const value = useMemo(
     () => ({
