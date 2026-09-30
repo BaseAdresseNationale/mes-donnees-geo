@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { Feature, Position, LineString as GeoLineString } from "geojson";
 import {
@@ -38,6 +39,9 @@ type TerraDrawInstance = {
   start: () => void;
   stop: () => void;
   setMode: (mode: string) => void;
+  selectFeature: (id: string | number, selectMode?: string) => void;
+  deselectFeature: (id: string | number) => void;
+  updateFeatureGeometry: (id: string | number, geometry: GeoLineString) => void;
   addFeatures: (features: Feature[]) => unknown;
   removeFeatures: (ids: (string | number)[]) => void;
   getSnapshot: () => Feature[];
@@ -78,6 +82,8 @@ export interface UseLocalPathDrawerResult {
   previewCoordinates: Position[] | null;
   mode: DrawMode;
   setMode: (m: DrawMode) => void;
+  selectedSegmentId: string | null;
+  selectSegment: (id: string | null) => void;
   updateSegmentAttributes: (
     id: string,
     patch: Partial<SegmentAttributes>,
@@ -102,6 +108,9 @@ const DEFAULT_ATTRIBUTES: SegmentAttributes = {
 // Distance, en pixels écran, en dessous de laquelle le premier point d'un
 // nouveau segment est aimanté à une extrémité du chemin existant.
 const SNAP_PIXEL_DISTANCE = 25;
+// Distance, en pixels écran, en dessous de laquelle un clic sur un segment
+// (hors extrémité) bascule automatiquement en mode sélection.
+const HIT_PIXEL_DISTANCE = 12;
 // Tolérance, en mètres, pour considérer que deux points coïncident.
 const SNAP_TOLERANCE_METERS = 2;
 // Distance max, en mètres, entre deux extrémités pour autoriser la fusion de
@@ -136,6 +145,28 @@ function isSamePoint(a: Position, b: Position): boolean {
   return metersBetween(a, b) <= SNAP_TOLERANCE_METERS;
 }
 
+// Égalité stricte de coordonnées (mêmes nombres) : sert à détecter qu'un
+// sommet partagé a bougé pour le répercuter sur le segment voisin.
+function samePointExact(a: Position, b: Position): boolean {
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+// terra-draw REJETTE (à `addFeatures`) toute feature dont une coordonnée
+// dépasse sa précision (9 décimales : `Math.round(v*1e9)/1e9`) — les segments
+// venus de la base (coordonnées double précision) ne seraient alors pas ajoutés
+// au store, donc ni sélectionnables ni éditables. On arrondit à l'identique et
+// on laisse tomber une éventuelle 3e composante (Z) avant de les fournir.
+const COORD_PRECISION_FACTOR = 1e9;
+function roundCoordinate(coord: Position): Position {
+  return [
+    Math.round(coord[0] * COORD_PRECISION_FACTOR) / COORD_PRECISION_FACTOR,
+    Math.round(coord[1] * COORD_PRECISION_FACTOR) / COORD_PRECISION_FACTOR,
+  ];
+}
+function roundCoordinates(coords: Position[]): Position[] {
+  return coords.map(roundCoordinate);
+}
+
 function toLineStringFeature(
   id: string,
   coordinates: Position[],
@@ -157,18 +188,25 @@ export function useLocalPathDrawer(
 ): UseLocalPathDrawerResult {
   const drawRef = useRef<TerraDrawInstance | null>(null);
   const initialAppliedRef = useRef(false);
+  // Un tracé WIP (premier point placé, pas encore terminé par double-clic)
+  // ne doit jamais être interrompu par le changement de mode automatique.
+  const wipFeatureRef = useRef(false);
 
   const [segments, setSegments] = useState<Segment[]>([]);
   const [previewCoordinates, setPreviewCoordinates] = useState<
     Position[] | null
   >(null);
   const [mode, setModeState] = useState<DrawMode>("draw");
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(
+    null,
+  );
   const [isReady, setIsReady] = useState(false);
   const [mergedPathIds, setMergedPathIds] = useState<string[]>([]);
   const { setIsDrawing } = useContext(DrawContext);
 
   const segmentsRef = useRef<Segment[]>([]);
   const modeRef = useRef<DrawMode>("draw");
+  const selectedIdRef = useRef<string | null>(null);
   const setMapMessageRef = useRef(setMapMessage);
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -206,10 +244,11 @@ export function useLocalPathDrawer(
     [guidanceMessage],
   );
 
-  const setMode = useCallback(
+  // Met à jour l'état React (mode/message) sans toucher à terra-draw : utile
+  // quand terra-draw a déjà changé de mode lui-même (ex. `instance.selectFeature`).
+  const applyModeState = useCallback(
     (m: DrawMode) => {
       setModeState(m);
-      drawRef.current?.setMode(m === "draw" ? "linestring" : "select");
       modeRef.current = m;
       setPreviewCoordinates(null);
       setMapMessageRef.current(guidanceMessage());
@@ -217,21 +256,121 @@ export function useLocalPathDrawer(
     [guidanceMessage],
   );
 
+  const setMode = useCallback(
+    (m: DrawMode) => {
+      drawRef.current?.setMode(m === "draw" ? "linestring" : "select");
+      applyModeState(m);
+    },
+    [applyModeState],
+  );
+
+  const applySelected = useCallback((id: string | null) => {
+    selectedIdRef.current = id;
+    setSelectedSegmentId(id);
+  }, []);
+
+  // Sélectionne un segment (mode select, ses points de tracé apparaissent) ou,
+  // avec `null`, désélectionne et repasse en mode dessin. Appelé par
+  // l'accordéon (action programmatique) ; la sélection déclenchée par un clic
+  // carte est gérée nativement par terra-draw (events `select`/`deselect`).
+  const selectSegment = useCallback(
+    (id: string | null) => {
+      const draw = drawRef.current;
+      if (!draw) return;
+      const prev = selectedIdRef.current;
+      if (id === null) {
+        // Désélection simple : terra-draw reste en mode select (au repos),
+        // on ne bascule PAS en dessin (cohérent avec la désélection native).
+        if (prev != null) {
+          try {
+            draw.deselectFeature(prev);
+          } catch {
+            // ignore
+          }
+        }
+        applySelected(null);
+        return;
+      }
+      if (prev === id) return;
+      if (prev != null) {
+        try {
+          draw.deselectFeature(prev);
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        draw.selectFeature(id);
+      } catch {
+        // ignore
+      }
+      applySelected(id);
+      applyModeState("select");
+    },
+    [applyModeState, applySelected],
+  );
+
   const updateSegmentsFromIds = useCallback((ids: (string | number)[]) => {
     const draw = drawRef.current;
     if (!draw) return;
     const changedIds = new Set(ids.map(String));
     const snap = draw.getSnapshot();
-    setSegments((prev) =>
-      prev.map((seg) => {
-        if (!changedIds.has(seg.id)) return seg;
-        const f = snap.find((f) => String(f.id) === seg.id);
-        if (!f || f.geometry?.type !== "LineString") return seg;
-        const coords = (f.geometry as GeoLineString).coordinates;
-        if (!coords || coords.length < 2) return seg;
-        return { ...seg, coordinates: coords };
-      }),
-    );
+
+    const next = segmentsRef.current.map((seg) => {
+      if (!changedIds.has(seg.id)) return seg;
+      const f = snap.find((f) => String(f.id) === seg.id);
+      if (!f || f.geometry?.type !== "LineString") return seg;
+      const coords = (f.geometry as GeoLineString).coordinates;
+      if (!coords || coords.length < 2) return seg;
+      return { ...seg, coordinates: coords };
+    });
+
+    // Un sommet aux extrémités d'un segment est partagé avec le segment voisin
+    // (chaîne contiguë) : on y propage le déplacement pour ne jamais créer de
+    // trou dans le chemin, même si le voisin n'est pas sélectionné.
+    const neighborUpdates: { id: string; coordinates: Position[] }[] = [];
+    for (let k = 0; k < next.length; k++) {
+      if (!changedIds.has(next[k].id)) continue;
+      const newStart = next[k].coordinates[0];
+      const newEnd = next[k].coordinates.at(-1)!;
+      if (k > 0) {
+        const left = next[k - 1];
+        if (!samePointExact(left.coordinates.at(-1)!, newStart)) {
+          const coords = [...left.coordinates];
+          coords[coords.length - 1] = newStart;
+          next[k - 1] = { ...left, coordinates: coords };
+          neighborUpdates.push({ id: left.id, coordinates: coords });
+        }
+      }
+      if (k < next.length - 1) {
+        const right = next[k + 1];
+        if (!samePointExact(right.coordinates[0], newEnd)) {
+          const coords = [...right.coordinates];
+          coords[0] = newEnd;
+          next[k + 1] = { ...right, coordinates: coords };
+          neighborUpdates.push({ id: right.id, coordinates: coords });
+        }
+      }
+    }
+
+    // `flushSync` : ce handler est déclenché par les évènements natifs bruts
+    // de terra-draw (pointermove) pendant un glisser, en dehors du système
+    // d'évènements React — sans ça, React peut différer/regrouper la mise à
+    // jour tant que le flux de pointermove continue, et la ligne éditée
+    // (`EDIT_LINE_LAYER_ID`, qui dépend de ce state via plusieurs composants)
+    // ne se met visuellement à jour qu'à l'arrêt du geste (désélection).
+    flushSync(() => setSegments(next));
+
+    for (const u of neighborUpdates) {
+      try {
+        draw.updateFeatureGeometry(u.id, {
+          type: "LineString",
+          coordinates: u.coordinates,
+        });
+      } catch {
+        // ignore
+      }
+    }
   }, []);
 
   // Aperçu en direct du segment en cours de tracé (pas encore finalisé).
@@ -251,14 +390,17 @@ export function useLocalPathDrawer(
         return f.geometry?.type === "LineString" && !knownIds.has(String(f.id));
       });
       if (!wip) {
+        wipFeatureRef.current = false;
         setPreviewCoordinates(null);
         return;
       }
       const coords = (wip.geometry as GeoLineString).coordinates;
       if (!coords || coords.length === 0) {
+        wipFeatureRef.current = false;
         setPreviewCoordinates(null);
         return;
       }
+      wipFeatureRef.current = true;
 
       const chain = segmentsRef.current;
       if (chain.length > 0) {
@@ -269,6 +411,7 @@ export function useLocalPathDrawer(
           !isSamePoint(firstPoint, chainStart) &&
           !isSamePoint(firstPoint, chainEnd)
         ) {
+          wipFeatureRef.current = false;
           setPreviewCoordinates(null);
           showTemporaryError(MSG_INVALID_SEGMENT);
           // Différé : on est encore dans la pile d'appel du clic qui vient de
@@ -287,6 +430,7 @@ export function useLocalPathDrawer(
     (id: string) => {
       const draw = drawRef.current;
       if (!draw) return;
+      wipFeatureRef.current = false;
       setPreviewCoordinates(null);
       const snap = draw.getSnapshot();
       const f = snap.find((f) => String(f.id) === id);
@@ -339,6 +483,7 @@ export function useLocalPathDrawer(
     let cancelled = false;
     let draw: TerraDrawInstance | null = null;
     let removeContextMenuListener: (() => void) | null = null;
+    let removeMouseDownListener: (() => void) | null = null;
 
     (async () => {
       const [
@@ -420,6 +565,14 @@ export function useLocalPathDrawer(
             },
           }),
           new TerraDrawSelectMode({
+            // Raccourcis clavier natifs désactivés : la suppression est gérée
+            // par nous (`removeSegment`, extrémités uniquement + sync voisin).
+            keyEvents: {
+              deselect: null,
+              delete: null,
+              rotate: null,
+              scale: null,
+            },
             flags: {
               linestring: {
                 feature: {
@@ -467,12 +620,28 @@ export function useLocalPathDrawer(
         const [id] = args as [string | number];
         handleFinish(String(id));
       });
+      instance.on("select", (...args: unknown[]) => {
+        // terra-draw a sélectionné un segment (clic natif ou `selectFeature`) :
+        // on synchronise l'état React (accordéon + mode select).
+        const [id] = args as [string | number];
+        applySelected(String(id));
+        applyModeState("select");
+      });
+      instance.on("deselect", () => {
+        // Désélection (clic hors trait, ou avant de sélectionner un autre
+        // segment) : on referme l'accordéon. On NE touche PAS au mode — terra-
+        // draw reste en select (mode au repos) ; changer `modeRef` ici sans
+        // rebasculer terra-draw le désynchroniserait (le clic sur une poignée
+        // d'extrémité ne repasserait alors plus en dessin).
+        applySelected(null);
+      });
 
       // Clic droit = annuler le segment en cours de tracé (comme la touche
       // Echap), sans changer de mode ni le menu contextuel du navigateur.
       const onContextMenu = (e: { preventDefault: () => void }) => {
         e.preventDefault();
         if (modeRef.current !== "draw") return;
+        wipFeatureRef.current = false;
         setPreviewCoordinates(null);
         // Différé : re-déclencher le même mode force terra-draw à nettoyer
         // (stop+cleanup+start) le tracé en cours sans casser son état interne.
@@ -481,6 +650,81 @@ export function useLocalPathDrawer(
       nativeMap.on("contextmenu", onContextMenu);
       removeContextMenuListener = () =>
         nativeMap.off("contextmenu", onContextMenu);
+
+      // Choix automatique du mode selon l'endroit PRESSÉ (plus de boutons
+      // Dessiner/Sélectionner) : près d'une extrémité → dessin (relance le
+      // tracé), sur un segment → sélection (terra-draw sélectionne nativement
+      // au `pointerup`). On agit au `mousedown` (avant que terra-draw ne traite
+      // le clic/relâchement) et on ne change le mode QUE s'il diffère, pour ne
+      // pas interrompre un glisser de sommet en cours.
+      const projectToPixel = (coord: Position) => {
+        const p = nativeMap.project(coord as [number, number]);
+        return { x: p.x, y: p.y };
+      };
+      const pixelDistance = (
+        a: { x: number; y: number },
+        b: { x: number; y: number },
+      ) => Math.hypot(a.x - b.x, a.y - b.y);
+      const distanceToSegmentPx = (
+        p: { x: number; y: number },
+        a: { x: number; y: number },
+        b: { x: number; y: number },
+      ) => {
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const lengthSq = dx * dx + dy * dy;
+        if (lengthSq === 0) return pixelDistance(p, a);
+        const t = Math.max(
+          0,
+          Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq),
+        );
+        return pixelDistance(p, { x: a.x + t * dx, y: a.y + t * dy });
+      };
+      const minDistanceToLinePx = (
+        coordinates: Position[],
+        point: { x: number; y: number },
+      ) => {
+        const projected = coordinates.map(projectToPixel);
+        let min = Infinity;
+        for (let i = 0; i < projected.length - 1; i++) {
+          min = Math.min(
+            min,
+            distanceToSegmentPx(point, projected[i], projected[i + 1]),
+          );
+        }
+        return min;
+      };
+      const onModeDecideMouseDown = (e: { point: { x: number; y: number } }) => {
+        // Ne jamais interrompre un tracé en cours (premier point déjà posé).
+        if (wipFeatureRef.current) return;
+        const chain = segmentsRef.current;
+        if (chain.length === 0) return;
+        const chainStart = chain[0].coordinates[0];
+        const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
+        const endpointDist = Math.min(
+          pixelDistance(projectToPixel(chainStart), e.point),
+          pixelDistance(projectToPixel(chainEnd), e.point),
+        );
+        let target: DrawMode | null = null;
+        if (endpointDist <= SNAP_PIXEL_DISTANCE) {
+          target = "draw";
+        } else if (
+          chain.some(
+            (seg) =>
+              minDistanceToLinePx(seg.coordinates, e.point) <=
+              HIT_PIXEL_DISTANCE,
+          )
+        ) {
+          target = "select";
+        }
+        // Ne rien faire sur un clic dans le vide (laisse terra-draw
+        // désélectionner de lui-même) ni si le mode est déjà le bon (sinon on
+        // couperait un glisser de sommet qui démarre au même `pointerdown`).
+        if (target && target !== modeRef.current) setMode(target);
+      };
+      nativeMap.on("mousedown", onModeDecideMouseDown);
+      removeMouseDownListener = () =>
+        nativeMap.off("mousedown", onModeDecideMouseDown);
 
       instance.start();
       instance.setMode("linestring");
@@ -493,7 +737,7 @@ export function useLocalPathDrawer(
         initialAppliedRef.current = true;
         const initSegments: Segment[] = initial.segments.map((s) => ({
           id: s.id,
-          coordinates: s.path.coordinates,
+          coordinates: roundCoordinates(s.path.coordinates),
           type: s.type,
           revetement: s.revetement,
           largeurMoyenne: s.largeurMoyenne ?? null,
@@ -510,10 +754,18 @@ export function useLocalPathDrawer(
           hasInitialSegments = true;
         }
       }
+      // Chemin existant : on part en mode sélection (rien de sélectionné) —
+      // presser un segment le sélectionne, presser une extrémité relance le
+      // dessin. Chemin vide : on reste en dessin pour tracer le 1er segment.
+      if (hasInitialSegments) {
+        instance.setMode("select");
+        modeRef.current = "select";
+        setModeState("select");
+      }
       // `segmentsRef` n'est pas encore synchronisé (le setSegments ci-dessus
       // n'a pas encore re-rendu) : on calcule le message directement.
       setMapMessageRef.current(
-        hasInitialSegments ? MSG_DRAW_CONTINUE : MSG_DRAW_START,
+        hasInitialSegments ? MSG_SELECT : MSG_DRAW_START,
       );
     })().catch((err) => {
       console.error("Terra Draw init failed", err);
@@ -527,12 +779,14 @@ export function useLocalPathDrawer(
         // ignore
       }
       removeContextMenuListener?.();
+      removeMouseDownListener?.();
       drawRef.current = null;
       setIsReady(false);
       // React StrictMode invoque cet effet deux fois au montage (dev) : sans
       // cette remise à zéro, la 2e invocation (celle qui survit) trouverait le
       // flag déjà à `true` et ne rechargerait jamais le tracé existant.
       initialAppliedRef.current = false;
+      wipFeatureRef.current = false;
       if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
       setMapMessageRef.current(null);
     };
@@ -559,10 +813,13 @@ export function useLocalPathDrawer(
         showTemporaryError(MSG_INVALID_DELETE);
         return;
       }
+      if (selectedIdRef.current === id) {
+        selectSegment(null);
+      }
       drawRef.current?.removeFeatures([id]);
       setSegments((prev) => prev.filter((s) => s.id !== id));
     },
-    [showTemporaryError],
+    [showTemporaryError, selectSegment],
   );
 
   // Fusionne un autre chemin (LocalPath) dans la chaîne en cours : ses segments
@@ -580,10 +837,26 @@ export function useLocalPathDrawer(
       const otherEnd = otherPath.segments.at(-1)!.path.coordinates.at(-1)!;
 
       const candidates = [
-        { dist: metersBetween(chainEnd, otherStart), place: "append" as const, reverse: false },
-        { dist: metersBetween(chainEnd, otherEnd), place: "append" as const, reverse: true },
-        { dist: metersBetween(chainStart, otherEnd), place: "prepend" as const, reverse: false },
-        { dist: metersBetween(chainStart, otherStart), place: "prepend" as const, reverse: true },
+        {
+          dist: metersBetween(chainEnd, otherStart),
+          place: "append" as const,
+          reverse: false,
+        },
+        {
+          dist: metersBetween(chainEnd, otherEnd),
+          place: "append" as const,
+          reverse: true,
+        },
+        {
+          dist: metersBetween(chainStart, otherEnd),
+          place: "prepend" as const,
+          reverse: false,
+        },
+        {
+          dist: metersBetween(chainStart, otherStart),
+          place: "prepend" as const,
+          reverse: true,
+        },
       ];
       const best = candidates.reduce((a, b) => (b.dist < a.dist ? b : a));
 
@@ -594,7 +867,7 @@ export function useLocalPathDrawer(
 
       let toAdd: Segment[] = otherPath.segments.map((s) => ({
         id: s.id,
-        coordinates: s.path.coordinates,
+        coordinates: roundCoordinates(s.path.coordinates),
         type: s.type,
         revetement: s.revetement,
         largeurMoyenne: s.largeurMoyenne ?? null,
@@ -656,6 +929,8 @@ export function useLocalPathDrawer(
       previewCoordinates,
       mode,
       setMode,
+      selectedSegmentId,
+      selectSegment,
       updateSegmentAttributes,
       removeSegment,
       toSegmentsInput,
@@ -668,6 +943,8 @@ export function useLocalPathDrawer(
       previewCoordinates,
       mode,
       setMode,
+      selectedSegmentId,
+      selectSegment,
       updateSegmentAttributes,
       removeSegment,
       toSegmentsInput,

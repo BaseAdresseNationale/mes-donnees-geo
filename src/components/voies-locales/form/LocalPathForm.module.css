@@ -34,24 +34,6 @@
   font-size: 0.8125rem;
 }
 
-.modeSwitch {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.125rem;
-  background: #f0f0f0;
-  border-radius: 4px;
-}
-.modeBtn {
-  flex: 1;
-  padding: 0.25rem 0.5rem;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.8125rem;
-}
-
 .pathIdentifier {
   display: flex;
   gap: 0.5rem;
@@ -68,12 +50,6 @@
   input {
     width: 100%;
   }
-}
-
-.modeBtnActive {
-  background: #fff;
-  border-color: var(--color-border, #d0d0d0);
-  font-weight: 600;
 }
 
 .textareaField {

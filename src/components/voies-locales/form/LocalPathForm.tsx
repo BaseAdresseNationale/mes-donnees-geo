@@ -3,6 +3,7 @@
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -181,7 +182,12 @@ export function LocalPathForm({
     });
   }, [drawer.segments, drawer.mergedPathIds, otherPaths]);
 
-  useEffect(() => {
+  // `useLayoutEffect` (pas `useEffect`) : doit rester dans le même flush
+  // synchrone que le `flushSync` de `useLocalPathDrawer` (glisser d'un point
+  // en mode sélection), sinon la ligne éditée ne se met à jour visuellement
+  // qu'à l'arrêt du geste (un `useEffect` classique, passif, n'est pas
+  // garanti synchrone même sous `flushSync`).
+  useLayoutEffect(() => {
     const preview = drawer.previewCoordinates
       ? [
           {
@@ -204,6 +210,9 @@ export function LocalPathForm({
       <VoiesLocalesFormMap
         drawSegments={displaySegments}
         hoveredSegmentId={hoveredSegmentId}
+        onHoverSegment={setHoveredSegmentId}
+        selectedSegmentId={drawer.selectedSegmentId}
+        otherPaths={otherPaths}
         mergeablePaths={mergeablePaths}
         onMergePath={drawer.mergePath}
       />,
@@ -217,6 +226,8 @@ export function LocalPathForm({
     drawer.segments,
     drawer.previewCoordinates,
     drawer.mergePath,
+    drawer.selectedSegmentId,
+    otherPaths,
     mergeablePaths,
     hoveredSegmentId,
   ]);
@@ -234,6 +245,30 @@ export function LocalPathForm({
     () => segmentLengths.reduce((sum, l) => sum + l, 0),
     [segmentLengths],
   );
+
+  // Raccourci clavier : Delete/Backspace supprime le segment sélectionné
+  // (si autorisé — `removeSegment` n'accepte que les extrémités). Ignoré quand
+  // la saisie est dans un champ de formulaire.
+  const { selectedSegmentId, removeSegment } = drawer;
+  useEffect(() => {
+    if (!selectedSegmentId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target?.isContentEditable
+      )
+        return;
+      e.preventDefault();
+      removeSegment(selectedSegmentId);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedSegmentId, removeSegment]);
 
   const isEdit = Boolean(initial);
 
@@ -402,31 +437,6 @@ export function LocalPathForm({
         />
       </div>
 
-      <div
-        className={styles.modeSwitch}
-        role="group"
-        aria-label="Mode d'édition cartographique"
-      >
-        <button
-          type="button"
-          className={`${styles.modeBtn} ${drawer.mode === "draw" ? styles.modeBtnActive : ""}`}
-          onClick={() => drawer.setMode("draw")}
-          aria-pressed={drawer.mode === "draw"}
-          disabled={!drawer.isReady}
-        >
-          Dessiner
-        </button>
-        <button
-          type="button"
-          className={`${styles.modeBtn} ${drawer.mode === "select" ? styles.modeBtnActive : ""}`}
-          onClick={() => drawer.setMode("select")}
-          aria-pressed={drawer.mode === "select"}
-          disabled={!drawer.isReady}
-        >
-          Sélectionner
-        </button>
-      </div>
-
       <section className={styles.segments} aria-label="Segments du chemin">
         <h3 className={styles.segmentsHeader}>
           <span>Segments</span>
@@ -457,8 +467,21 @@ export function LocalPathForm({
                     )
                   }
                 >
-                  <details className={styles.segmentAccordion}>
-                    <summary className={styles.segmentSummary}>
+                  <details
+                    className={styles.segmentAccordion}
+                    open={drawer.selectedSegmentId === seg.id}
+                  >
+                    <summary
+                      className={styles.segmentSummary}
+                      onClick={(e) => {
+                        // Contrôlé par la sélection : un seul segment ouvert à
+                        // la fois, synchronisé avec le mode sélection carte.
+                        e.preventDefault();
+                        drawer.selectSegment(
+                          drawer.selectedSegmentId === seg.id ? null : seg.id,
+                        );
+                      }}
+                    >
                       <span className={styles.segmentLabel}>
                         Segment {i + 1}
                         <span className={styles.segmentLength}>
