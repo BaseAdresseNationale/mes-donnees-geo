@@ -92,7 +92,10 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
 
   // Determine if the map should initially fly to the commune based on the current path and available plugins.
   const shouldFlyToCommuneRef = useRef(
-    ALL_PLUGINS.map(({ id }) => `/${codeInsee}/${id}`).includes(pathName),
+    [
+      `/${codeInsee}`,
+      ...ALL_PLUGINS.map(({ id }) => `/${codeInsee}/${id}`),
+    ].includes(pathName),
   );
 
   useEffect(() => {
