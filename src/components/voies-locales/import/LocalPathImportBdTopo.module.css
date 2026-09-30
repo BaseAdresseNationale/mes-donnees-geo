@@ -23,10 +23,6 @@
   text-decoration: none;
 }
 
-.back:hover {
-  text-decoration: underline;
-}
-
 .title {
   margin: 0;
   font-size: 1.0625rem;

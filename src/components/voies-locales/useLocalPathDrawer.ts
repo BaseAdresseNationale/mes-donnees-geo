@@ -89,6 +89,7 @@ export interface UseLocalPathDrawerResult {
     patch: Partial<SegmentAttributes>,
   ) => void;
   removeSegment: (id: string) => void;
+  commitDrawSegment: () => boolean;
   toSegmentsInput: () => SegmentInput[];
   isReady: boolean;
   mergedPathIds: string[];
@@ -177,6 +178,32 @@ function toLineStringFeature(
     properties: { mode: "linestring" },
     geometry: { type: "LineString", coordinates },
   };
+}
+
+// Calcule la chaîne obtenue en ajoutant un nouveau segment (fini ou en cours
+// de tracé) à l'une des deux extrémités de la chaîne existante — `null` si son
+// premier point ne correspond à aucune des deux (segment non contigu).
+function computeChainAfterAppend(
+  chain: Segment[],
+  id: string,
+  coords: Position[],
+): Segment[] | null {
+  if (chain.length === 0) {
+    return [{ id, ...DEFAULT_ATTRIBUTES, coordinates: coords }];
+  }
+  const chainStart = chain[0].coordinates[0];
+  const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
+  const newStart = coords[0];
+  if (isSamePoint(newStart, chainEnd)) {
+    return [...chain, { id, ...DEFAULT_ATTRIBUTES, coordinates: coords }];
+  }
+  if (isSamePoint(newStart, chainStart)) {
+    return [
+      { id, ...DEFAULT_ATTRIBUTES, coordinates: [...coords].reverse() },
+      ...chain,
+    ];
+  }
+  return null;
 }
 
 export function useLocalPathDrawer(
@@ -441,32 +468,9 @@ export function useLocalPathDrawer(
         return;
       }
 
-      const chain = segmentsRef.current;
-      if (chain.length === 0) {
-        setSegments([{ id, ...DEFAULT_ATTRIBUTES, coordinates: coords }]);
-        setMapMessageRef.current(MSG_DRAW_CONTINUE);
-        return;
-      }
-
-      const chainStart = chain[0].coordinates[0];
-      const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
-      const newStart = coords[0];
-
-      let next: Segment[] | null = null;
-      if (isSamePoint(newStart, chainEnd)) {
-        next = [...chain, { id, ...DEFAULT_ATTRIBUTES, coordinates: coords }];
-      } else if (isSamePoint(newStart, chainStart)) {
-        next = [
-          {
-            id,
-            ...DEFAULT_ATTRIBUTES,
-            coordinates: [...coords].reverse(),
-          },
-          ...chain,
-        ];
-      }
-
+      const next = computeChainAfterAppend(segmentsRef.current, id, coords);
       if (next) {
+        segmentsRef.current = next;
         setSegments(next);
         setMapMessageRef.current(MSG_DRAW_CONTINUE);
       } else {
@@ -476,6 +480,47 @@ export function useLocalPathDrawer(
     },
     [showTemporaryError],
   );
+
+  // Termine immédiatement le segment en cours de tracé (sans attendre un
+  // double-clic) pour l'insérer dans la chaîne : utilisé quand un clic en
+  // cours de tracé tombe sur un chemin fusionnable, avant de proposer la
+  // fusion (avec ou sans fusion ensuite, ce segment reste acquis).
+  const commitDrawSegment = useCallback((): boolean => {
+    const draw = drawRef.current;
+    if (!draw) return false;
+    const knownIds = new Set(segmentsRef.current.map((s) => s.id));
+    const wip = draw
+      .getSnapshot()
+      .find(
+        (f) => f.geometry?.type === "LineString" && !knownIds.has(String(f.id)),
+      );
+    if (!wip) return false;
+    const wipId = String(wip.id);
+    const coords = (wip.geometry as GeoLineString).coordinates;
+    wipFeatureRef.current = false;
+    setPreviewCoordinates(null);
+    if (!coords || coords.length < 2) {
+      draw.removeFeatures([wipId]);
+      return false;
+    }
+    const next = computeChainAfterAppend(segmentsRef.current, wipId, coords);
+    if (!next) {
+      draw.removeFeatures([wipId]);
+      showTemporaryError(MSG_INVALID_SEGMENT);
+      return false;
+    }
+    const finalCoords = next.find((s) => s.id === wipId)!.coordinates;
+    draw.removeFeatures([wipId]);
+    // Reset propre du mode dessin (vide currentId/closingPoint internes), puis
+    // réinsertion comme segment ordinaire (même id) : n'est plus "en cours"
+    // pour terra-draw, comme un segment fusionné.
+    draw.setMode("linestring");
+    draw.addFeatures([toLineStringFeature(wipId, finalCoords)]);
+    segmentsRef.current = next;
+    setSegments(next);
+    setMapMessageRef.current(MSG_DRAW_CONTINUE);
+    return true;
+  }, [showTemporaryError]);
 
   // Cycle de vie Terra Draw.
   useEffect(() => {
@@ -694,7 +739,9 @@ export function useLocalPathDrawer(
         }
         return min;
       };
-      const onModeDecideMouseDown = (e: { point: { x: number; y: number } }) => {
+      const onModeDecideMouseDown = (e: {
+        point: { x: number; y: number };
+      }) => {
         // Ne jamais interrompre un tracé en cours (premier point déjà posé).
         if (wipFeatureRef.current) return;
         const chain = segmentsRef.current;
@@ -933,6 +980,7 @@ export function useLocalPathDrawer(
       selectSegment,
       updateSegmentAttributes,
       removeSegment,
+      commitDrawSegment,
       toSegmentsInput,
       isReady,
       mergedPathIds,
@@ -947,6 +995,7 @@ export function useLocalPathDrawer(
       selectSegment,
       updateSegmentAttributes,
       removeSegment,
+      commitDrawSegment,
       toSegmentsInput,
       isReady,
       mergedPathIds,

@@ -41,18 +41,13 @@ import { VoiesLocalesFormMap } from "./LocalPathFormMap";
 import { geometryBounds } from "@/lib/geo/bounds";
 import MapContext from "@/contexts/MapContext";
 import { MERGE_TOLERANCE_METERS, metersBetween } from "../useLocalPathDrawer";
+import Link from "next/link";
 
 interface LocalPathFormProps {
   codeCommune: string;
   initial?: LocalPath;
   otherPaths?: LocalPath[];
 }
-
-const STATUS_OPTIONS = [
-  { label: "Brouillon", value: LocalPathStatus.DRAFT },
-  { label: "Publié", value: LocalPathStatus.PUBLISHED },
-  { label: "Certifié", value: LocalPathStatus.CERTIFIED },
-];
 
 const CLASSEMENT_OPTIONS = Object.values(LocalPathClassement).map((value) => ({
   label: CLASSEMENT_LABELS[value],
@@ -162,12 +157,26 @@ export function LocalPathForm({
     initial ? { segments: initial.segments } : null,
   );
 
-  // Autres chemins dont une extrémité touche (à ~15m près) une extrémité
-  // du chemin en cours d'édition : proposés à la fusion.
+  // Autres chemins dont une extrémité touche (à ~15m près) une extrémité du
+  // chemin en cours d'édition (chaîne finie, ou pointe du tracé en cours si on
+  // est en train de dessiner) : proposés à la fusion.
   const mergeablePaths = useMemo(() => {
-    if (drawer.segments.length === 0) return [];
-    const chainStart = drawer.segments[0].coordinates[0];
-    const chainEnd = drawer.segments.at(-1)!.coordinates.at(-1)!;
+    const preview = drawer.previewCoordinates;
+    let chainStart = drawer.segments[0]?.coordinates[0];
+    let chainEnd = drawer.segments.at(-1)?.coordinates.at(-1);
+    if (preview) {
+      const tip = preview.at(-1)!;
+      // Le tracé en cours prolonge soit le début, soit la fin de la chaîne
+      // (ou aucun des deux si elle est vide, nouveau chemin) : seule
+      // l'extrémité réellement prolongée devient la pointe dynamique.
+      if (chainStart && metersBetween(preview[0], chainStart) <= 5) {
+        chainStart = tip;
+      } else {
+        chainEnd = tip;
+        chainStart = chainStart ?? preview[0];
+      }
+    }
+    if (!chainStart || !chainEnd) return [];
     return otherPaths.filter((p) => {
       if (drawer.mergedPathIds.includes(p.id)) return false;
       if (p.segments.length === 0) return false;
@@ -180,7 +189,12 @@ export function LocalPathForm({
         metersBetween(chainEnd, otherEnd) <= MERGE_TOLERANCE_METERS
       );
     });
-  }, [drawer.segments, drawer.mergedPathIds, otherPaths]);
+  }, [
+    drawer.segments,
+    drawer.previewCoordinates,
+    drawer.mergedPathIds,
+    otherPaths,
+  ]);
 
   // `useLayoutEffect` (pas `useEffect`) : doit rester dans le même flush
   // synchrone que le `flushSync` de `useLocalPathDrawer` (glisser d'un point
@@ -215,6 +229,7 @@ export function LocalPathForm({
         otherPaths={otherPaths}
         mergeablePaths={mergeablePaths}
         onMergePath={drawer.mergePath}
+        onCommitDrawSegment={drawer.commitDrawSegment}
       />,
     );
 
@@ -226,6 +241,7 @@ export function LocalPathForm({
     drawer.segments,
     drawer.previewCoordinates,
     drawer.mergePath,
+    drawer.commitDrawSegment,
     drawer.selectedSegmentId,
     otherPaths,
     mergeablePaths,
@@ -367,9 +383,19 @@ export function LocalPathForm({
       }}
       aria-label={isEdit ? "Édition d'un chemin rural" : "Nouveau chemin rural"}
     >
-      <h2 className={styles.title}>
-        {isEdit ? initial?.nom || "Chemin sans nom" : "Nouveau chemin rural"}
-      </h2>
+      <div className={styles.header}>
+        <Link href={`/${codeCommune}/voies-locales`} className={styles.back}>
+          <span className="material-icons">arrow_back</span>
+          Retour à la liste
+        </Link>
+      </div>
+      <Input
+        label="Nom du chemin"
+        fullWidth
+        value={nom}
+        onChange={(e) => setNom(e.target.value)}
+        disabled={pending}
+      />
 
       <div className={styles.pathIdentifier}>
         <Select
@@ -398,14 +424,6 @@ export function LocalPathForm({
           disabled={pending}
         />
       </div>
-
-      <Input
-        label="Nom du chemin"
-        fullWidth
-        value={nom}
-        onChange={(e) => setNom(e.target.value)}
-        disabled={pending}
-      />
 
       <Select
         label="Gestionnaire"

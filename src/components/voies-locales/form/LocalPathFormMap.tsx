@@ -70,6 +70,7 @@ export function VoiesLocalesFormMap({
   otherPaths,
   mergeablePaths,
   onMergePath,
+  onCommitDrawSegment,
 }: {
   drawSegments: Segment[];
   hoveredSegmentId?: string | null;
@@ -78,6 +79,7 @@ export function VoiesLocalesFormMap({
   otherPaths?: LocalPath[];
   mergeablePaths?: LocalPath[];
   onMergePath?: (path: LocalPath) => void;
+  onCommitDrawSegment?: () => boolean;
 }) {
   const map = useMap();
   const modals = useModals();
@@ -90,6 +92,12 @@ export function VoiesLocalesFormMap({
   // poignée d'extrémité (zones qui se chevauchent aux extrémités).
   const overSegmentRef = useRef(false);
   const overHandleRef = useRef(false);
+  // Un tracé (aperçu "__preview__") est en cours : un clic sur un chemin
+  // fusionnable doit d'abord le terminer, avant de proposer la fusion.
+  const isDrawingRef = useRef(false);
+  useEffect(() => {
+    isDrawingRef.current = drawSegments.some((s) => s.id === "__preview__");
+  }, [drawSegments]);
 
   // Aperçu du tracé en cours d'édition (halo blanc + couleur par revêtement).
   const editFeatureCollection = useMemo<FeatureCollection<LineString>>(
@@ -171,6 +179,12 @@ export function VoiesLocalesFormMap({
         ?.pathId;
       const path = mergeablePaths?.find((p) => p.id === pathId);
       if (!path) return;
+      if (isDrawingRef.current) {
+        // Laisse terra-draw terminer le traitement de CE clic (ajout du
+        // point exact cliqué) avant de "finir" le segment en cours.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        if (!onCommitDrawSegment?.()) return;
+      }
       const decision = await modals.confirmationModal({
         title: "Fusionner ce chemin ?",
         children: `Fusionner « ${path.nom || "chemin sans nom"} » dans ce chemin ?`,
@@ -198,7 +212,7 @@ export function VoiesLocalesFormMap({
       m.off("mousemove", OTHER_HITAREA_LAYER_ID, onMove);
       m.off("mouseleave", OTHER_HITAREA_LAYER_ID, onLeave);
     };
-  }, [map, mergeablePaths, onMergePath, modals]);
+  }, [map, mergeablePaths, onMergePath, onCommitDrawSegment, modals]);
 
   // Le survol est masqué si le chemin n'est plus proposé à la fusion (fusionné, retiré...).
   const visibleHoveredMergeable =

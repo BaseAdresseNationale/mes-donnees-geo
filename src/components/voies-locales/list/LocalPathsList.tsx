@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Input, Filter, FilterOption } from "@gouvfr-lasuite/ui-components";
+import { Button, Input } from "@gouvfr-lasuite/ui-components";
 import styles from "./LocalPathsList.module.css";
 import {
   LocalPath,
@@ -11,6 +11,7 @@ import {
   CLASSEMENT_LABELS,
 } from "@/components/voies-locales/types";
 import { useLocalPathsListEffects } from "./useLocalPathsListEffects";
+import { LocalPathsFilterModal } from "./LocalPathsFilterModal";
 
 interface LocalPathListProps {
   codeCommune: string;
@@ -41,30 +42,29 @@ const CLASSEMENT_CLASS: Record<LocalPathClassement, string> = {
 
 export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<LocalPathStatus | null>(
-    null,
+  const [statusFilters, setStatusFilters] = useState<Set<LocalPathStatus>>(
+    new Set(),
   );
+  const [classementFilters, setClassementFilters] = useState<
+    Set<LocalPathClassement>
+  >(new Set());
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const hasActiveFilters = statusFilters.size > 0 || classementFilters.size > 0;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
     return localPaths.filter((p) => {
-      if (statusFilter !== null && p.statut !== statusFilter) return false;
+      if (statusFilters.size > 0 && !statusFilters.has(p.statut)) return false;
+      if (classementFilters.size > 0 && !classementFilters.has(p.classement))
+        return false;
       if (!q) return true;
       return (p.nom ?? "").toLocaleLowerCase().includes(q);
     });
-  }, [localPaths, query, statusFilter]);
+  }, [localPaths, query, statusFilters, classementFilters]);
 
-  const statusOptions: FilterOption[] = useMemo(
-    () => [
-      ...Object.values(LocalPathStatus).map((s) => ({
-        label: STATUS_LABEL[s],
-        value: s,
-      })),
-    ],
-    [],
-  );
-
-  const { setHoveredPathId } = useLocalPathsListEffects({ localPaths });
+  const { setHoveredPathId } = useLocalPathsListEffects({
+    localPaths: filtered,
+  });
 
   return (
     <section className={styles.container} aria-label="Liste des voies locales">
@@ -72,7 +72,7 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
         <div className={styles.toolbarRow}>
           <div className={styles.search}>
             <Input
-              aria-label="Rechercher un chemin rural"
+              aria-label="Rechercher une voie locale"
               hideLabel
               fullWidth
               className={styles.searchInput}
@@ -81,14 +81,26 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
               icon={<span className="material-icons">search</span>}
             />
           </div>
+          <Button
+            variant="secondary"
+            color={hasActiveFilters ? "brand" : "neutral"}
+            active={hasActiveFilters}
+            icon={<span className="material-icons">filter_list</span>}
+            aria-label="Filtrer les voies locales"
+            onClick={() => setIsFilterModalOpen(true)}
+          />
         </div>
-        <Filter
-          label="Filtrer par statut"
-          options={statusOptions}
-          value={statusFilter}
-          onChange={(value) => setStatusFilter(value as LocalPathStatus)}
-        />
       </div>
+      <LocalPathsFilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        statusFilters={statusFilters}
+        classementFilters={classementFilters}
+        onApply={(status, classement) => {
+          setStatusFilters(status);
+          setClassementFilters(classement);
+        }}
+      />
 
       {filtered.length === 0 ? (
         <p className={styles.empty}>
@@ -124,10 +136,6 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
                     className={`${styles.statusBadge} ${STATUS_CLASS[p.statut]}`}
                   >
                     {STATUS_LABEL[p.statut]}
-                  </span>
-                  <span>
-                    {p.segments.length} segment
-                    {p.segments.length > 1 ? "s" : ""}
                   </span>
                 </span>
               </Link>
