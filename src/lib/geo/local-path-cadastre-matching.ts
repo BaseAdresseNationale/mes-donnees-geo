@@ -473,7 +473,9 @@ function linesOverlapRatio(
 // fois normalisés) et dont le tracé du plus court est presque entièrement superposé au
 // tracé du plus long sont un doublon (ex. libellés cadastraux voisins non fusionnés en
 // amont). On ne garde alors que le plus long.
-function dedupeAssembledPaths(paths: AssembledLocalPath[]): AssembledLocalPath[] {
+function dedupeAssembledPaths(
+  paths: AssembledLocalPath[],
+): AssembledLocalPath[] {
   const groups = new Map<string, AssembledLocalPath[]>();
   for (const path of paths) {
     const nom = path.nom ? normalizeLabel(path.nom) : "";

@@ -47,8 +47,8 @@
 
 .item {
   display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 0.625rem;
   background: #fff;
   border: 1px solid var(--color-border, #e5e5e5);
@@ -58,6 +58,14 @@
   cursor: pointer;
   text-align: left;
   font: inherit;
+}
+
+.itemContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .item:hover,
@@ -77,6 +85,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.itemNumero {
+  font-weight: 400;
+  color: var(--color-muted, #929292);
 }
 
 .itemMeta {
@@ -131,6 +144,17 @@
 .classementVoieCommunale {
   background: #e3e9ff;
   color: #0063cb;
+}
+
+.warningIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #e8b400;
+}
+
+.warningIcon .material-icons {
+  font-size: 1.125rem;
 }
 
 .empty {
