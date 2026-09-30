@@ -29,6 +29,19 @@ const MAX_BEARING_DIFF_DEGREES = 45;
 // d'une portion plus longue déjà retenue est jugée redondante (doublon/superposition BD TOPO).
 const DEDUP_TOL_METERS = 5;
 const DEDUP_COVER_RATIO = 0.7;
+// Un chemin assemblé composé d'un seul segment plus court que ça n'est pas créé (bruit,
+// amorce de tronçon sans intérêt pratique).
+const MIN_SINGLE_SEGMENT_METERS = 40;
+// Seuil de similarité (0..1, cf. `labelSimilarity`) au-dessus duquel deux libellés
+// cadastraux (à numéro égal) sont considérés comme désignant le même chemin.
+const LABEL_SIMILARITY_THRESHOLD = 0.6;
+// Tolérance (plus large que MATCH_BUFFER_METERS) pour comparer deux chemins ASSEMBLÉS
+// entiers entre eux — leurs segments MANUEL peuvent diverger davantage qu'un simple
+// tronçon BD TOPO du tracé cadastral.
+const DUPLICATE_PATH_TOLERANCE_METERS = 15;
+// En-deçà de cette distance, 2 segments consécutifs qui ramènent quasiment au point de
+// départ du 1er sont jugés « s'annuler » (aller-retour, pas un vrai prolongement).
+const CANCELLING_SEGMENT_TOLERANCE_METERS = 5;
 
 export interface CadastralRuralPathGeometry {
   path: LineString;
@@ -63,6 +76,8 @@ interface CadastralGroup {
   numero: number | null;
   nom: string | null;
   classement: LocalPathClassement;
+  /** Libellé normalisé du 1er membre du groupe, utilisé comme référence pour la similarité. */
+  label: string;
   lines: LineString[];
   bbox: Bbox;
 }
@@ -154,36 +169,83 @@ function nearestCadastral(
   return best;
 }
 
-// Regroupe les chemins ruraux cadastraux par identité : numéro + libellé (le numéro
-// seul fusionnait des chemins distincts). Fallback sur l'index de feature si pas de libellé.
+// Normalise un libellé pour la comparaison (accents/casse/espaces insensibles).
+function normalizeLabel(label: string): string {
+  return label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+// Distance d'édition (Levenshtein) entre deux chaînes, en O(a.length * b.length) en temps
+// et O(min(a.length, b.length)) en mémoire (2 lignes de la matrice DP).
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length < b.length) return levenshteinDistance(b, a);
+  if (b.length === 0) return a.length;
+
+  let previousRow = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 0; i < a.length; i++) {
+    const currentRow = [i + 1];
+    for (let j = 0; j < b.length; j++) {
+      const insertCost = currentRow[j] + 1;
+      const deleteCost = previousRow[j + 1] + 1;
+      const substituteCost = previousRow[j] + (a[i] === b[j] ? 0 : 1);
+      currentRow.push(Math.min(insertCost, deleteCost, substituteCost));
+    }
+    previousRow = currentRow;
+  }
+  return previousRow[b.length];
+}
+
+// Similarité normalisée entre 0 (rien en commun) et 1 (identiques).
+function labelSimilarity(a: string, b: string): number {
+  const maxLength = Math.max(a.length, b.length);
+  if (maxLength === 0) return 1;
+  return 1 - levenshteinDistance(a, b) / maxLength;
+}
+
+// Regroupe les chemins ruraux cadastraux par identité : même numéro ET libellé « proche »
+// (distance d'édition normalisée ≥ seuil) d'un groupe déjà constitué — un matching sur
+// libellé strictement égal était trop fragile (variantes de ponctuation/graphie). Fallback
+// sur l'index de feature si pas de libellé (aucune base de comparaison fiable).
 function groupCadastralPaths(
   cadastralPaths: CadastralRuralPathGeometry[],
 ): CadastralGroup[] {
-  const groups = new Map<string, CadastralGroup>();
+  const groups: CadastralGroup[] = [];
   cadastralPaths.forEach((cadastral, index) => {
-    const label = cadastral.libelle.trim().toLocaleLowerCase();
-    const key = label
-      ? `${cadastral.classement}|${cadastral.numero ?? ""}|${label}`
-      : `feat:${index}`;
+    const label = normalizeLabel(cadastral.libelle);
     const lineBbox = bbox(cadastral.path) as Bbox;
-    const existing = groups.get(key);
+    const existing = label
+      ? groups.find(
+          (group) =>
+            group.label !== "" &&
+            group.classement === cadastral.classement &&
+            group.numero === cadastral.numero &&
+            labelSimilarity(group.label, label) >= LABEL_SIMILARITY_THRESHOLD,
+        )
+      : undefined;
     if (existing) {
       existing.lines.push(cadastral.path);
       existing.bbox = mergeBbox(existing.bbox, lineBbox);
       existing.numero ??= cadastral.numero;
       existing.nom ??= cadastral.nom;
     } else {
-      groups.set(key, {
-        key,
+      groups.push({
+        key: label
+          ? `${cadastral.classement}|${cadastral.numero ?? ""}|${label}`
+          : `feat:${index}`,
         numero: cadastral.numero,
         nom: cadastral.nom,
         classement: cadastral.classement,
+        label,
         lines: [cadastral.path],
         bbox: lineBbox,
       });
     }
   });
-  return [...groups.values()];
+  return groups;
 }
 
 // Extrait la ou les portions d'un tronçon BD TOPO qui restent dans le couloir cadastral.
@@ -366,13 +428,122 @@ function dedupePortions(portions: Portion[]): Portion[] {
   return kept;
 }
 
+function assembledPathLines(path: AssembledLocalPath): LineString[] {
+  return path.segments.map((segment) => segment.path);
+}
+
+function assembledPathLength(path: AssembledLocalPath): number {
+  return path.segments.reduce(
+    (total, segment) =>
+      total +
+      turfLength(lineString(segment.path.coordinates), { units: "meters" }),
+    0,
+  );
+}
+
+// Fraction des points échantillonnés de `lines` situés à ≤ `toleranceMeters` d'au moins
+// une ligne de `otherLines` (même principe que `coverageRatio`, mais sur plusieurs lignes
+// de chaque côté).
+function linesOverlapRatio(
+  lines: LineString[],
+  otherLines: LineString[],
+  toleranceMeters: number,
+): number {
+  let sampled = 0;
+  let inside = 0;
+  for (const path of lines) {
+    if (path.coordinates.length < 2) continue;
+    const line = lineString(path.coordinates);
+    const length = turfLength(line, { units: "meters" });
+    if (length === 0) continue;
+    const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
+    for (let i = 0; i <= count; i++) {
+      const coord = along(line, (length * i) / count, { units: "meters" })
+        .geometry.coordinates as Position;
+      sampled++;
+      if (nearestCadastral(coord, otherLines).distance <= toleranceMeters) {
+        inside++;
+      }
+    }
+  }
+  return sampled === 0 ? 0 : inside / sampled;
+}
+
+// Post-traitement : deux chemins assemblés portant le même numéro et le même nom (une
+// fois normalisés) et dont le tracé du plus court est presque entièrement superposé au
+// tracé du plus long sont un doublon (ex. libellés cadastraux voisins non fusionnés en
+// amont). On ne garde alors que le plus long.
+function dedupeAssembledPaths(paths: AssembledLocalPath[]): AssembledLocalPath[] {
+  const groups = new Map<string, AssembledLocalPath[]>();
+  for (const path of paths) {
+    const nom = path.nom ? normalizeLabel(path.nom) : "";
+    if (!nom) continue;
+    const groupKey = `${path.numero ?? ""}|${nom}`;
+    const group = groups.get(groupKey);
+    if (group) group.push(path);
+    else groups.set(groupKey, [path]);
+  }
+
+  const discarded = new Set<AssembledLocalPath>();
+  for (const group of groups.values()) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i];
+        const b = group[j];
+        if (discarded.has(a) || discarded.has(b)) continue;
+        const [shorter, longer] =
+          assembledPathLength(a) <= assembledPathLength(b) ? [a, b] : [b, a];
+        const ratio = linesOverlapRatio(
+          assembledPathLines(shorter),
+          assembledPathLines(longer),
+          DUPLICATE_PATH_TOLERANCE_METERS,
+        );
+        if (ratio >= DEDUP_COVER_RATIO) discarded.add(shorter);
+      }
+    }
+  }
+  return paths.filter((path) => !discarded.has(path));
+}
+
+// Écarte les paires de segments consécutifs qui « s'annulent » : le 2e ramène (à
+// CANCELLING_SEGMENT_TOLERANCE_METERS près) au point de départ du 1er, signe d'un
+// aller-retour parasite (ex. impasse chaînée par erreur) plutôt que d'un vrai tracé. La
+// jonction restante est recollée sur ce point de départ pour garder la chaîne contiguë.
+function removeCancellingSegments(
+  segments: AssembledSegment[],
+): AssembledSegment[] {
+  const result = segments.map((segment) => ({ ...segment }));
+  let i = 0;
+  while (i < result.length - 1) {
+    const anchor = start(result[i].path);
+    const after = end(result[i + 1].path);
+    if (haversineMeters(anchor, after) > CANCELLING_SEGMENT_TOLERANCE_METERS) {
+      i++;
+      continue;
+    }
+    result.splice(i, 2);
+    const next = result[i];
+    if (next) {
+      next.path = {
+        type: "LineString",
+        coordinates: [anchor, ...next.path.coordinates.slice(1)],
+      };
+    }
+    i = Math.max(i - 1, 0);
+  }
+  return result;
+}
+
 /**
  * Assemble des chemins ruraux « prêts à importer » à partir des tronçons BD TOPO qui
  * coïncident géométriquement avec l'habillage cadastral. Chaque chemin cadastral
- * (regroupé par numéro + libellé) devient un chemin composé de segments : portions de
- * tronçons BD TOPO découpées au couloir de tolérance (`source=BD_TOPO`), et segments de
- * comblement en ligne droite là où subsiste un trou ≤ 20 m (`source=MANUEL`). Un trou
- * > 20 m scinde le groupe en chemins distincts (pas de longue ligne droite aberrante).
+ * (regroupé par numéro + proximité de libellé) devient un chemin composé de segments :
+ * portions de tronçons BD TOPO découpées au couloir de tolérance (`source=BD_TOPO`), et
+ * segments de comblement en ligne droite là où subsiste un trou ≤ 20 m (`source=MANUEL`).
+ * Un trou > 20 m scinde le groupe en chemins distincts (pas de longue ligne droite
+ * aberrante). Les allers-retours parasites (2 segments qui s'annulent) sont retirés, un
+ * chemin qui se résume à un seul segment de moins de 40 m est écarté, et un doublon
+ * (même numéro + nom, tracé superposé) au profit du plus long.
  */
 export function assembleLocalPathsFromCadastre(
   candidates: BdTopoTronconCandidate[],
@@ -427,7 +598,15 @@ export function assembleLocalPathsFromCadastre(
     }
     if (current.length > 0) runs.push(current);
 
-    runs.forEach((segments, index) => {
+    runs.forEach((rawSegments, index) => {
+      const segments = removeCancellingSegments(rawSegments);
+      if (segments.length === 0) return;
+      if (segments.length === 1) {
+        const length = turfLength(lineString(segments[0].path.coordinates), {
+          units: "meters",
+        });
+        if (length < MIN_SINGLE_SEGMENT_METERS) return;
+      }
       assembled.push({
         key: runs.length > 1 ? `${group.key}#${index}` : group.key,
         numero: group.numero,
@@ -437,5 +616,5 @@ export function assembleLocalPathsFromCadastre(
       });
     });
   }
-  return assembled;
+  return dedupeAssembledPaths(assembled);
 }
