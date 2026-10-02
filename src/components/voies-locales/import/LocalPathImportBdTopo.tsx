@@ -1,13 +1,28 @@
 "use client";
 
-import { useContext, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input } from "@gouvfr-lasuite/ui-components";
+import { Button } from "@gouvfr-lasuite/ui-components";
 import Link from "next/link";
 import MapContext from "@/contexts/MapContext";
 import type { AssembledLocalPathResponse } from "./types";
 import { CLASSEMENT_LABELS, LocalPathClassement } from "../types";
 import { LocalPathImportMap } from "./LocalPathImportMap";
+import {
+  LeftPanelList,
+  type LeftPanelSortOption,
+} from "@/components/common/left-panel-list/LeftPanelList";
+import {
+  LeftPanelFilterModal,
+  type LeftPanelFilterSelection,
+} from "@/components/common/left-panel-list/LeftPanelFilterModal";
 import styles from "./LocalPathImportBdTopo.module.css";
 
 const CLASSEMENT_ABBR: Record<LocalPathClassement, string> = {
@@ -33,6 +48,74 @@ export function pathLabel(path: AssembledLocalPathResponse): string {
   return `${classement} sans nom`;
 }
 
+const SORT_OPTIONS: LeftPanelSortOption<AssembledLocalPathResponse>[] = [
+  {
+    key: "nom-asc",
+    label: "Nom (A → Z)",
+    comparator: (a, b) => pathLabel(a).localeCompare(pathLabel(b), "fr"),
+  },
+  {
+    key: "nom-desc",
+    label: "Nom (Z → A)",
+    comparator: (a, b) => pathLabel(b).localeCompare(pathLabel(a), "fr"),
+  },
+  {
+    key: "numero-asc",
+    label: "Numéro croissant",
+    comparator: (a, b) =>
+      (a.numero ?? Number.POSITIVE_INFINITY) -
+      (b.numero ?? Number.POSITIVE_INFINITY),
+  },
+  {
+    key: "numero-desc",
+    label: "Numéro décroissant",
+    comparator: (a, b) =>
+      (b.numero ?? Number.NEGATIVE_INFINITY) -
+      (a.numero ?? Number.NEGATIVE_INFINITY),
+  },
+  {
+    key: "type",
+    label: "Type",
+    comparator: (a, b) =>
+      CLASSEMENT_LABELS[a.classement].localeCompare(
+        CLASSEMENT_LABELS[b.classement],
+        "fr",
+      ),
+  },
+  {
+    key: "longueur-desc",
+    label: "Longueur décroissante",
+    comparator: (a, b) => b.longueur - a.longueur,
+  },
+];
+
+const FILTER_GROUP_CLASSEMENT = "classement";
+
+const FILTER_GROUPS = [
+  {
+    id: FILTER_GROUP_CLASSEMENT,
+    legend: "Type",
+    options: Object.values(LocalPathClassement).map((value) => ({
+      value,
+      label: CLASSEMENT_LABELS[value],
+    })),
+  },
+];
+
+function emptyFilterSelection(): LeftPanelFilterSelection {
+  return { [FILTER_GROUP_CLASSEMENT]: new Set() };
+}
+
+function matchesImportQuery(
+  path: AssembledLocalPathResponse,
+  query: string,
+): boolean {
+  return (
+    pathLabel(path).toLocaleLowerCase().includes(query) ||
+    (path.numero != null && String(path.numero).includes(query))
+  );
+}
+
 export function LocalPathImportBdTopo({
   codeCommune,
 }: {
@@ -46,8 +129,9 @@ export function LocalPathImportBdTopo({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [query, setQuery] = useState("");
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [filters, setFilters] =
+    useState<LeftPanelFilterSelection>(emptyFilterSelection);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,39 +160,73 @@ export function LocalPathImportBdTopo({
     };
   }, [codeCommune]);
 
-  const filtered = useMemo(() => {
-    if (!paths) return [];
-    const q = query.trim().toLocaleLowerCase();
-    return paths.filter((p) => {
-      if (p.alreadyImported) return false;
-      if (!q) return true;
-      return (
-        pathLabel(p).toLocaleLowerCase().includes(q) ||
-        (p.numero != null && String(p.numero).includes(q))
-      );
-    });
-  }, [paths, query]);
+  const importable = useMemo(
+    () => (paths ?? []).filter((p) => !p.alreadyImported),
+    [paths],
+  );
 
-  function toggle(key: string) {
+  const classementFilters = filters[FILTER_GROUP_CLASSEMENT];
+  const hasActiveFilters = classementFilters.size > 0;
+
+  const matchesFilters = useCallback(
+    (path: AssembledLocalPathResponse) =>
+      classementFilters.size === 0 || classementFilters.has(path.classement),
+    [classementFilters],
+  );
+
+  const filter = useMemo(
+    () => ({
+      isActive: hasActiveFilters,
+      ariaLabel: "Filtrer les voies locales",
+      matches: matchesFilters,
+      renderModal: ({
+        isOpen,
+        onClose,
+      }: {
+        isOpen: boolean;
+        onClose: () => void;
+      }) => (
+        <LeftPanelFilterModal
+          isOpen={isOpen}
+          onClose={onClose}
+          title="Filtrer les voies locales"
+          groups={FILTER_GROUPS}
+          selected={filters}
+          onApply={setFilters}
+        />
+      ),
+    }),
+    [hasActiveFilters, matchesFilters, filters],
+  );
+
+  const toggle = useCallback((key: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  }
+  }, []);
 
-  function selectAllFiltered() {
+  const handleSelectAll = useCallback((keys: string[]) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      filtered.forEach((p) => next.add(p.key));
+      keys.forEach((key) => next.add(key));
       return next;
     });
-  }
+  }, []);
 
-  function clearSelection() {
-    setSelected(new Set());
-  }
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  const selection = useMemo(
+    () => ({
+      selectedKeys: selected,
+      onToggle: toggle,
+      onSelectAll: handleSelectAll,
+      onClear: clearSelection,
+    }),
+    [selected, toggle, handleSelectAll, clearSelection],
+  );
 
   useEffect(() => {
     setMapChildren(
@@ -120,7 +238,7 @@ export function LocalPathImportBdTopo({
       />,
     );
     return () => setMapChildren(null);
-  }, [setMapChildren, paths, selected, hoveredKey]);
+  }, [setMapChildren, paths, selected, hoveredKey, toggle]);
 
   useEffect(() => {
     if (!paths || loadError) {
@@ -153,24 +271,34 @@ export function LocalPathImportBdTopo({
     });
   }
 
-  return (
-    <section className={styles.container} aria-label="Import BD TOPO">
-      <div className={styles.header}>
-        <Link href={`/${codeCommune}/voies-locales`} className={styles.back}>
-          <span className="material-icons">arrow_back</span>
-          Retour à la liste
-        </Link>
-        <h2 className={styles.title}>Importer des voies locales</h2>
-        <p className={styles.description}>
-          Ces voies locales ont été reconstituées à partir de la voirie BD TOPO
-          coïncidant avec l&apos;habillage cadastral. Vous pourrez ensuite
-          qualifier chaque voie importée (numéro, revêtement…) individuellement.
-        </p>
-      </div>
+  const header = (
+    <div className={styles.header}>
+      <Link href={`/${codeCommune}/voies-locales`} className={styles.back}>
+        <span className="material-icons">arrow_back</span>
+        Retour à la liste
+      </Link>
+      <h2 className={styles.title}>Importer des voies locales</h2>
+      <p className={styles.description}>
+        Ces voies locales ont été reconstituées à partir de la voirie BD TOPO
+        coïncidant avec l&apos;habillage cadastral. Vous pourrez ensuite
+        qualifier chaque voie importée (numéro, revêtement…) individuellement.
+      </p>
+    </div>
+  );
 
-      {loadError && <p className={styles.error}>{loadError}</p>}
+  if (loadError) {
+    return (
+      <section className={styles.container} aria-label="Import BD TOPO">
+        {header}
+        <p className={styles.error}>{loadError}</p>
+      </section>
+    );
+  }
 
-      {!paths && !loadError && (
+  if (!paths) {
+    return (
+      <section className={styles.container} aria-label="Import BD TOPO">
+        {header}
         <div className={styles.loading} role="status">
           <span className={styles.spinner} aria-hidden="true" />
           <span>Reconstitution des voies locales…</span>
@@ -179,82 +307,32 @@ export function LocalPathImportBdTopo({
             commune.
           </span>
         </div>
-      )}
+      </section>
+    );
+  }
 
-      {paths && (
+  return (
+    <LeftPanelList
+      ariaLabel="Import BD TOPO"
+      items={importable}
+      getKey={(p) => p.key}
+      header={header}
+      searchAriaLabel="Rechercher une voie locale"
+      matchesQuery={matchesImportQuery}
+      sortOptions={SORT_OPTIONS}
+      sortAriaLabel="Trier les voies locales"
+      filter={filter}
+      selection={selection}
+      onHoverChange={setHoveredKey}
+      emptyMessage={
+        paths.length === 0
+          ? "Aucune voie locale cadastrale n'a pu être reconstituée pour cette commune."
+          : "Toutes les voies locales cadastrales de cette commune ont déjà été importées."
+      }
+      noResultsMessage="Aucun résultat pour cette recherche."
+      footer={
         <>
-          <div className={styles.toolbar}>
-            <div className={styles.toolbarRow}>
-              <div className={styles.search}>
-                <Input
-                  aria-label="Rechercher une voie locale"
-                  hideLabel
-                  className={styles.searchInput}
-                  fullWidth
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  icon={<span className="material-icons">search</span>}
-                />
-              </div>
-            </div>
-            <div className={styles.selectionRow}>
-              <Button size="small" color="neutral" onClick={selectAllFiltered}>
-                Tout sélectionner ({filtered.length})
-              </Button>
-              <Button size="small" color="neutral" onClick={clearSelection}>
-                Tout désélectionner
-              </Button>
-            </div>
-          </div>
-
-          {filtered.length === 0 ? (
-            <p className={styles.empty}>
-              {paths.length === 0
-                ? "Aucune voie locale cadastrale n'a pu être reconstituée pour cette commune."
-                : paths.every((p) => p.alreadyImported)
-                  ? "Toutes les voies locales cadastrales de cette commune ont déjà été importées."
-                  : "Aucun résultat pour cette recherche."}
-            </p>
-          ) : (
-            <ul className={styles.list}>
-              {filtered.map((p) => (
-                <li key={p.key}>
-                  <label
-                    className={styles.item}
-                    onMouseEnter={() => setHoveredKey(p.key)}
-                    onMouseLeave={() =>
-                      setHoveredKey((cur) => (cur === p.key ? null : cur))
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(p.key)}
-                      onChange={() => toggle(p.key)}
-                    />
-                    <span className={styles.itemBody}>
-                      <span className={styles.itemTitle}>{pathLabel(p)}</span>
-                      <span className={styles.itemMeta}>
-                        <span
-                          className={`${styles.classementBadge} ${CLASSEMENT_CLASS[p.classement]}`}
-                          title={CLASSEMENT_LABELS[p.classement]}
-                        >
-                          {CLASSEMENT_ABBR[p.classement]}
-                        </span>
-                        <span>
-                          {p.segments.length} segment
-                          {p.segments.length > 1 ? "s" : ""}
-                        </span>
-                        <span>{formatLength(p.longueur)}</span>
-                      </span>
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-
           {importError && <p className={styles.error}>{importError}</p>}
-
           <div className={styles.footer}>
             <Button
               color="brand"
@@ -267,7 +345,28 @@ export function LocalPathImportBdTopo({
             </Button>
           </div>
         </>
+      }
+      renderItem={(p, ctx) => (
+        <label
+          className={styles.item}
+          onMouseEnter={ctx.onMouseEnter}
+          onMouseLeave={ctx.onMouseLeave}
+        >
+          <input type="checkbox" checked={ctx.selected} onChange={ctx.toggle} />
+          <span className={styles.itemBody}>
+            <span className={styles.itemTitle}>{pathLabel(p)}</span>
+            <span className={styles.itemMeta}>
+              <span
+                className={`${styles.classementBadge} ${CLASSEMENT_CLASS[p.classement]}`}
+                title={CLASSEMENT_LABELS[p.classement]}
+              >
+                {CLASSEMENT_ABBR[p.classement]}
+              </span>
+              <span>{formatLength(p.longueur)}</span>
+            </span>
+          </span>
+        </label>
       )}
-    </section>
+    />
   );
 }
