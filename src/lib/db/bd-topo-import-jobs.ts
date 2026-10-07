@@ -62,6 +62,15 @@ export async function getPendingBdTopoPreviewJob(codeInsee: string) {
   });
 }
 
+export async function getPendingBdTopoJobs(codeInsee: string) {
+  await expireJobs(codeInsee);
+  return prisma.bdTopoImportJob.findMany({
+    where: { codeInsee, status: "pending", kind: { in: ["preview", "import"] } },
+    select: { id: true, kind: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export async function getBdTopoImportJob(codeInsee: string, id: string) {
   await expireJobs(codeInsee);
   const job = await prisma.bdTopoImportJob.findFirst({

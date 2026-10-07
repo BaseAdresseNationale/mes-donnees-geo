@@ -157,13 +157,17 @@ export function LocalPathImportBdTopo({
           `/api/voies-locales/import/bd-topo/jobs/${jobId}`,
           { signal, cache: "no-store" },
         );
-        if (response.status === 401 || response.status === 404) {
+        if (response.status === 404) {
+          if (!signal.aborted && readImportJob(storageKey) === jobId) {
+            writeImportJob(storageKey, null);
+          }
+          return { status: "missing" as const, error: null };
+        }
+        if (response.status === 401) {
           return {
             status: "failed",
             error:
-              response.status === 401
-                ? "Votre session a expiré. Reconnectez-vous pour suivre l'import."
-                : "Cette tâche d'import est introuvable.",
+              "Votre session a expiré. Reconnectez-vous pour suivre l'import.",
           };
         }
         if (!response.ok) throw new Error("Suivi de l'import indisponible.");
@@ -218,7 +222,7 @@ export function LocalPathImportBdTopo({
     return () => {
       controller.abort();
     };
-  }, [codeCommune]);
+  }, [codeCommune, jobId]);
 
   const importable = useMemo(
     () => (paths ?? []).filter((p) => !p.alreadyImported),
@@ -400,9 +404,8 @@ export function LocalPathImportBdTopo({
           )}
           {jobId && pending && (
             <p role="status">
-              {importJob.isError
-                ? "Connexion au suivi interrompue. Nouvelle tentative en cours…"
-                : "Import BD TOPO en cours…"}
+              {importJob.isError &&
+                "Connexion au suivi interrompue. Nouvelle tentative en cours…"}
             </p>
           )}
           <div className={styles.footer}>

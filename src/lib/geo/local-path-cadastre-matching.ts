@@ -412,7 +412,7 @@ function coverageRatio(path: LineString, cover: LineString): number {
 // Écarte les portions redondantes (doublons/superpositions) qui produiraient des
 // allers-retours dans la chaîne : on garde les plus longues et on retire celles
 // largement recouvertes par une portion déjà conservée.
-function dedupePortions(portions: Portion[]): Portion[] {
+async function dedupePortions(portions: Portion[]): Promise<Portion[]> {
   const sorted = [...portions].sort(
     (a, b) =>
       turfLength(lineString(b.path.coordinates), { units: "meters" }) -
@@ -420,6 +420,7 @@ function dedupePortions(portions: Portion[]): Portion[] {
   );
   const kept: Portion[] = [];
   for (const portion of sorted) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     const redundant = kept.some(
       (k) => coverageRatio(portion.path, k.path) >= DEDUP_COVER_RATIO,
     );
@@ -444,13 +445,14 @@ function assembledPathLength(path: AssembledLocalPath): number {
 // Fraction des points échantillonnés de `lines` situés à ≤ `toleranceMeters` d'au moins
 // une ligne de `otherLines` (même principe que `coverageRatio`, mais sur plusieurs lignes
 // de chaque côté).
-function linesOverlapRatio(
+async function linesOverlapRatio(
   lines: LineString[],
   otherLines: LineString[],
   toleranceMeters: number,
-): number {
+): Promise<number> {
   let sampled = 0;
   let inside = 0;
+  let lastYield = Date.now();
   for (const path of lines) {
     if (path.coordinates.length < 2) continue;
     const line = lineString(path.coordinates);
@@ -458,6 +460,10 @@ function linesOverlapRatio(
     if (length === 0) continue;
     const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
     for (let i = 0; i <= count; i++) {
+      if (Date.now() - lastYield >= 20) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        lastYield = Date.now();
+      }
       const coord = along(line, (length * i) / count, { units: "meters" })
         .geometry.coordinates as Position;
       sampled++;
@@ -473,9 +479,9 @@ function linesOverlapRatio(
 // fois normalisés) et dont le tracé du plus court est presque entièrement superposé au
 // tracé du plus long sont un doublon (ex. libellés cadastraux voisins non fusionnés en
 // amont). On ne garde alors que le plus long.
-function dedupeAssembledPaths(
+async function dedupeAssembledPaths(
   paths: AssembledLocalPath[],
-): AssembledLocalPath[] {
+): Promise<AssembledLocalPath[]> {
   const groups = new Map<string, AssembledLocalPath[]>();
   for (const path of paths) {
     const nom = path.nom ? normalizeLabel(path.nom) : "";
@@ -495,7 +501,7 @@ function dedupeAssembledPaths(
         if (discarded.has(a) || discarded.has(b)) continue;
         const [shorter, longer] =
           assembledPathLength(a) <= assembledPathLength(b) ? [a, b] : [b, a];
-        const ratio = linesOverlapRatio(
+        const ratio = await linesOverlapRatio(
           assembledPathLines(shorter),
           assembledPathLines(longer),
           DUPLICATE_PATH_TOLERANCE_METERS,
@@ -547,10 +553,10 @@ function removeCancellingSegments(
  * chemin qui se résume à un seul segment de moins de 40 m est écarté, et un doublon
  * (même numéro + nom, tracé superposé) au profit du plus long.
  */
-export function assembleLocalPathsFromCadastre(
+export async function assembleLocalPathsFromCadastre(
   candidates: BdTopoTronconCandidate[],
   cadastralPaths: CadastralRuralPathGeometry[],
-): AssembledLocalPath[] {
+): Promise<AssembledLocalPath[]> {
   const groups = groupCadastralPaths(cadastralPaths);
   const candidatesWithBbox = candidates.map((candidate) => ({
     candidate,
@@ -558,9 +564,15 @@ export function assembleLocalPathsFromCadastre(
   }));
 
   const assembled: AssembledLocalPath[] = [];
+  let lastYield = Date.now();
   for (const group of groups) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     const portions: Portion[] = [];
     for (const { candidate, bbox: candidateBbox } of candidatesWithBbox) {
+      if (Date.now() - lastYield >= 20) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        lastYield = Date.now();
+      }
       if (!bboxesOverlap(candidateBbox, group.bbox)) continue;
       for (const path of corridorPortions(candidate.path, group.lines)) {
         portions.push({ path, candidate });
@@ -568,7 +580,7 @@ export function assembleLocalPathsFromCadastre(
     }
     if (portions.length === 0) continue;
 
-    const ordered = chainPortions(dedupePortions(portions));
+    const ordered = chainPortions(await dedupePortions(portions));
 
     // Découpe la chaîne en sous-chemins à chaque trou > MAX_FILLER_METERS : au-delà,
     // un raccordement en ligne droite n'aurait pas de sens (chemins distincts).
