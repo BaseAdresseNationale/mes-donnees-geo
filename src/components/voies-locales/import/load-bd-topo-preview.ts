@@ -17,6 +17,7 @@ function waitForNextPoll(signal: AbortSignal): Promise<void> {
 
 export async function loadBdTopoPreview(
   signal: AbortSignal,
+  onSuccess?: (jobId: string, count: number) => void,
 ): Promise<AssembledLocalPathResponse[]> {
   const response = await fetch("/api/voies-locales/import/bd-topo", {
     signal,
@@ -47,6 +48,8 @@ export async function loadBdTopoPreview(
       if (!Array.isArray(status.result)) {
         throw new Error("Résultat de reconstitution invalide.");
       }
+      signal.throwIfAborted();
+      onSuccess?.(job.jobId, status.result.length);
       return status.result;
     }
     await waitForNextPoll(signal);

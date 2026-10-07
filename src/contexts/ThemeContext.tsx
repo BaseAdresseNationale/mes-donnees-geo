@@ -1,6 +1,10 @@
 "use client";
 
-import { CunninghamProvider, Spinner } from "@gouvfr-lasuite/ui-components";
+import {
+  CunninghamProvider,
+  Spinner,
+  ToastProvider,
+} from "@gouvfr-lasuite/ui-components";
 import React, { useState, ReactNode, useEffect } from "react";
 
 interface ThemeContextType {
@@ -68,7 +72,9 @@ export function ThemeContextProvider({ children }: { children: ReactNode }) {
     </div>
   ) : (
     <ThemeContext.Provider value={value}>
-      <CunninghamProvider theme={theme}>{children}</CunninghamProvider>
+      <CunninghamProvider theme={theme}>
+        <ToastProvider>{children}</ToastProvider>
+      </CunninghamProvider>
     </ThemeContext.Provider>
   );
 }

@@ -4,13 +4,19 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useEffectEvent,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import { QueryClient, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Button } from "@gouvfr-lasuite/ui-components";
+import {
+  Button,
+  useToastProvider,
+  VariantType,
+} from "@gouvfr-lasuite/ui-components";
 import Link from "next/link";
 import MapContext from "@/contexts/MapContext";
 import type { AssembledLocalPathResponse } from "./types";
@@ -130,6 +136,9 @@ export function LocalPathImportBdTopo({
   codeCommune: string;
 }) {
   const router = useRouter();
+  const { toast } = useToastProvider();
+  const notifiedJobs = useRef(new Set<string>());
+  const notifiedLoadErrors = useRef(new Set<string>());
   const { setMapChildren, setMapMessage } = useContext(MapContext);
   const [queryClient] = useState(() => new QueryClient());
   const [submitting, setSubmitting] = useState(false);
@@ -194,14 +203,56 @@ export function LocalPathImportBdTopo({
 
   useEffect(() => {
     const result = importJob.data;
-    if (!jobId || result?.status !== "succeeded") return;
+    if (
+      !jobId ||
+      !result ||
+      (result.status !== "succeeded" && result.status !== "failed")
+    )
+      return;
+    if (!notifiedJobs.current.has(jobId)) {
+      notifiedJobs.current.add(jobId);
+      if (result.status === "succeeded") {
+        const count = "created" in result ? result.created : null;
+        toast(
+          count == null
+            ? "Import des voies locales terminé."
+            : `${count} voie${count > 1 ? "s" : ""} locale${count > 1 ? "s" : ""} importée${count > 1 ? "s" : ""}.`,
+          VariantType.SUCCESS,
+          { duration: 5000 },
+        );
+      } else {
+        toast(result.error ?? "Échec de l'import.", VariantType.ERROR, {
+          duration: 8000,
+        });
+      }
+    }
+    if (result.status !== "succeeded" || readImportJob(storageKey) !== jobId)
+      return;
     writeImportJob(storageKey, null);
     router.push(`/${codeCommune}/voies-locales`);
-  }, [importJob.data, jobId, storageKey, router, codeCommune]);
+  }, [importJob.data, jobId, storageKey, router, codeCommune, toast]);
+
+  const notifyPreviewSuccess = useEffectEvent(
+    (previewId: string, count: number) => {
+      if (notifiedJobs.current.has(previewId)) return;
+      notifiedJobs.current.add(previewId);
+      toast(`Chargement des voies locales terminé.`, VariantType.SUCCESS, {
+        duration: 5000,
+      });
+    },
+  );
+
+  const notifyPreviewError = useEffectEvent((message: string) => {
+    if (notifiedLoadErrors.current.has(message)) return;
+    notifiedLoadErrors.current.add(message);
+    toast(message, VariantType.ERROR, { duration: 8000 });
+  });
 
   useEffect(() => {
     const controller = new AbortController();
-    loadBdTopoPreview(controller.signal)
+    loadBdTopoPreview(controller.signal, (previewId, count) => {
+      notifyPreviewSuccess(previewId, count);
+    })
       .then((data) => {
         if (controller.signal.aborted) return;
         setPaths(data);
@@ -212,11 +263,12 @@ export function LocalPathImportBdTopo({
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
-          setLoadError(
+          const message =
             error instanceof Error
               ? error.message
-              : "Impossible de récupérer les voies locales issues du cadastre.",
-          );
+              : "Impossible de récupérer les voies locales issues du cadastre.";
+          setLoadError(message);
+          notifyPreviewError(message);
         }
       });
     return () => {
@@ -327,12 +379,17 @@ export function LocalPathImportBdTopo({
       });
       const data = await res.json();
       if (!res.ok) {
-        setImportError(data.error ?? "Échec de l'import.");
+        const message = data.error ?? "Échec de l'import.";
+        setImportError(message);
+        toast(message, VariantType.ERROR, { duration: 8000 });
         return;
       }
       writeImportJob(storageKey, data.jobId);
     } catch {
       setImportError("Impossible de lancer l'import.");
+      toast("Impossible de lancer l'import.", VariantType.ERROR, {
+        duration: 8000,
+      });
     } finally {
       setSubmitting(false);
     }
