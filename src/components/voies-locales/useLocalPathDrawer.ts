@@ -88,7 +88,12 @@ export interface UseLocalPathDrawerResult {
     id: string,
     patch: Partial<SegmentAttributes>,
   ) => void;
+  updateSegmentsAttributes: (
+    ids: string[],
+    patch: Partial<SegmentAttributes>,
+  ) => void;
   removeSegment: (id: string) => void;
+  removeSegments: (ids: string[]) => void;
   commitDrawSegment: () => boolean;
   toSegmentsInput: () => SegmentInput[];
   isReady: boolean;
@@ -850,6 +855,16 @@ export function useLocalPathDrawer(
     [],
   );
 
+  const updateSegmentsAttributes = useCallback(
+    (ids: string[], patch: Partial<SegmentAttributes>) => {
+      const idSet = new Set(ids);
+      setSegments((prev) =>
+        prev.map((s) => (idSet.has(s.id) ? { ...s, ...patch } : s)),
+      );
+    },
+    [],
+  );
+
   const removeSegment = useCallback(
     (id: string) => {
       const chain = segmentsRef.current;
@@ -867,6 +882,19 @@ export function useLocalPathDrawer(
       setSegments((prev) => prev.filter((s) => s.id !== id));
     },
     [showTemporaryError, selectSegment],
+  );
+
+  // Pas de contrôle d'extrémité ici : l'appelant garantit une sélection contiguë en bout de chaîne.
+  const removeSegments = useCallback(
+    (ids: string[]) => {
+      const idSet = new Set(ids);
+      if (selectedIdRef.current && idSet.has(selectedIdRef.current)) {
+        selectSegment(null);
+      }
+      drawRef.current?.removeFeatures(ids);
+      setSegments((prev) => prev.filter((s) => !idSet.has(s.id)));
+    },
+    [selectSegment],
   );
 
   // Fusionne un autre chemin (LocalPath) dans la chaîne en cours : ses segments
@@ -979,7 +1007,9 @@ export function useLocalPathDrawer(
       selectedSegmentId,
       selectSegment,
       updateSegmentAttributes,
+      updateSegmentsAttributes,
       removeSegment,
+      removeSegments,
       commitDrawSegment,
       toSegmentsInput,
       isReady,
@@ -994,7 +1024,9 @@ export function useLocalPathDrawer(
       selectedSegmentId,
       selectSegment,
       updateSegmentAttributes,
+      updateSegmentsAttributes,
       removeSegment,
+      removeSegments,
       commitDrawSegment,
       toSegmentsInput,
       isReady,

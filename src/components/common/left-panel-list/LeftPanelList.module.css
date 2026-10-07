@@ -53,3 +53,14 @@
   color: var(--color-muted, #555);
   font-size: 0.875rem;
 }
+
+.container.inline {
+  flex: none;
+  padding: 0;
+  overflow: visible;
+}
+
+.container.inline .list {
+  flex: none;
+  overflow: visible;
+}

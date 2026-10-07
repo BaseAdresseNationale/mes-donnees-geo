@@ -8,12 +8,15 @@ import {
   useRef,
   useState,
   useTransition,
+  type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
+  Checkbox,
   Input,
   Select,
+  Tooltip,
   useModals,
 } from "@gouvfr-lasuite/ui-components";
 import turfLength from "@turf/length";
@@ -21,6 +24,9 @@ import { lineString } from "@turf/helpers";
 import styles from "./LocalPathForm.module.css";
 import { useLocalPathDrawer } from "../useLocalPathDrawer";
 import { LocalPathSegmentForm } from "./LocalPathSegmentForm";
+import { LocalPathBulkEditModal } from "./LocalPathBulkEditModal";
+import { LeftPanelList } from "@/components/common/left-panel-list/LeftPanelList";
+import type { Segment } from "../useLocalPathDrawer";
 import { validateLocalPathInput } from "../validation";
 import type { LocalPath } from "../types";
 import {
@@ -68,9 +74,35 @@ const DELETION_REASON_OPTIONS = Object.values(LocalPathDeletionReason).map(
   }),
 );
 
+const PORTION_HINT =
+  "Disponible si les segments sélectionnés sont contigus et incluent une extrémité du chemin.";
+
+interface SegmentItem {
+  segment: Segment;
+  index: number;
+  length: number;
+  isOuter: boolean;
+}
+
 function formatLength(meters: number): string {
   if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
   return `${Math.round(meters)} m`;
+}
+
+// Le <span> capte le survol, qu'un bouton désactivé ne remonte pas.
+function HintWhenDisabled({
+  hint,
+  children,
+}: {
+  hint: string | null;
+  children: ReactNode;
+}) {
+  if (!hint) return children;
+  return (
+    <Tooltip content={hint} placement="top">
+      <span className={styles.hintAnchor}>{children}</span>
+    </Tooltip>
+  );
 }
 
 function DeletionReasonPrompt({
@@ -130,6 +162,10 @@ export function LocalPathForm({
   const [gestionnaire, setGestionnaire] =
     useState<LocalPathGestionnaire | null>(initial?.gestionnaire ?? null);
   const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
+  const [checkedSegmentIds, setCheckedSegmentIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const deletionReasonRef = useRef<LocalPathDeletionReason | null>(null);
 
   useEffect(() => {
@@ -196,6 +232,21 @@ export function LocalPathForm({
     otherPaths,
   ]);
 
+  // Exclut les segments supprimés depuis leur sélection.
+  const selectedSegmentIds = useMemo(
+    () =>
+      new Set(
+        drawer.segments
+          .filter((s) => checkedSegmentIds.has(s.id))
+          .map((s) => s.id),
+      ),
+    [drawer.segments, checkedSegmentIds],
+  );
+  const checkedIdsList = useMemo(
+    () => [...selectedSegmentIds],
+    [selectedSegmentIds],
+  );
+
   // `useLayoutEffect` (pas `useEffect`) : doit rester dans le même flush
   // synchrone que le `flushSync` de `useLocalPathDrawer` (glisser d'un point
   // en mode sélection), sinon la ligne éditée ne se met à jour visuellement
@@ -224,6 +275,7 @@ export function LocalPathForm({
       <VoiesLocalesFormMap
         drawSegments={displaySegments}
         hoveredSegmentId={hoveredSegmentId}
+        checkedSegmentIds={checkedIdsList}
         onHoverSegment={setHoveredSegmentId}
         selectedSegmentId={drawer.selectedSegmentId}
         otherPaths={otherPaths}
@@ -246,6 +298,7 @@ export function LocalPathForm({
     otherPaths,
     mergeablePaths,
     hoveredSegmentId,
+    checkedIdsList,
   ]);
 
   const segmentLengths = useMemo(
@@ -260,6 +313,34 @@ export function LocalPathForm({
   const totalLength = useMemo(
     () => segmentLengths.reduce((sum, l) => sum + l, 0),
     [segmentLengths],
+  );
+
+  const segmentItems = useMemo(
+    () =>
+      drawer.segments.map((segment, index) => ({
+        segment,
+        index,
+        length: segmentLengths[index] ?? 0,
+        isOuter: index === 0 || index === drawer.segments.length - 1,
+      })),
+    [drawer.segments, segmentLengths],
+  );
+
+  const segmentSelection = useMemo(
+    () => ({
+      selectedKeys: selectedSegmentIds,
+      onToggle: (key: string) =>
+        setCheckedSegmentIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return next;
+        }),
+      onSelectAll: (keys: string[]) =>
+        setCheckedSegmentIds((prev) => new Set([...prev, ...keys])),
+      onClear: () => setCheckedSegmentIds(new Set()),
+    }),
+    [selectedSegmentIds],
   );
 
   // Raccourci clavier : Delete/Backspace supprime le segment sélectionné
@@ -287,6 +368,101 @@ export function LocalPathForm({
   }, [selectedSegmentId, removeSegment]);
 
   const isEdit = Boolean(initial);
+
+  // Une portion (segments cochés contigus, touchant une extrémité) peut être
+  // retirée du chemin sans le scinder en deux.
+  const portion = useMemo(() => {
+    const indices = new Set<number>();
+    drawer.segments.forEach((s, i) => {
+      if (selectedSegmentIds.has(s.id)) indices.add(i);
+    });
+    const sorted = [...indices];
+    const first = sorted[0];
+    const last = sorted.at(-1);
+    const valid =
+      sorted.length > 0 &&
+      last! - first + 1 === sorted.length &&
+      (first === 0 || last === drawer.segments.length - 1);
+    return {
+      indices,
+      canRemove: valid,
+      canDefuse: valid && sorted.length < drawer.segments.length,
+    };
+  }, [drawer.segments, selectedSegmentIds]);
+
+  function removePortion() {
+    if (!portion.canRemove) return;
+    drawer.removeSegments([...selectedSegmentIds]);
+    setCheckedSegmentIds(new Set());
+  }
+
+  async function defuse() {
+    if (!initial || !portion.canDefuse) return;
+    const decision = await modals.confirmationModal({
+      title: "Défusionner ces segments ?",
+      children: `Un nouveau chemin sans nom sera créé avec les ${portion.indices.size} segments sélectionnés. Ils seront retirés de ce chemin.`,
+    });
+    if (decision !== "yes") return;
+
+    const all = drawer.toSegmentsInput();
+    const detached = validateLocalPathInput({
+      nom: null,
+      statut,
+      classement,
+      numero: 0,
+      gestionnaire,
+      commentaire: null,
+      segments: all.filter((_, i) => portion.indices.has(i)),
+    });
+    const remaining = validateLocalPathInput({
+      nom: nom.trim() || null,
+      statut,
+      classement,
+      numero: Number(numero),
+      gestionnaire,
+      commentaire: commentaire.trim() || null,
+      segments: all.filter((_, i) => !portion.indices.has(i)),
+    });
+    if (!detached.ok || !remaining.ok) {
+      setSubmitStatus("error");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const headers = { "content-type": "application/json" };
+        const created = await fetch("/api/voies-locales", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(detached.data),
+        });
+        if (!created.ok) {
+          setSubmitStatus("error");
+          return;
+        }
+        const newPath = (await created.json()) as LocalPath;
+        const updated = await fetch(`/api/voies-locales/${initial.id}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(remaining.data),
+        });
+        if (!updated.ok) {
+          setSubmitStatus("error");
+          return;
+        }
+        if (drawer.mergedPathIds.length > 0) {
+          await Promise.allSettled(
+            drawer.mergedPathIds.map((id) =>
+              fetch(`/api/voies-locales/${id}`, { method: "DELETE" }),
+            ),
+          );
+        }
+        router.push(`/${codeCommune}/voies-locales/${newPath.id}`);
+      } catch {
+        setSubmitStatus("error");
+      }
+    });
+  }
 
   function submit() {
     const parsedNumero = Number(numero);
@@ -375,212 +551,286 @@ export function LocalPathForm({
   }
 
   return (
-    <form
-      className={styles.form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-      aria-label={isEdit ? "Édition d'un chemin rural" : "Nouveau chemin rural"}
-    >
-      <div className={styles.header}>
-        <Link href={`/${codeCommune}/voies-locales`} className={styles.back}>
-          <span className="material-icons">arrow_back</span>
-          Retour à la liste
-        </Link>
-      </div>
-      <Input
-        label="Nom du chemin"
-        fullWidth
-        value={nom}
-        onChange={(e) => setNom(e.target.value)}
-        disabled={pending}
-      />
+    <>
+      <form
+        className={styles.form}
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        aria-label={
+          isEdit ? "Édition d'un chemin rural" : "Nouveau chemin rural"
+        }
+      >
+        <div className={styles.header}>
+          <Link href={`/${codeCommune}/voies-locales`} className={styles.back}>
+            <span className="material-icons">arrow_back</span>
+            Retour à la liste
+          </Link>
+        </div>
+        <Input
+          label="Nom du chemin"
+          fullWidth
+          value={nom}
+          onChange={(e) => setNom(e.target.value)}
+          disabled={pending}
+        />
 
-      <div className={styles.pathIdentifier}>
+        <div className={styles.pathIdentifier}>
+          <Select
+            label="Classement"
+            className={styles.pathType}
+            options={CLASSEMENT_OPTIONS}
+            value={classement}
+            onChange={(e) =>
+              setClassement(
+                (e.target.value as LocalPathClassement) ??
+                  LocalPathClassement.CHEMIN_RURAL,
+              )
+            }
+            disabled={pending}
+            clearable={false}
+          />
+
+          <Input
+            className={styles.pathNumber}
+            label="Numéro"
+            type="number"
+            min={0}
+            step={1}
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            disabled={pending}
+          />
+        </div>
+
         <Select
-          label="Classement"
-          className={styles.pathType}
-          options={CLASSEMENT_OPTIONS}
-          value={classement}
+          label="Gestionnaire"
+          fullWidth
+          options={GESTIONNAIRE_OPTIONS}
+          value={gestionnaire ?? undefined}
           onChange={(e) =>
-            setClassement(
-              (e.target.value as LocalPathClassement) ??
-                LocalPathClassement.CHEMIN_RURAL,
+            setGestionnaire(
+              e.target.value ? (e.target.value as LocalPathGestionnaire) : null,
             )
           }
-          disabled={pending}
-          clearable={false}
-        />
-
-        <Input
-          className={styles.pathNumber}
-          label="Numéro"
-          type="number"
-          min={0}
-          step={1}
-          value={numero}
-          onChange={(e) => setNumero(e.target.value)}
+          clearable
           disabled={pending}
         />
-      </div>
 
-      <Select
-        label="Gestionnaire"
-        fullWidth
-        options={GESTIONNAIRE_OPTIONS}
-        value={gestionnaire ?? undefined}
-        onChange={(e) =>
-          setGestionnaire(
-            e.target.value ? (e.target.value as LocalPathGestionnaire) : null,
-          )
-        }
-        clearable
-        disabled={pending}
-      />
+        <div className={styles.textareaField}>
+          <label
+            className={styles.textareaLabel}
+            htmlFor="local-path-commentaire"
+          >
+            Commentaire
+          </label>
+          <textarea
+            id="local-path-commentaire"
+            className={styles.textarea}
+            value={commentaire}
+            onChange={(e) => setCommentaire(e.target.value)}
+            disabled={pending}
+          />
+        </div>
 
-      <div className={styles.textareaField}>
-        <label
-          className={styles.textareaLabel}
-          htmlFor="local-path-commentaire"
-        >
-          Commentaire
-        </label>
-        <textarea
-          id="local-path-commentaire"
-          className={styles.textarea}
-          value={commentaire}
-          onChange={(e) => setCommentaire(e.target.value)}
-          disabled={pending}
-        />
-      </div>
-
-      <section className={styles.segments} aria-label="Segments du chemin">
-        <h3 className={styles.segmentsHeader}>
-          <span>Segments</span>
-          <span>
-            {drawer.segments.length}
-            {drawer.segments.length > 0 && ` — ${formatLength(totalLength)}`}
-          </span>
-        </h3>
-        {drawer.segments.length === 0 ? (
-          <p className={styles.segmentsEmpty}>
-            {drawer.isReady
-              ? "Cliquez sur la carte pour tracer un segment."
-              : "Initialisation de l'outil de dessin\u2026"}
-          </p>
-        ) : (
-          <ul className={styles.segmentList}>
-            {drawer.segments.map((seg, i) => {
-              const isOuterSegment =
-                i === 0 || i === drawer.segments.length - 1;
-              return (
-                <li
-                  key={seg.id}
-                  className={styles.segmentItem}
-                  onMouseEnter={() => setHoveredSegmentId(seg.id)}
-                  onMouseLeave={() =>
-                    setHoveredSegmentId((current) =>
-                      current === seg.id ? null : current,
-                    )
-                  }
-                >
-                  <details
-                    className={styles.segmentAccordion}
-                    open={drawer.selectedSegmentId === seg.id}
-                  >
-                    <summary
-                      className={styles.segmentSummary}
-                      onClick={(e) => {
-                        // Contrôlé par la sélection : un seul segment ouvert à
-                        // la fois, synchronisé avec le mode sélection carte.
-                        e.preventDefault();
-                        drawer.selectSegment(
-                          drawer.selectedSegmentId === seg.id ? null : seg.id,
-                        );
-                      }}
+        <section className={styles.segments} aria-label="Segments du chemin">
+          <LeftPanelList<SegmentItem>
+            variant="inline"
+            ariaLabel="Liste des segments"
+            items={segmentItems}
+            getKey={(item) => item.segment.id}
+            selection={segmentSelection}
+            onHoverChange={setHoveredSegmentId}
+            emptyMessage={
+              drawer.isReady
+                ? "Cliquez sur la carte pour tracer un segment."
+                : "Initialisation de l'outil de dessin\u2026"
+            }
+            noResultsMessage="Aucun segment."
+            header={
+              <>
+                <h3 className={styles.segmentsHeader}>
+                  <span>Segments</span>
+                  <span>
+                    {drawer.segments.length}
+                    {drawer.segments.length > 0 &&
+                      ` — ${formatLength(totalLength)}`}
+                  </span>
+                </h3>
+                {selectedSegmentIds.size >= 1 && (
+                  <div className={styles.bulkActions}>
+                    <Button
+                      type="button"
+                      size="small"
+                      color="brand"
+                      variant="secondary"
+                      icon={<span className="material-icons">edit</span>}
+                      onClick={() => setIsBulkEditOpen(true)}
+                      disabled={pending || selectedSegmentIds.size < 2}
                     >
-                      <span className={styles.segmentLabel}>
-                        Segment {i + 1}
-                        <span className={styles.segmentLength}>
-                          {formatLength(segmentLengths[i] ?? 0)}
-                        </span>
-                      </span>
-                    </summary>
-                    <div className={styles.segmentBody}>
-                      <LocalPathSegmentForm
-                        index={i}
-                        segment={seg}
-                        disabled={pending}
-                        onChange={(patch) =>
-                          drawer.updateSegmentAttributes(seg.id, patch)
+                      Édition multiple ({selectedSegmentIds.size})
+                    </Button>
+
+                    <HintWhenDisabled
+                      hint={!portion.canRemove ? PORTION_HINT : null}
+                    >
+                      <Button
+                        type="button"
+                        size="small"
+                        color="error"
+                        variant="secondary"
+                        icon={<span className="material-icons">delete</span>}
+                        onClick={removePortion}
+                        disabled={pending || !portion.canRemove}
+                      >
+                        Supprimer
+                      </Button>
+                    </HintWhenDisabled>
+                    <HintWhenDisabled
+                      hint={
+                        !isEdit
+                          ? "Enregistrez le chemin avant de défusionner."
+                          : !portion.canDefuse
+                            ? PORTION_HINT
+                            : null
+                      }
+                    >
+                      <Button
+                        type="button"
+                        size="small"
+                        color="neutral"
+                        variant="secondary"
+                        icon={
+                          <span className="material-icons">call_split</span>
                         }
-                      />
-                    </div>
-                  </details>
-                  <Button
-                    type="button"
-                    variant="tertiary"
-                    className={styles.segmentRemove}
-                    onClick={() => drawer.removeSegment(seg.id)}
-                    aria-label={
-                      isOuterSegment
-                        ? `Supprimer le segment ${i + 1}`
-                        : "Seules les extrémités du chemin peuvent être supprimées"
-                    }
-                    title={
-                      isOuterSegment
-                        ? undefined
-                        : "Seules les extrémités du chemin peuvent être supprimées"
-                    }
-                    disabled={pending || !isOuterSegment}
-                    icon={<span className="material-icons">delete</span>}
-                  />
-                </li>
-              );
-            })}
-          </ul>
+                        onClick={defuse}
+                        disabled={pending || !isEdit || !portion.canDefuse}
+                      >
+                        Défusionner
+                      </Button>
+                    </HintWhenDisabled>
+                  </div>
+                )}
+              </>
+            }
+            renderItem={({ segment: seg, index: i, length, isOuter }, ctx) => (
+              <div
+                className={styles.segmentItem}
+                onMouseEnter={ctx.onMouseEnter}
+                onMouseLeave={ctx.onMouseLeave}
+              >
+                <Checkbox
+                  type="checkbox"
+                  className={styles.segmentCheckbox}
+                  checked={ctx.selected}
+                  onChange={ctx.toggle}
+                  aria-label={`Sélectionner le segment ${i + 1}`}
+                  disabled={pending}
+                />
+                <details
+                  className={styles.segmentAccordion}
+                  open={drawer.selectedSegmentId === seg.id}
+                >
+                  <summary
+                    className={styles.segmentSummary}
+                    onClick={(e) => {
+                      // Contrôlé par la sélection : un seul segment ouvert à
+                      // la fois, synchronisé avec le mode sélection carte.
+                      e.preventDefault();
+                      drawer.selectSegment(
+                        drawer.selectedSegmentId === seg.id ? null : seg.id,
+                      );
+                    }}
+                  >
+                    <span className={styles.segmentLabel}>
+                      Segment {i + 1}
+                      <span className={styles.segmentLength}>
+                        {formatLength(length)}
+                      </span>
+                    </span>
+                  </summary>
+                  <div className={styles.segmentBody}>
+                    <LocalPathSegmentForm
+                      index={i}
+                      segment={seg}
+                      disabled={pending}
+                      onChange={(patch) =>
+                        drawer.updateSegmentAttributes(seg.id, patch)
+                      }
+                    />
+                  </div>
+                </details>
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  className={styles.segmentRemove}
+                  onClick={() => drawer.removeSegment(seg.id)}
+                  aria-label={
+                    isOuter
+                      ? `Supprimer le segment ${i + 1}`
+                      : "Seules les extrémités du chemin peuvent être supprimées"
+                  }
+                  title={
+                    isOuter
+                      ? undefined
+                      : "Seules les extrémités du chemin peuvent être supprimées"
+                  }
+                  disabled={pending || !isOuter}
+                  icon={<span className="material-icons">delete</span>}
+                />
+              </div>
+            )}
+          />
+        </section>
+
+        {submitStatus === "error" && (
+          <p className={styles.error} role="alert">
+            Une erreur est survenue.
+          </p>
         )}
-      </section>
 
-      {submitStatus === "error" && (
-        <p className={styles.error} role="alert">
-          Une erreur est survenue.
-        </p>
-      )}
+        {submitStatus === "success" && (
+          <p className={styles.successMessage} role="status">
+            Chemin enregistré avec succès.
+          </p>
+        )}
 
-      {submitStatus === "success" && (
-        <p className={styles.successMessage} role="status">
-          Chemin enregistré avec succès.
-        </p>
-      )}
-
-      <div className={styles.actions}>
-        <Button
-          type="button"
-          color="neutral"
-          variant="tertiary"
-          onClick={() => router.push(`/${codeCommune}/voies-locales`)}
-          disabled={pending}
-        >
-          Annuler
-        </Button>
-        {isEdit && (
+        <div className={styles.actions}>
           <Button
             type="button"
-            color="error"
+            color="neutral"
             variant="tertiary"
-            onClick={remove}
+            onClick={() => router.push(`/${codeCommune}/voies-locales`)}
             disabled={pending}
           >
-            Supprimer
+            Annuler
           </Button>
-        )}
-        <span className={styles.actionsSpacer} />
-        <Button type="submit" color="brand" disabled={pending}>
-          {pending ? "Enregistrement..." : "Enregistrer"}
-        </Button>
-      </div>
-    </form>
+          {isEdit && (
+            <Button
+              type="button"
+              color="error"
+              variant="tertiary"
+              onClick={remove}
+              disabled={pending}
+            >
+              Supprimer
+            </Button>
+          )}
+          <span className={styles.actionsSpacer} />
+          <Button type="submit" color="brand" disabled={pending}>
+            {pending ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      </form>
+      <LocalPathBulkEditModal
+        isOpen={isBulkEditOpen}
+        onClose={() => setIsBulkEditOpen(false)}
+        count={selectedSegmentIds.size}
+        onApply={(patch) =>
+          drawer.updateSegmentsAttributes([...selectedSegmentIds], patch)
+        }
+      />
+    </>
   );
 }

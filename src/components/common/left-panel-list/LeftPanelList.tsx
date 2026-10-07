@@ -68,6 +68,9 @@ export interface LeftPanelListProps<T> {
 
   header?: ReactNode;
   footer?: ReactNode;
+
+  /** `inline` : s'intègre dans un conteneur déjà scrollable (sans padding ni hauteur imposée). */
+  variant?: "panel" | "inline";
 }
 
 export function LeftPanelList<T>({
@@ -87,6 +90,7 @@ export function LeftPanelList<T>({
   noResultsMessage,
   header,
   footer,
+  variant = "panel",
 }: LeftPanelListProps<T>) {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -131,62 +135,73 @@ export function LeftPanelList<T>({
   }, [hoveredKey, onHoverChange]);
 
   return (
-    <section className={styles.container} aria-label={ariaLabel}>
+    <section
+      className={`${styles.container} ${variant === "inline" ? styles.inline : ""}`}
+      aria-label={ariaLabel}
+    >
       {header}
 
-      {(matchesQuery || sortOptions || filter) && (
+      {(matchesQuery || sortOptions || filter || selection) && (
         <div className={styles.toolbar}>
-          <div className={styles.toolbarRow}>
-            {matchesQuery && (
-              <div className={styles.search}>
-                <Input
-                  aria-label={searchAriaLabel}
-                  hideLabel
-                  fullWidth
-                  className={styles.searchInput}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  icon={<span className="material-icons">search</span>}
-                />
-              </div>
-            )}
-            {sortOptions && sortOptions.length > 0 && (
-              <DropdownMenu
-                isOpen={isSortMenuOpen}
-                onOpenChange={setIsSortMenuOpen}
-                options={sortMenuOptions}
-              >
+          {(matchesQuery || sortOptions || filter) && (
+            <div className={styles.toolbarRow}>
+              {matchesQuery && (
+                <div className={styles.search}>
+                  <Input
+                    aria-label={searchAriaLabel}
+                    hideLabel
+                    fullWidth
+                    className={styles.searchInput}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    icon={<span className="material-icons">search</span>}
+                  />
+                </div>
+              )}
+              {sortOptions && sortOptions.length > 0 && (
+                <DropdownMenu
+                  isOpen={isSortMenuOpen}
+                  onOpenChange={setIsSortMenuOpen}
+                  options={sortMenuOptions}
+                >
+                  <Button
+                    variant="secondary"
+                    color={sortKey ? "brand" : "neutral"}
+                    active={sortKey !== null}
+                    icon={<span className="material-icons">swap_vert</span>}
+                    aria-label={sortAriaLabel}
+                    onClick={() => setIsSortMenuOpen((open) => !open)}
+                  />
+                </DropdownMenu>
+              )}
+              {filter && (
                 <Button
                   variant="secondary"
-                  color={sortKey ? "brand" : "neutral"}
-                  active={sortKey !== null}
-                  icon={<span className="material-icons">swap_vert</span>}
-                  aria-label={sortAriaLabel}
-                  onClick={() => setIsSortMenuOpen((open) => !open)}
+                  color={filter.isActive ? "brand" : "neutral"}
+                  active={filter.isActive}
+                  icon={<span className="material-icons">filter_list</span>}
+                  aria-label={filter.ariaLabel ?? "Filtrer"}
+                  onClick={() => setIsFilterModalOpen(true)}
                 />
-              </DropdownMenu>
-            )}
-            {filter && (
-              <Button
-                variant="secondary"
-                color={filter.isActive ? "brand" : "neutral"}
-                active={filter.isActive}
-                icon={<span className="material-icons">filter_list</span>}
-                aria-label={filter.ariaLabel ?? "Filtrer"}
-                onClick={() => setIsFilterModalOpen(true)}
-              />
-            )}
-          </div>
+              )}
+            </div>
+          )}
           {selection && (
             <div className={styles.selectionRow}>
               <Button
-                size="small"
+                type="button"
+                size="nano"
                 color="neutral"
                 onClick={() => selection.onSelectAll(visibleItems.map(getKey))}
               >
                 Tout sélectionner ({visibleItems.length})
               </Button>
-              <Button size="small" color="neutral" onClick={selection.onClear}>
+              <Button
+                type="button"
+                size="nano"
+                color="neutral"
+                onClick={selection.onClear}
+              >
                 Tout désélectionner
               </Button>
             </div>

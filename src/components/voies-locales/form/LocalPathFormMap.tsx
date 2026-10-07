@@ -65,6 +65,7 @@ const CLASSEMENT_COLOR_MATCH: ExpressionSpecification = [
 export function VoiesLocalesFormMap({
   drawSegments,
   hoveredSegmentId,
+  checkedSegmentIds,
   onHoverSegment,
   selectedSegmentId,
   otherPaths,
@@ -74,6 +75,7 @@ export function VoiesLocalesFormMap({
 }: {
   drawSegments: Segment[];
   hoveredSegmentId?: string | null;
+  checkedSegmentIds?: string[];
   onHoverSegment?: (id: string | null) => void;
   selectedSegmentId?: string | null;
   otherPaths?: LocalPath[];
@@ -83,6 +85,11 @@ export function VoiesLocalesFormMap({
 }) {
   const map = useMap();
   const modals = useModals();
+  const isHaloed = [
+    "any",
+    ["==", ["get", "id"], hoveredSegmentId ?? ""],
+    ["in", ["get", "id"], ["literal", checkedSegmentIds ?? []]],
+  ] as unknown as ExpressionSpecification;
   const [hoveredMergeable, setHoveredMergeable] = useState<{
     pathId: string;
     lng: number;
@@ -369,18 +376,8 @@ export function VoiesLocalesFormMap({
             paint: {
               "line-color": REVETEMENT_COLOR_MATCH,
               "line-blur": 4,
-              "line-width": [
-                "case",
-                ["==", ["get", "id"], hoveredSegmentId ?? ""],
-                16,
-                0,
-              ],
-              "line-opacity": [
-                "case",
-                ["==", ["get", "id"], hoveredSegmentId ?? ""],
-                0.5,
-                0,
-              ],
+              "line-width": ["case", isHaloed, 16, 0],
+              "line-opacity": ["case", isHaloed, 0.5, 0],
             },
           } as LayerProps)}
         />
