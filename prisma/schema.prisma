@@ -7,6 +7,21 @@ datasource db {
   provider = "postgresql"
 }
 
+model BdTopoImportJob {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeInsee  String    @map("code_insee") @db.VarChar(5)
+  status     String    @default("pending") @db.VarChar(20)
+  kind       String    @default("import") @db.VarChar(20)
+  result     Json?
+  created    Int?
+  error      String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  @@index([codeInsee, createdAt])
+  @@map("bd_topo_import_jobs")
+}
+
 model CommuneSettings {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   codeInsee       String    @unique @map("code_insee") @db.VarChar(5)

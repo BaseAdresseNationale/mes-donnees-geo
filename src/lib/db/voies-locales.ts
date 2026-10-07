@@ -293,19 +293,25 @@ export interface LocalPathImportInput {
 export async function createLocalPathsFromImport(
   codeCommune: string,
   inputs: LocalPathImportInput[],
+  transaction?: Prisma.TransactionClient,
 ): Promise<LocalPath[]> {
   if (inputs.length === 0) return [];
+  if (!transaction) {
+    return prisma.$transaction(
+      (tx) => createLocalPathsFromImport(codeCommune, inputs, tx),
+      { timeout: 60_000 },
+    );
+  }
 
-  const maxNumero = await prisma.localPath.aggregate({
+  const maxNumero = await transaction.localPath.aggregate({
     where: { codeInsee: codeCommune, deletedAt: null },
     _max: { numero: true },
   });
   let nextNumero = (maxNumero._max.numero ?? 0) + 1;
 
-  return prisma
-    .$transaction(
+  return Promise.all(
       inputs.map((input) =>
-        prisma.localPath.create({
+        transaction.localPath.create({
           data: {
             codeInsee: codeCommune,
             nom: input.nom,

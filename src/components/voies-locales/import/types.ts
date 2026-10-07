@@ -7,6 +7,7 @@ import type {
 export interface ImportSegmentResponse {
   path: GeoJSON.LineString;
   source: LocalPathSource;
+  sourceRef?: string | null;
   revetement: LocalPathRevetement;
 }
 

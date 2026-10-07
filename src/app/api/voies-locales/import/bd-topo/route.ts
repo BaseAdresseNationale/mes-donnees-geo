@@ -1,75 +1,24 @@
-import { NextResponse } from "next/server";
-import turfLength from "@turf/length";
-import { lineString } from "@turf/helpers";
+import { after, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
-import { BdTopoService } from "@/lib/geo/bd-topo";
-import { CadastreService } from "@/lib/geo/cadastre";
+import { getCachedBdTopoPreviewJob } from "@/lib/db/bd-topo-preview-cache";
 import {
-  assembleLocalPathsFromCadastre,
-  type AssembledLocalPath,
-} from "@/lib/geo/local-path-cadastre-matching";
-import {
-  createLocalPathsFromImport,
-  getImportedSourceRefs,
-  type LocalPathImportInput,
-} from "@/lib/db/voies-locales";
-import {
-  LocalPathClassement,
-  LocalPathEtat,
-  LocalPathSource,
-} from "@/components/voies-locales/types";
-import type { AssembledLocalPathResponse } from "@/components/voies-locales/import/types";
+  createBdTopoImportJob,
+  getPendingBdTopoPreviewJob,
+  runBdTopoPreviewJob,
+  runBdTopoImportJob,
+} from "@/lib/db/bd-topo-import-jobs";
 
 const MAX_SELECTION = 500;
 
-/**
- * Assemble côté serveur les chemins ruraux cadastraux à partir de la voirie BD TOPO
- * (jamais de confiance à une géométrie fournie par le client — tout est recalculé ici).
- */
-async function assembleForCommune(
-  codeInsee: string,
-): Promise<AssembledLocalPath[]> {
-  const [candidates, ruralPaths, voiesCommunales] = await Promise.all([
-    BdTopoService.findTronconsForCommune(codeInsee),
-    CadastreService.findRuralPathToponymsForCommune(codeInsee),
-    CadastreService.findVoieCommunaleToponymsForCommune(codeInsee),
-  ]);
-  const cadastralPaths = [
-    ...ruralPaths.map((feature) => ({
-      path: feature.geometry,
-      numero: feature.properties.numero,
-      nom: feature.properties.nom,
-      libelle: feature.properties.libelle,
-      classement: LocalPathClassement.CHEMIN_RURAL,
-    })),
-    ...voiesCommunales.map((feature) => ({
-      path: feature.geometry,
-      numero: feature.properties.numero,
-      nom: feature.properties.nom,
-      libelle: feature.properties.libelle,
-      classement: LocalPathClassement.VOIE_COMMUNALE,
-    })),
-  ];
-  return assembleLocalPathsFromCadastre(candidates, cadastralPaths);
-}
-
-function totalLength(assembled: AssembledLocalPath): number {
-  return assembled.segments.reduce(
-    (sum, seg) =>
-      sum + turfLength(lineString(seg.path.coordinates), { units: "meters" }),
-    0,
+function acceptedJob(id: string): Response {
+  const statusUrl = `/api/voies-locales/import/bd-topo/jobs/${id}`;
+  return NextResponse.json(
+    { jobId: id, statusUrl },
+    {
+      status: 202,
+      headers: { Location: statusUrl, "Cache-Control": "no-store" },
+    },
   );
-}
-
-// Un chemin est considéré « déjà importé » si toutes ses références BD TOPO le sont.
-function isAlreadyImported(
-  assembled: AssembledLocalPath,
-  importedRefs: Set<string>,
-): boolean {
-  const refs = assembled.segments
-    .map((seg) => seg.sourceRef)
-    .filter((ref): ref is string => ref != null);
-  return refs.length > 0 && refs.every((ref) => importedRefs.has(ref));
 }
 
 export async function GET(): Promise<Response> {
@@ -80,26 +29,21 @@ export async function GET(): Promise<Response> {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const [assembled, importedRefs] = await Promise.all([
-    assembleForCommune(session.communeInsee),
-    getImportedSourceRefs(session.communeInsee, LocalPathSource.BD_TOPO),
-  ]);
-
-  const response: AssembledLocalPathResponse[] = assembled.map((path) => ({
-    key: path.key,
-    numero: path.numero,
-    nom: path.nom,
-    classement: path.classement,
-    segments: path.segments.map((seg) => ({
-      path: seg.path,
-      source: seg.source,
-      revetement: seg.revetement,
-    })),
-    longueur: totalLength(path),
-    alreadyImported: isAlreadyImported(path, importedRefs),
-  }));
-
-  return NextResponse.json(response);
+  const cached = await getCachedBdTopoPreviewJob(session.communeInsee);
+  if (cached) return acceptedJob(cached.id);
+  const pending = await getPendingBdTopoPreviewJob(session.communeInsee);
+  if (pending) return acceptedJob(pending.id);
+  const job = await createBdTopoImportJob(session.communeInsee, "preview");
+  if (!job) {
+    const concurrent = await getPendingBdTopoPreviewJob(session.communeInsee);
+    if (concurrent) return acceptedJob(concurrent.id);
+    return NextResponse.json(
+      { error: "La reconstitution est momentanément indisponible. Réessayez." },
+      { status: 503 },
+    );
+  }
+  after(() => runBdTopoPreviewJob(job.id, session.communeInsee));
+  return acceptedJob(job.id);
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -133,42 +77,13 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const [assembled, importedRefs] = await Promise.all([
-    assembleForCommune(session.communeInsee),
-    getImportedSourceRefs(session.communeInsee, LocalPathSource.BD_TOPO),
-  ]);
-
-  const selectedKeys = new Set(keys);
-  const inputs: LocalPathImportInput[] = assembled
-    .filter(
-      (path) =>
-        selectedKeys.has(path.key) && !isAlreadyImported(path, importedRefs),
-    )
-    .map((path) => ({
-      nom: path.nom,
-      classement: path.classement,
-      numero: path.numero,
-      segments: path.segments.map((seg) => ({
-        path: seg.path,
-        type: seg.type,
-        revetement: seg.revetement,
-        largeurMoyenne: seg.largeurMoyenne,
-        etat: LocalPathEtat.BON,
-        fermeALaCirculation: null,
-        servitudes: [],
-        bornage: null,
-        source: seg.source,
-        sourceRef: seg.sourceRef,
-      })),
-    }));
-
-  const created = await createLocalPathsFromImport(
-    session.communeInsee,
-    inputs,
-  );
-
-  return NextResponse.json(
-    { created: created.length, localPaths: created },
-    { status: 201 },
-  );
+  const job = await createBdTopoImportJob(session.communeInsee);
+  if (!job) {
+    return NextResponse.json(
+      { error: "Un import est déjà en cours pour cette commune." },
+      { status: 409 },
+    );
+  }
+  after(() => runBdTopoImportJob(job.id, session.communeInsee, keys));
+  return acceptedJob(job.id);
 }

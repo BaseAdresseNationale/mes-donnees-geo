@@ -6,8 +6,9 @@ import {
   useEffect,
   useMemo,
   useState,
-  useTransition,
+  useSyncExternalStore,
 } from "react";
+import { QueryClient, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Button } from "@gouvfr-lasuite/ui-components";
 import Link from "next/link";
@@ -24,6 +25,13 @@ import {
   type LeftPanelFilterSelection,
 } from "@/components/common/left-panel-list/LeftPanelFilterModal";
 import styles from "./LocalPathImportBdTopo.module.css";
+import { loadBdTopoPreview } from "./load-bd-topo-preview";
+import {
+  readImportJob,
+  writeImportJob,
+  subscribeImportJob,
+  serverImportJob,
+} from "./import-job-storage";
 
 const CLASSEMENT_ABBR: Record<LocalPathClassement, string> = {
   [LocalPathClassement.CHEMIN_RURAL]: "CR",
@@ -123,7 +131,14 @@ export function LocalPathImportBdTopo({
 }) {
   const router = useRouter();
   const { setMapChildren, setMapMessage } = useContext(MapContext);
-  const [pending, startTransition] = useTransition();
+  const [queryClient] = useState(() => new QueryClient());
+  const [submitting, setSubmitting] = useState(false);
+  const storageKey = `bd-topo-import:${codeCommune}`;
+  const jobId = useSyncExternalStore(
+    subscribeImportJob,
+    useCallback(() => readImportJob(storageKey), [storageKey]),
+    serverImportJob,
+  );
 
   const [paths, setPaths] = useState<AssembledLocalPathResponse[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -133,30 +148,75 @@ export function LocalPathImportBdTopo({
   const [filters, setFilters] =
     useState<LeftPanelFilterSelection>(emptyFilterSelection);
 
+  const importJob = useQuery(
+    {
+      queryKey: ["bd-topo-import", codeCommune, jobId],
+      enabled: jobId !== null,
+      queryFn: async ({ signal }) => {
+        const response = await fetch(
+          `/api/voies-locales/import/bd-topo/jobs/${jobId}`,
+          { signal, cache: "no-store" },
+        );
+        if (response.status === 401 || response.status === 404) {
+          return {
+            status: "failed",
+            error:
+              response.status === 401
+                ? "Votre session a expiré. Reconnectez-vous pour suivre l'import."
+                : "Cette tâche d'import est introuvable.",
+          };
+        }
+        if (!response.ok) throw new Error("Suivi de l'import indisponible.");
+        return response.json() as Promise<{
+          status: "pending" | "succeeded" | "failed";
+          created: number | null;
+          error: string | null;
+        }>;
+      },
+      refetchInterval: (query) =>
+        !query.state.data || query.state.data.status === "pending"
+          ? 2000
+          : false,
+    },
+    queryClient,
+  );
+  const pending =
+    submitting || (jobId !== null && importJob.data?.status !== "failed");
+  const displayedImportError =
+    importError ??
+    (jobId && importJob.data?.status === "failed"
+      ? importJob.data.error
+      : null);
+
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/voies-locales/import/bd-topo")
-      .then((res) => {
-        if (!res.ok) throw new Error();
-        return res.json() as Promise<AssembledLocalPathResponse[]>;
-      })
+    const result = importJob.data;
+    if (!jobId || result?.status !== "succeeded") return;
+    writeImportJob(storageKey, null);
+    router.push(`/${codeCommune}/voies-locales`);
+  }, [importJob.data, jobId, storageKey, router, codeCommune]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadBdTopoPreview(controller.signal)
       .then((data) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setPaths(data);
         // Tous les chemins proposés ont matché le cadastre : ils sont présélectionnés.
         setSelected(
           new Set(data.filter((p) => !p.alreadyImported).map((p) => p.key)),
         );
       })
-      .catch(() => {
-        if (!cancelled) {
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
           setLoadError(
-            "Impossible de récupérer les voies locales issues du cadastre.",
+            error instanceof Error
+              ? error.message
+              : "Impossible de récupérer les voies locales issues du cadastre.",
           );
         }
       });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [codeCommune]);
 
@@ -251,24 +311,27 @@ export function LocalPathImportBdTopo({
     return () => setMapMessage(null);
   }, [setMapMessage, paths, loadError]);
 
-  function submitImport() {
+  async function submitImport() {
+    if (pending) return;
     setImportError(null);
-    startTransition(async () => {
-      try {
-        const res = await fetch("/api/voies-locales/import/bd-topo", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ keys: [...selected] }),
-        });
-        if (!res.ok) {
-          setImportError("Échec de l'import.");
-          return;
-        }
-        router.push(`/${codeCommune}/voies-locales`);
-      } catch {
-        setImportError("Échec de l'import.");
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/voies-locales/import/bd-topo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ keys: [...selected] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setImportError(data.error ?? "Échec de l'import.");
+        return;
       }
-    });
+      writeImportJob(storageKey, data.jobId);
+    } catch {
+      setImportError("Impossible de lancer l'import.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const header = (
@@ -332,7 +395,16 @@ export function LocalPathImportBdTopo({
       noResultsMessage="Aucun résultat pour cette recherche."
       footer={
         <>
-          {importError && <p className={styles.error}>{importError}</p>}
+          {displayedImportError && (
+            <p className={styles.error}>{displayedImportError}</p>
+          )}
+          {jobId && pending && (
+            <p role="status">
+              {importJob.isError
+                ? "Connexion au suivi interrompue. Nouvelle tentative en cours…"
+                : "Import BD TOPO en cours…"}
+            </p>
+          )}
           <div className={styles.footer}>
             <Button
               color="brand"
