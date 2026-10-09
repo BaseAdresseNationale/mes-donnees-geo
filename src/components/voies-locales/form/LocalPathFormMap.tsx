@@ -35,7 +35,9 @@ const OTHER_HITAREA_LAYER_ID = "voies-locales-other-hitarea";
 // Poignées d'extrémité (apparaissent au survol du chemin) : plus grosses et
 // d'une couleur distincte des points de manipulation blancs ; cliquer dessus
 // relance le mode dessin.
-const ENDPOINT_COLOR = "#ff7a00";
+// Violet de la palette La Suite (brand-600 / brand-500) ; MapLibre n'accepte pas les variables CSS.
+const ENDPOINT_COLOR = "#6969df";
+const ENDPOINT_HOVER_COLOR = "#534fc2";
 
 // Couches internes ajoutées par terra-draw-maplibre-gl-adapter (préfixe "td"
 // par défaut) : les points de manipulation doivent rester au-dessus.
@@ -99,6 +101,7 @@ export function VoiesLocalesFormMap({
   // poignée d'extrémité (zones qui se chevauchent aux extrémités).
   const overSegmentRef = useRef(false);
   const overHandleRef = useRef(false);
+  const [hoveredHandle, setHoveredHandle] = useState<string | null>(null);
   // Un tracé (aperçu "__preview__") est en cours : un clic sur un chemin
   // fusionnable doit d'abord le terminer, avant de proposer la fusion.
   const isDrawingRef = useRef(false);
@@ -165,13 +168,13 @@ export function VoiesLocalesFormMap({
     if (start && first && first.id !== selectedSegmentId)
       features.push({
         type: "Feature",
-        properties: {},
+        properties: { handle: "start" },
         geometry: { type: "Point", coordinates: start },
       });
     if (end && last && last.id !== selectedSegmentId)
       features.push({
         type: "Feature",
-        properties: {},
+        properties: { handle: "end" },
         geometry: { type: "Point", coordinates: end },
       });
     return { type: "FeatureCollection", features };
@@ -244,12 +247,16 @@ export function VoiesLocalesFormMap({
       if (!overHandleRef.current) m.getCanvas().style.cursor = "";
       onHoverSegment?.(null);
     };
-    const onHandleEnter = () => {
+    const onHandleEnter = (e: MapLayerMouseEvent) => {
       overHandleRef.current = true;
       m.getCanvas().style.cursor = "pointer";
+      const handle = (e.features?.[0]?.properties as { handle?: string } | null)
+        ?.handle;
+      setHoveredHandle(handle ?? null);
     };
     const onHandleLeave = () => {
       overHandleRef.current = false;
+      setHoveredHandle(null);
       if (!overSegmentRef.current) m.getCanvas().style.cursor = "";
     };
 
@@ -415,8 +422,18 @@ export function VoiesLocalesFormMap({
             id: ENDPOINT_LAYER_ID,
             type: "circle",
             paint: {
-              "circle-radius": 9,
-              "circle-color": ENDPOINT_COLOR,
+              "circle-radius": [
+                "case",
+                ["==", ["get", "handle"], hoveredHandle ?? ""],
+                11,
+                9,
+              ],
+              "circle-color": [
+                "case",
+                ["==", ["get", "handle"], hoveredHandle ?? ""],
+                ENDPOINT_HOVER_COLOR,
+                ENDPOINT_COLOR,
+              ],
               "circle-stroke-color": "#ffffff",
               "circle-stroke-width": 2,
             },

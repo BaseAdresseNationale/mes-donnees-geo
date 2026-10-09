@@ -118,6 +118,9 @@ const SNAP_PIXEL_DISTANCE = 25;
 // Distance, en pixels écran, en dessous de laquelle un clic sur un segment
 // (hors extrémité) bascule automatiquement en mode sélection.
 const HIT_PIXEL_DISTANCE = 12;
+// Distance max, en pixels écran, entre deux clics pour que le second termine
+// le segment (défaut terra-draw : 40, trop permissif).
+const FINISH_PIXEL_DISTANCE = 8;
 // Tolérance, en mètres, pour considérer que deux points coïncident.
 const SNAP_TOLERANCE_METERS = 2;
 // Distance max, en mètres, entre deux extrémités pour autoriser la fusion de
@@ -581,6 +584,7 @@ export function useLocalPathDrawer(
         }),
         modes: [
           new TerraDrawLineStringMode({
+            pointerDistance: FINISH_PIXEL_DISTANCE,
             styles: {
               ...neutralLineStyle,
               closingPointColor: pointStyle.color,
