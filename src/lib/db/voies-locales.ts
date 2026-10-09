@@ -125,13 +125,55 @@ function toDomain(row: Row): LocalPath {
   };
 }
 
-export async function getLocalPaths(codeCommune: string): Promise<LocalPath[]> {
+export async function getLocalPaths(
+  codeCommune: string,
+  options: { statut?: LocalPathStatus } = {},
+): Promise<LocalPath[]> {
   const rows = await prisma.localPath.findMany({
-    where: { codeInsee: codeCommune, deletedAt: null },
+    where: {
+      codeInsee: codeCommune,
+      deletedAt: null,
+      ...(options.statut ? { statut: options.statut } : {}),
+    },
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     select: SELECT,
   });
   return rows.map((r) => toDomain(r as unknown as Row));
+}
+
+/** Voies supprimées avec un motif parmi `ids` (seules les suppressions motivées sont publiées). */
+export async function getDeletedLocalPathsWithReason(
+  codeCommune: string,
+  ids: string[],
+): Promise<LocalPath[]> {
+  if (ids.length === 0) return [];
+  const rows = await prisma.localPath.findMany({
+    where: {
+      id: { in: ids },
+      codeInsee: codeCommune,
+      deletedAt: { not: null },
+      deletionReason: { not: null },
+    },
+    select: SELECT,
+  });
+  return rows.map((r) => toDomain(r as unknown as Row));
+}
+
+export async function qualifyLocalPaths(
+  codeCommune: string,
+  ids: string[],
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const result = await prisma.localPath.updateMany({
+    where: {
+      id: { in: ids },
+      codeInsee: codeCommune,
+      deletedAt: null,
+      statut: LocalPathStatusEnum.A_QUALIFIER,
+    },
+    data: { statut: LocalPathStatusEnum.QUALIFIEE },
+  });
+  return result.count;
 }
 
 export async function getLocalPathById(
@@ -160,7 +202,6 @@ export interface LocalPathSegmentWriteInput {
 
 export interface LocalPathWriteInput {
   nom: string | null;
-  statut: LocalPathStatus;
   classement: LocalPathClassement;
   numero: number;
   gestionnaire: LocalPathGestionnaire | null;
@@ -194,7 +235,7 @@ export async function createLocalPath(
     data: {
       codeInsee: codeCommune,
       nom: input.nom,
-      statut: input.statut,
+      statut: LocalPathStatusEnum.QUALIFIEE,
       classement: input.classement,
       numero: input.numero,
       gestionnaire: input.gestionnaire,
@@ -217,7 +258,7 @@ export async function updateLocalPath(
       where: { id, codeInsee: codeCommune, deletedAt: null },
       data: {
         nom: input.nom,
-        statut: input.statut,
+        statut: LocalPathStatusEnum.QUALIFIEE,
         classement: input.classement,
         numero: input.numero,
         gestionnaire: input.gestionnaire,
@@ -322,7 +363,7 @@ export async function createLocalPathsFromImport(
           data: {
             codeInsee: codeCommune,
             nom: input.nom,
-            statut: LocalPathStatusEnum.DRAFT,
+            statut: LocalPathStatusEnum.A_QUALIFIER,
             classement: input.classement,
             numero: input.numero ?? nextNumero++,
             segments: { create: segmentsCreateData(input.segments) },

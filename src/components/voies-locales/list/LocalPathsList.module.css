@@ -111,19 +111,40 @@
   letter-spacing: 0.02em;
 }
 
-.statusDraft {
-  background: #ececfe;
-  color: #4b4bcb;
+.statusToQualify {
+  background: #feebd0;
+  color: #b34000;
 }
 
-.statusPublished {
+.statusQualified {
   background: #b8fec9;
   color: #1e6b2c;
 }
 
-.statusCertified {
+.publicationPublished {
+  background: #e3e3fd;
+  color: #000091;
+}
+
+.publicationModified {
   background: #fee7fc;
   color: #6e2e63;
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.itemRow .item {
+  flex: 1;
+  min-width: 0;
+}
+
+.qualifyFooter {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .classementBadge {

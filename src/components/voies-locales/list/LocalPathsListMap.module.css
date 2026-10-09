@@ -27,17 +27,12 @@
   letter-spacing: 0.02em;
 }
 
-.statusDraft {
-  background: #ececfe;
-  color: #4b4bcb;
+.statusToQualify {
+  background: #feebd0;
+  color: #b34000;
 }
 
-.statusPublished {
+.statusQualified {
   background: #b8fec9;
   color: #1e6b2c;
-}
-
-.statusCertified {
-  background: #fee7fc;
-  color: #6e2e63;
 }

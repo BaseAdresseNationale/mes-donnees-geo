@@ -1,6 +1,7 @@
 import turfLength from "@turf/length";
 import {
   CLASSEMENT_LABELS,
+  DELETION_REASON_LABELS,
   DELIMITATION_LABELS,
   ETAT_LABELS,
   GESTIONNAIRE_LABELS,
@@ -8,8 +9,8 @@ import {
   SERVITUDE_LABELS,
   SOURCE_LABELS,
   TYPE_LABELS,
-  type LocalPath,
 } from "@/components/voies-locales/types";
+import type { PublishedPath } from "@/lib/publication/types";
 
 type Position = [number, number];
 
@@ -60,7 +61,7 @@ export const CSV_COLUMNS = [
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export function buildExportRows(paths: LocalPath[]): ExportRow[] {
+export function buildExportRows(paths: PublishedPath[]): ExportRow[] {
   const rows: ExportRow[] = [];
   for (const path of paths) {
     const segments = [...path.segments].sort((a, b) => a.ordre - b.ordre);
@@ -96,7 +97,10 @@ export function buildExportRows(paths: LocalPath[]): ExportRow[] {
         longueur,
         largeur_moyenne: largeur,
         superficie: largeur != null ? round2(longueur * largeur) : null,
-        etat: ETAT_LABELS[seg.etat],
+        // Une voie supprimée est publiée avec son motif de suppression comme état.
+        etat: path.deletionReason
+          ? DELETION_REASON_LABELS[path.deletionReason]
+          : ETAT_LABELS[seg.etat],
         servitudes: seg.servitudes.map((s) => SERVITUDE_LABELS[s]),
         delimitation: seg.delimitation
           ? DELIMITATION_LABELS[seg.delimitation]

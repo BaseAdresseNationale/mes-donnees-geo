@@ -5,7 +5,6 @@ import {
   LocalPathGestionnaire,
   LocalPathRevetement,
   LocalPathServitude,
-  LocalPathStatus,
   LocalPathType,
 } from "@/generated/prisma/browser";
 
@@ -22,7 +21,6 @@ export interface LocalPathSegmentInput {
 
 export interface LocalPathInput {
   nom: string | null;
-  statut: LocalPathStatus;
   classement: LocalPathClassement;
   numero: number;
   gestionnaire: LocalPathGestionnaire | null;
@@ -40,7 +38,6 @@ type SegmentValidationResult =
   | { ok: true; data: LocalPathSegmentInput }
   | { ok: false; error: string };
 
-const STATUT_VALUES = new Set<string>(Object.values(LocalPathStatus));
 const CLASSEMENT_VALUES = new Set<string>(Object.values(LocalPathClassement));
 const TYPE_VALUES = new Set<string>(Object.values(LocalPathType));
 const REVETEMENT_VALUES = new Set<string>(Object.values(LocalPathRevetement));
@@ -212,13 +209,6 @@ export function validateLocalPathInput(body: unknown): ValidationResult {
     nom = trimmed.length > 0 ? trimmed : null;
   }
 
-  // statut
-  const statutRaw = b.statut ?? LocalPathStatus.DRAFT;
-  if (typeof statutRaw !== "string" || !STATUT_VALUES.has(statutRaw)) {
-    return { ok: false, error: "statut invalide." };
-  }
-  const statut = statutRaw as LocalPathStatus;
-
   // classement
   if (
     typeof b.classement !== "string" ||
@@ -288,7 +278,6 @@ export function validateLocalPathInput(body: unknown): ValidationResult {
     ok: true,
     data: {
       nom,
-      statut,
       classement,
       numero,
       gestionnaire,

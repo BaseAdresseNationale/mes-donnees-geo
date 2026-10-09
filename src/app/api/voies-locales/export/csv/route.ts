@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { getLocalPaths } from "@/lib/db/voies-locales";
+import { LocalPathStatus } from "@/generated/prisma/client";
 import { buildExportRows, toCsv } from "@/lib/export/voies-locales-export";
 
 export async function GET(): Promise<Response> {
@@ -11,7 +12,9 @@ export async function GET(): Promise<Response> {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const paths = await getLocalPaths(session.communeInsee);
+  const paths = await getLocalPaths(session.communeInsee, {
+    statut: LocalPathStatus.QUALIFIEE,
+  });
   const csv = toCsv(buildExportRows(paths));
 
   return new Response(csv, {

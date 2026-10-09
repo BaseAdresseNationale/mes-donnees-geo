@@ -9,9 +9,16 @@ import {
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import styles from "./LocalPathsToolbar.module.css";
+import {
+  LocalPathPublishButton,
+  type PublishHighlightRequest,
+} from "./LocalPathPublishButton";
+import type { PublicationChange } from "@/lib/publication/types";
 
 interface LocalPathToolbarProps {
   codeCommune: string;
+  changes: PublicationChange[];
+  onHighlight: (request: PublishHighlightRequest | null) => void;
 }
 
 function downloadFile(url: string) {
@@ -23,7 +30,11 @@ function downloadFile(url: string) {
   link.remove();
 }
 
-export function LocalPathToolbar({ codeCommune }: LocalPathToolbarProps) {
+export function LocalPathToolbar({
+  codeCommune,
+  changes,
+  onHighlight,
+}: LocalPathToolbarProps) {
   const router = useRouter();
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -65,7 +76,7 @@ export function LocalPathToolbar({ codeCommune }: LocalPathToolbarProps) {
       >
         Importer des voies
       </Button>
-      <div className={styles.exportWrapper}>
+      <div className={styles.actions}>
         <DropdownMenu
           options={exportOptions}
           isOpen={isExportOpen}
@@ -78,7 +89,7 @@ export function LocalPathToolbar({ codeCommune }: LocalPathToolbarProps) {
               <Icon name={isExportOpen ? "arrow_drop_up" : "arrow_drop_down"} />
             }
             iconPosition="right"
-            aria-label="Exporter les voies"
+            aria-label="Exporter les voies qualifiées"
             aria-haspopup="menu"
             aria-expanded={isExportOpen}
             onClick={() => setIsExportOpen((open) => !open)}
@@ -86,6 +97,7 @@ export function LocalPathToolbar({ codeCommune }: LocalPathToolbarProps) {
             Exporter
           </Button>
         </DropdownMenu>
+        <LocalPathPublishButton changes={changes} onHighlight={onHighlight} />
       </div>
     </div>
   );

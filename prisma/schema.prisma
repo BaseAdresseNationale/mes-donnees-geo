@@ -34,9 +34,8 @@ model CommuneSettings {
 }
 
 enum LocalPathStatus {
-  DRAFT     @map("draft")
-  PUBLISHED @map("published")
-  CERTIFIED @map("certified")
+  A_QUALIFIER @map("a_qualifier")
+  QUALIFIEE   @map("qualifiee")
 
   @@map("local_path_status")
 }
@@ -142,7 +141,7 @@ enum LocalPathDeletionReason {
 model LocalPath {
   id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   codeInsee        String                   @map("code_insee") @db.VarChar(5)
-  statut           LocalPathStatus          @default(DRAFT)
+  statut           LocalPathStatus          @default(QUALIFIEE)
   nom              String?
   classement       LocalPathClassement
   numero           Int
@@ -185,4 +184,32 @@ model LocalPathSegment {
   @@index([deletedAt])
   @@index([source, sourceRef])
   @@map("local_path_segments")
+}
+
+model LocalPathPublication {
+  id           String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeInsee    String                     @map("code_insee") @db.VarChar(5)
+  publishedBy  String?                    @map("published_by")
+  changesCount Int                        @map("changes_count")
+  items        LocalPathPublicationItem[]
+  createdAt    DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([codeInsee, createdAt])
+  @@map("local_path_publications")
+}
+
+// Seules les voies modifiées par une publication y sont rattachées : l'état publié courant
+// d'une voie est son dernier item.
+model LocalPathPublicationItem {
+  id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  publicationId String               @map("publication_id") @db.Uuid
+  publication   LocalPathPublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  localPathId   String               @map("local_path_id") @db.Uuid
+  hash          String
+  snapshot      Json                 @db.JsonB
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([publicationId, localPathId])
+  @@index([localPathId])
+  @@map("local_path_publication_items")
 }

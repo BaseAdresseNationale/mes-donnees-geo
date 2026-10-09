@@ -38,7 +38,6 @@ import {
   LocalPathClassement,
   LocalPathDeletionReason,
   LocalPathGestionnaire,
-  LocalPathStatus,
   LocalPathRevetement,
   LocalPathType,
   LocalPathEtat,
@@ -157,9 +156,6 @@ export function LocalPathForm({
   >("idle");
 
   const [nom, setNom] = useState(initial?.nom ?? "");
-  const [statut, setStatut] = useState<LocalPathStatus>(
-    initial?.statut ?? LocalPathStatus.DRAFT,
-  );
   const [classement, setClassement] = useState<LocalPathClassement>(
     initial?.classement ?? LocalPathClassement.CHEMIN_RURAL,
   );
@@ -418,7 +414,6 @@ export function LocalPathForm({
     const all = drawer.toSegmentsInput();
     const detached = validateLocalPathInput({
       nom: null,
-      statut,
       classement,
       numero: 0,
       gestionnaire,
@@ -428,7 +423,6 @@ export function LocalPathForm({
     });
     const remaining = validateLocalPathInput({
       nom: nom.trim() || null,
-      statut,
       classement,
       numero: Number(numero),
       gestionnaire,
@@ -482,7 +476,6 @@ export function LocalPathForm({
 
     const validation = validateLocalPathInput({
       nom: nom.trim() || null,
-      statut,
       classement,
       numero: parsedNumero,
       gestionnaire,

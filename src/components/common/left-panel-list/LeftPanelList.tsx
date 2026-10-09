@@ -58,6 +58,8 @@ export interface LeftPanelListProps<T> {
   filter?: LeftPanelFilter<T>;
 
   selection?: LeftPanelSelection;
+  /** Restreint "Tout sélectionner" aux éléments pour lesquels le prédicat est vrai. */
+  isSelectable?: (item: T) => boolean;
   onHoverChange?: (key: string | null) => void;
 
   /** Notifie le parent de la liste visible (filtrée + triée), p.ex. pour la carte. */
@@ -84,6 +86,7 @@ export function LeftPanelList<T>({
   sortAriaLabel = "Trier",
   filter,
   selection,
+  isSelectable,
   onHoverChange,
   onVisibleItemsChange,
   emptyMessage,
@@ -128,6 +131,11 @@ export function LeftPanelList<T>({
   useEffect(() => {
     onVisibleItemsChange?.(visibleItems);
   }, [visibleItems, onVisibleItemsChange]);
+
+  const selectableItems = useMemo(
+    () => (isSelectable ? visibleItems.filter(isSelectable) : visibleItems),
+    [visibleItems, isSelectable],
+  );
 
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   useEffect(() => {
@@ -192,9 +200,9 @@ export function LeftPanelList<T>({
                 type="button"
                 size="nano"
                 color="neutral"
-                onClick={() => selection.onSelectAll(visibleItems.map(getKey))}
+                onClick={() => selection.onSelectAll(selectableItems.map(getKey))}
               >
-                Tout sélectionner ({visibleItems.length})
+                Tout sélectionner ({selectableItems.length})
               </Button>
               <Button
                 type="button"

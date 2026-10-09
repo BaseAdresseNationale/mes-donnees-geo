@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
-import { Tooltip } from "@gouvfr-lasuite/ui-components";
+import { Button, Tooltip } from "@gouvfr-lasuite/ui-components";
 import styles from "./LocalPathsList.module.css";
 import {
   LocalPath,
@@ -10,6 +11,7 @@ import {
   LocalPathClassement,
   CLASSEMENT_LABELS,
 } from "@/components/voies-locales/types";
+import type { PublicationOverview } from "@/lib/publication/types";
 import { useLocalPathsListEffects } from "./useLocalPathsListEffects";
 import {
   LeftPanelList,
@@ -23,18 +25,17 @@ import {
 interface LocalPathListProps {
   codeCommune: string;
   localPaths: LocalPath[];
+  publication: PublicationOverview;
 }
 
 const STATUS_LABEL: Record<LocalPathStatus, string> = {
-  [LocalPathStatus.DRAFT]: "Brouillon",
-  [LocalPathStatus.PUBLISHED]: "Publié",
-  [LocalPathStatus.CERTIFIED]: "Certifié",
+  [LocalPathStatus.A_QUALIFIER]: "À qualifier",
+  [LocalPathStatus.QUALIFIEE]: "Qualifiée",
 };
 
 const STATUS_CLASS: Record<LocalPathStatus, string> = {
-  [LocalPathStatus.DRAFT]: styles.statusDraft,
-  [LocalPathStatus.PUBLISHED]: styles.statusPublished,
-  [LocalPathStatus.CERTIFIED]: styles.statusCertified,
+  [LocalPathStatus.A_QUALIFIER]: styles.statusToQualify,
+  [LocalPathStatus.QUALIFIEE]: styles.statusQualified,
 };
 
 const CLASSEMENT_ABBR: Record<LocalPathClassement, string> = {
@@ -48,9 +49,8 @@ const CLASSEMENT_CLASS: Record<LocalPathClassement, string> = {
 };
 
 const STATUS_ORDER: Record<LocalPathStatus, number> = {
-  [LocalPathStatus.DRAFT]: 0,
-  [LocalPathStatus.PUBLISHED]: 1,
-  [LocalPathStatus.CERTIFIED]: 2,
+  [LocalPathStatus.A_QUALIFIER]: 0,
+  [LocalPathStatus.QUALIFIEE]: 1,
 };
 
 const SORT_OPTIONS: LeftPanelSortOption<LocalPath>[] = [
@@ -125,11 +125,92 @@ function matchesLocalPathQuery(path: LocalPath, query: string): boolean {
   return (path.nom ?? "").toLocaleLowerCase().includes(query);
 }
 
-export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
+export function LocalPathList({
+  codeCommune,
+  localPaths,
+  publication,
+}: LocalPathListProps) {
+  const router = useRouter();
   const [filters, setFilters] =
     useState<LeftPanelFilterSelection>(emptyFilterSelection);
   const [visiblePaths, setVisiblePaths] = useState<LocalPath[]>(localPaths);
   const [hoveredPathId, setHoveredPathId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [qualifying, setQualifying] = useState(false);
+  const [qualifyError, setQualifyError] = useState<string | null>(null);
+
+  const changeKindById = useMemo(
+    () => new Map(publication.changes.map((c) => [c.id, c.kind])),
+    [publication.changes],
+  );
+  const publishedIds = useMemo(
+    () => new Set(publication.publishedPathIds),
+    [publication.publishedPathIds],
+  );
+  const hasPathsToQualify = useMemo(
+    () => localPaths.some((p) => p.statut === LocalPathStatus.A_QUALIFIER),
+    [localPaths],
+  );
+
+  const isQualifiable = useCallback(
+    (p: LocalPath) => p.statut === LocalPathStatus.A_QUALIFIER,
+    [],
+  );
+
+  const selection = useMemo(
+    () =>
+      hasPathsToQualify
+        ? {
+            selectedKeys: selectedIds,
+            onToggle: (key: string) =>
+              setSelectedIds((prev) => {
+                const next = new Set(prev);
+                if (!next.delete(key)) next.add(key);
+                return next;
+              }),
+            onSelectAll: (keys: string[]) => setSelectedIds(new Set(keys)),
+            onClear: () => setSelectedIds(new Set()),
+          }
+        : undefined,
+    [hasPathsToQualify, selectedIds],
+  );
+
+  async function qualifySelection() {
+    setQualifying(true);
+    setQualifyError(null);
+    try {
+      const response = await fetch("/api/voies-locales/qualify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: [...selectedIds] }),
+      });
+      if (!response.ok) {
+        setQualifyError("La qualification a échoué.");
+        return;
+      }
+      setSelectedIds(new Set());
+      router.refresh();
+    } catch {
+      setQualifyError("La qualification a échoué.");
+    } finally {
+      setQualifying(false);
+    }
+  }
+
+  function publicationMarker(
+    p: LocalPath,
+  ): { label: string; className: string } | null {
+    if (changeKindById.get(p.id) === "modified") {
+      return {
+        label: "Modifiée depuis publication",
+        className: styles.publicationModified,
+      };
+    }
+    if (publishedIds.has(p.id) && !changeKindById.has(p.id)) {
+      return { label: "Publiée", className: styles.publicationPublished };
+    }
+    return null;
+  }
 
   const statusFilters = filters[FILTER_GROUP_STATUS];
   const classementFilters = filters[FILTER_GROUP_CLASSEMENT];
@@ -191,7 +272,12 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
     return [];
   };
 
-  useLocalPathsListEffects({ localPaths: visiblePaths, hoveredPathId });
+  useLocalPathsListEffects({
+    localPaths: visiblePaths,
+    allLocalPaths: localPaths,
+    hoveredPathId,
+    changes: publication.changes,
+  });
 
   return (
     <LeftPanelList
@@ -203,13 +289,33 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
       sortOptions={SORT_OPTIONS}
       sortAriaLabel="Trier les voies locales"
       filter={filter}
+      selection={selection}
+      isSelectable={isQualifiable}
       onHoverChange={setHoveredPathId}
       onVisibleItemsChange={setVisiblePaths}
       emptyMessage="Aucune voie locale pour cette commune."
       noResultsMessage="Aucun résultat pour ces filtres."
+      footer={
+        selectedIds.size > 0 ? (
+          <div className={styles.qualifyFooter}>
+            {qualifyError && <p role="alert">{qualifyError}</p>}
+            <Button
+              color="brand"
+              size="small"
+              disabled={qualifying}
+              onClick={qualifySelection}
+            >
+              {qualifying
+                ? "Qualification en cours…"
+                : `Qualifier la sélection (${selectedIds.size})`}
+            </Button>
+          </div>
+        ) : undefined
+      }
       renderItem={(p, ctx) => {
         const warnings = getWarnings(p);
-        return (
+        const marker = publicationMarker(p);
+        const link = (
           <Link
             href={`/${codeCommune}/voies-locales/${p.id}`}
             className={styles.item}
@@ -233,6 +339,13 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
                 >
                   {STATUS_LABEL[p.statut]}
                 </span>
+                {marker && (
+                  <span
+                    className={`${styles.statusBadge} ${marker.className}`}
+                  >
+                    {marker.label}
+                  </span>
+                )}
               </span>
             </span>
             {warnings.length > 0 && (
@@ -245,6 +358,18 @@ export function LocalPathList({ codeCommune, localPaths }: LocalPathListProps) {
               </Tooltip>
             )}
           </Link>
+        );
+        if (!selection || !isQualifiable(p)) return link;
+        return (
+          <div className={styles.itemRow}>
+            <input
+              type="checkbox"
+              checked={ctx.selected}
+              onChange={ctx.toggle}
+              aria-label={`Sélectionner ${p.nom?.trim() || "ce chemin"} n°${p.numero}`}
+            />
+            {link}
+          </div>
         );
       }}
     />
