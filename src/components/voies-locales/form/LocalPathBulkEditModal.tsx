@@ -10,14 +10,14 @@ import {
   SelectMulti,
 } from "@gouvfr-lasuite/ui-components";
 import {
-  LocalPathBornage,
+  LocalPathDelimitation,
   LocalPathEtat,
   LocalPathRevetement,
   LocalPathServitude,
   LocalPathType,
 } from "@/generated/prisma/browser";
 import {
-  BORNAGE_LABELS,
+  DELIMITATION_LABELS,
   ETAT_LABELS,
   REVETEMENT_LABELS,
   SERVITUDE_LABELS,
@@ -46,8 +46,8 @@ const SERVITUDE_OPTIONS = Object.values(LocalPathServitude).map((value) => ({
   value,
 }));
 
-const BORNAGE_OPTIONS = Object.values(LocalPathBornage).map((value) => ({
-  label: BORNAGE_LABELS[value],
+const DELIMITATION_OPTIONS = Object.values(LocalPathDelimitation).map((value) => ({
+  label: DELIMITATION_LABELS[value],
   value,
 }));
 
@@ -71,7 +71,7 @@ export function LocalPathBulkEditModal({
   const [largeur, setLargeur] = useState("");
   const [etat, setEtat] = useState<LocalPathEtat | null>(null);
   const [servitudes, setServitudes] = useState<LocalPathServitude[]>([]);
-  const [bornage, setBornage] = useState<LocalPathBornage | null>(null);
+  const [delimitation, setDelimitation] = useState<LocalPathDelimitation | null>(null);
 
   // Réinitialise le formulaire à chaque ouverture.
   const [wasOpen, setWasOpen] = useState(isOpen);
@@ -83,7 +83,7 @@ export function LocalPathBulkEditModal({
       setLargeur("");
       setEtat(null);
       setServitudes([]);
-      setBornage(null);
+      setDelimitation(null);
     }
   }
 
@@ -99,7 +99,7 @@ export function LocalPathBulkEditModal({
     patch.largeurMoyenne = largeurNumber;
   if (etat) patch.etat = etat;
   if (servitudes.length > 0) patch.servitudes = servitudes;
-  if (bornage) patch.bornage = bornage;
+  if (delimitation) patch.delimitation = delimitation;
 
   const canApply = Object.keys(patch).length > 0 && !largeurInvalid;
 
@@ -189,12 +189,12 @@ export function LocalPathBulkEditModal({
           fullWidth
         />
         <Select
-          label="Bornage"
-          options={BORNAGE_OPTIONS}
-          value={bornage ?? undefined}
+          label="Délimitation"
+          options={DELIMITATION_OPTIONS}
+          value={delimitation ?? undefined}
           onChange={(e) =>
-            setBornage(
-              e.target.value ? (e.target.value as LocalPathBornage) : null,
+            setDelimitation(
+              e.target.value ? (e.target.value as LocalPathDelimitation) : null,
             )
           }
           clearable

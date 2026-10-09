@@ -7,9 +7,9 @@ import {
 import { prisma } from "./prisma";
 import type {
   LocalPath,
-  LocalPathBornage,
   LocalPathClassement,
   LocalPathDeletionReason,
+  LocalPathDelimitation,
   LocalPathEtat,
   LocalPathGestionnaire,
   LocalPathRevetement,
@@ -28,6 +28,7 @@ const SELECT = {
   classement: true,
   numero: true,
   gestionnaire: true,
+  dateDAffectation: true,
   commentaire: true,
   deletionReason: true,
   createdAt: true,
@@ -45,7 +46,7 @@ const SELECT = {
       etat: true,
       fermeALaCirculation: true,
       servitudes: true,
-      bornage: true,
+      delimitation: true,
       source: true,
       sourceRef: true,
     },
@@ -62,7 +63,7 @@ type SegmentRow = {
   etat: LocalPathEtat;
   fermeALaCirculation: boolean | null;
   servitudes: LocalPathServitude[];
-  bornage: LocalPathBornage | null;
+  delimitation: LocalPathDelimitation | null;
   source: LocalPathSource;
   sourceRef: string | null;
 };
@@ -75,6 +76,7 @@ type Row = {
   classement: LocalPathClassement;
   numero: number;
   gestionnaire: LocalPathGestionnaire | null;
+  dateDAffectation: Date;
   commentaire: string | null;
   deletionReason: LocalPathDeletionReason | null;
   segments: SegmentRow[];
@@ -98,7 +100,7 @@ function toDomainSegment(row: SegmentRow): LocalPathSegment {
     ...(row.fermeALaCirculation != null
       ? { fermeALaCirculation: row.fermeALaCirculation }
       : {}),
-    ...(row.bornage != null ? { bornage: row.bornage } : {}),
+    ...(row.delimitation != null ? { delimitation: row.delimitation } : {}),
     ...(row.sourceRef != null ? { sourceRef: row.sourceRef } : {}),
   };
 }
@@ -112,6 +114,7 @@ function toDomain(row: Row): LocalPath {
     classement: row.classement,
     numero: row.numero,
     ...(row.gestionnaire != null ? { gestionnaire: row.gestionnaire } : {}),
+    dateDAffectation: row.dateDAffectation.toISOString().slice(0, 10),
     ...(row.commentaire != null ? { commentaire: row.commentaire } : {}),
     ...(row.deletionReason != null
       ? { deletionReason: row.deletionReason }
@@ -150,7 +153,7 @@ export interface LocalPathSegmentWriteInput {
   etat: LocalPathEtat;
   fermeALaCirculation: boolean | null;
   servitudes: LocalPathServitude[];
-  bornage: LocalPathBornage | null;
+  delimitation: LocalPathDelimitation | null;
   source?: LocalPathSource;
   sourceRef?: string | null;
 }
@@ -161,6 +164,8 @@ export interface LocalPathWriteInput {
   classement: LocalPathClassement;
   numero: number;
   gestionnaire: LocalPathGestionnaire | null;
+  /** Date au format YYYY-MM-DD. */
+  dateDAffectation: string;
   commentaire: string | null;
   segments: LocalPathSegmentWriteInput[];
 }
@@ -175,7 +180,7 @@ function segmentsCreateData(segments: LocalPathSegmentWriteInput[]) {
     etat: seg.etat,
     fermeALaCirculation: seg.fermeALaCirculation,
     servitudes: seg.servitudes,
-    bornage: seg.bornage,
+    delimitation: seg.delimitation,
     source: seg.source ?? LocalPathSourceEnum.MANUEL,
     sourceRef: seg.sourceRef ?? null,
   }));
@@ -193,6 +198,7 @@ export async function createLocalPath(
       classement: input.classement,
       numero: input.numero,
       gestionnaire: input.gestionnaire,
+      dateDAffectation: new Date(`${input.dateDAffectation}T00:00:00Z`),
       commentaire: input.commentaire,
       segments: { create: segmentsCreateData(input.segments) },
     },
@@ -215,6 +221,7 @@ export async function updateLocalPath(
         classement: input.classement,
         numero: input.numero,
         gestionnaire: input.gestionnaire,
+        dateDAffectation: new Date(`${input.dateDAffectation}T00:00:00Z`),
         commentaire: input.commentaire,
       },
     });

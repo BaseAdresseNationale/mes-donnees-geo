@@ -5,7 +5,7 @@ export {
   LocalPathClassement,
   LocalPathEtat,
   LocalPathServitude,
-  LocalPathBornage,
+  LocalPathDelimitation,
   LocalPathGestionnaire,
   LocalPathDeletionReason,
   LocalPathSource,
@@ -17,7 +17,7 @@ import type {
   LocalPathClassement,
   LocalPathEtat,
   LocalPathServitude,
-  LocalPathBornage,
+  LocalPathDelimitation,
   LocalPathGestionnaire,
   LocalPathDeletionReason,
   LocalPathSource,
@@ -33,7 +33,7 @@ export type LocalPathSegment = {
   etat: LocalPathEtat;
   fermeALaCirculation?: boolean;
   servitudes: LocalPathServitude[];
-  bornage?: LocalPathBornage;
+  delimitation?: LocalPathDelimitation;
   source: LocalPathSource;
   sourceRef?: string;
 };
@@ -46,6 +46,8 @@ export type LocalPath = {
   classement: LocalPathClassement;
   numero: number;
   gestionnaire?: LocalPathGestionnaire;
+  /** Date au format YYYY-MM-DD. */
+  dateDAffectation: string;
   commentaire?: string;
   deletionReason?: LocalPathDeletionReason;
   segments: LocalPathSegment[];
@@ -92,11 +94,13 @@ export const SERVITUDE_LABELS: Record<LocalPathServitude, string> = {
   AUTRE_SERVITUDE: "Autre servitude",
 };
 
-export const BORNAGE_LABELS: Record<LocalPathBornage, string> = {
-  TOTAL: "Total",
-  UNILATERAL: "Unilatéral",
-  PARTIEL: "Partiel",
-  NON_BORNE: "Non borné",
+export const DELIMITATION_LABELS: Record<LocalPathDelimitation, string> = {
+  INDETERMINE: "Indéterminé",
+  BORNAGE: "Bornage",
+  ALIGNEMENT_INDIVIDUEL: "Alignement individuel",
+  PLAN_D_ALIGNEMENT: "Plan d'alignement",
+  PLAN_PARCELLAIRE: "Plan parcellaire",
+  AUCUNE: "Aucune",
 };
 
 export const GESTIONNAIRE_LABELS: Record<LocalPathGestionnaire, string> = {

@@ -7,14 +7,14 @@ import {
   Switch,
 } from "@gouvfr-lasuite/ui-components";
 import {
-  LocalPathBornage,
+  LocalPathDelimitation,
   LocalPathEtat,
   LocalPathRevetement,
   LocalPathServitude,
   LocalPathType,
 } from "@/generated/prisma/browser";
 import {
-  BORNAGE_LABELS,
+  DELIMITATION_LABELS,
   ETAT_LABELS,
   REVETEMENT_LABELS,
   SERVITUDE_LABELS,
@@ -43,8 +43,8 @@ const SERVITUDE_OPTIONS = Object.values(LocalPathServitude).map((value) => ({
   value,
 }));
 
-const BORNAGE_OPTIONS = Object.values(LocalPathBornage).map((value) => ({
-  label: BORNAGE_LABELS[value],
+const DELIMITATION_OPTIONS = Object.values(LocalPathDelimitation).map((value) => ({
+  label: DELIMITATION_LABELS[value],
   value,
 }));
 
@@ -128,13 +128,13 @@ export function LocalPathSegmentForm({
         fullWidth
       />
       <Select
-        label="Bornage"
-        options={BORNAGE_OPTIONS}
-        value={segment.bornage ?? undefined}
+        label="Délimitation"
+        options={DELIMITATION_OPTIONS}
+        value={segment.delimitation ?? undefined}
         onChange={(e) =>
           onChange({
-            bornage: e.target.value
-              ? (e.target.value as LocalPathBornage)
+            delimitation: e.target.value
+              ? (e.target.value as LocalPathDelimitation)
               : null,
           })
         }

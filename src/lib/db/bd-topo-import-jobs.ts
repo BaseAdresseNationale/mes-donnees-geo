@@ -181,7 +181,7 @@ export async function runBdTopoImportJob(
           etat: LocalPathEtat.BON,
           fermeALaCirculation: null,
           servitudes: [],
-          bornage: null,
+          delimitation: null,
           source: segment.source,
           sourceRef: segment.sourceRef,
         })),

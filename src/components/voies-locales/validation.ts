@@ -1,6 +1,6 @@
 import {
-  LocalPathBornage,
   LocalPathClassement,
+  LocalPathDelimitation,
   LocalPathEtat,
   LocalPathGestionnaire,
   LocalPathRevetement,
@@ -17,7 +17,7 @@ export interface LocalPathSegmentInput {
   etat: LocalPathEtat;
   fermeALaCirculation: boolean | null;
   servitudes: LocalPathServitude[];
-  bornage: LocalPathBornage | null;
+  delimitation: LocalPathDelimitation | null;
 }
 
 export interface LocalPathInput {
@@ -26,6 +26,8 @@ export interface LocalPathInput {
   classement: LocalPathClassement;
   numero: number;
   gestionnaire: LocalPathGestionnaire | null;
+  /** Date au format YYYY-MM-DD. */
+  dateDAffectation: string;
   commentaire: string | null;
   segments: LocalPathSegmentInput[];
 }
@@ -44,13 +46,21 @@ const TYPE_VALUES = new Set<string>(Object.values(LocalPathType));
 const REVETEMENT_VALUES = new Set<string>(Object.values(LocalPathRevetement));
 const ETAT_VALUES = new Set<string>(Object.values(LocalPathEtat));
 const SERVITUDE_VALUES = new Set<string>(Object.values(LocalPathServitude));
-const BORNAGE_VALUES = new Set<string>(Object.values(LocalPathBornage));
+const DELIMITATION_VALUES = new Set<string>(
+  Object.values(LocalPathDelimitation),
+);
 const GESTIONNAIRE_VALUES = new Set<string>(
   Object.values(LocalPathGestionnaire),
 );
 
 const NAME_MAX_LENGTH = 200;
 const COMMENTAIRE_MAX_LENGTH = 2000;
+
+function isIsoDate(v: unknown): v is string {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const date = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === v;
+}
 
 function isLngLat(v: unknown): v is [number, number] {
   return (
@@ -153,12 +163,18 @@ function validateSegment(raw: unknown, index: number): SegmentValidationResult {
     }
   }
 
-  let bornage: LocalPathBornage | null = null;
-  if (s.bornage !== undefined && s.bornage !== null) {
-    if (typeof s.bornage !== "string" || !BORNAGE_VALUES.has(s.bornage)) {
-      return { ok: false, error: `Segment ${index + 1} : bornage invalide.` };
+  let delimitation: LocalPathDelimitation | null = null;
+  if (s.delimitation !== undefined && s.delimitation !== null) {
+    if (
+      typeof s.delimitation !== "string" ||
+      !DELIMITATION_VALUES.has(s.delimitation)
+    ) {
+      return {
+        ok: false,
+        error: `Segment ${index + 1} : délimitation invalide.`,
+      };
     }
-    bornage = s.bornage as LocalPathBornage;
+    delimitation = s.delimitation as LocalPathDelimitation;
   }
 
   return {
@@ -171,7 +187,7 @@ function validateSegment(raw: unknown, index: number): SegmentValidationResult {
       etat,
       fermeALaCirculation,
       servitudes,
-      bornage,
+      delimitation,
     },
   };
 }
@@ -234,6 +250,12 @@ export function validateLocalPathInput(body: unknown): ValidationResult {
     gestionnaire = b.gestionnaire as LocalPathGestionnaire;
   }
 
+  // dateDAffectation
+  if (!isIsoDate(b.dateDAffectation)) {
+    return { ok: false, error: "date d'affectation invalide ou manquante." };
+  }
+  const dateDAffectation = b.dateDAffectation;
+
   // commentaire
   let commentaire: string | null = null;
   if (b.commentaire !== undefined && b.commentaire !== null) {
@@ -264,6 +286,15 @@ export function validateLocalPathInput(body: unknown): ValidationResult {
 
   return {
     ok: true,
-    data: { nom, statut, classement, numero, gestionnaire, commentaire, segments },
+    data: {
+      nom,
+      statut,
+      classement,
+      numero,
+      gestionnaire,
+      dateDAffectation,
+      commentaire,
+      segments,
+    },
   };
 }

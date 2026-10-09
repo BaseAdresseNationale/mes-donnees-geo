@@ -13,7 +13,7 @@ import type { MapRef } from "react-map-gl/maplibre";
 import type { Feature, Position, LineString as GeoLineString } from "geojson";
 import type { GeoJSONStoreFeatures } from "terra-draw";
 import {
-  LocalPathBornage,
+  LocalPathDelimitation,
   LocalPathEtat,
   LocalPathRevetement,
   LocalPathServitude,
@@ -57,7 +57,7 @@ export interface SegmentAttributes {
   etat: LocalPathEtat;
   fermeALaCirculation: boolean | null;
   servitudes: LocalPathServitude[];
-  bornage: LocalPathBornage | null;
+  delimitation: LocalPathDelimitation | null;
 }
 
 export interface Segment extends SegmentAttributes {
@@ -73,7 +73,7 @@ export interface SegmentInput {
   etat: LocalPathEtat;
   fermeALaCirculation: boolean | null;
   servitudes: LocalPathServitude[];
-  bornage: LocalPathBornage | null;
+  delimitation: LocalPathDelimitation | null;
 }
 
 export type DrawMode = "draw" | "select";
@@ -109,7 +109,7 @@ const DEFAULT_ATTRIBUTES: SegmentAttributes = {
   etat: LocalPathEtat.BON,
   fermeALaCirculation: null,
   servitudes: [],
-  bornage: null,
+  delimitation: null,
 };
 
 // Distance, en pixels écran, en dessous de laquelle le premier point d'un
@@ -812,7 +812,7 @@ export function useLocalPathDrawer(
           etat: s.etat,
           fermeALaCirculation: s.fermeALaCirculation ?? null,
           servitudes: s.servitudes ?? [],
-          bornage: s.bornage ?? null,
+          delimitation: s.delimitation ?? null,
         }));
         if (initSegments.length > 0) {
           instance.addFeatures(
@@ -965,7 +965,7 @@ export function useLocalPathDrawer(
         etat: s.etat,
         fermeALaCirculation: s.fermeALaCirculation ?? null,
         servitudes: s.servitudes ?? [],
-        bornage: s.bornage ?? null,
+        delimitation: s.delimitation ?? null,
       }));
       if (best.reverse) {
         toAdd = [...toAdd]
@@ -1009,7 +1009,7 @@ export function useLocalPathDrawer(
         etat: s.etat,
         fermeALaCirculation: s.fermeALaCirculation,
         servitudes: s.servitudes,
-        bornage: s.bornage,
+        delimitation: s.delimitation,
       })),
     [segments],
   );

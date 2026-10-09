@@ -89,6 +89,14 @@ function formatLength(meters: number): string {
   return `${Math.round(meters)} m`;
 }
 
+// Date locale (pas UTC) au format attendu par <input type="date">.
+function todayIsoDate(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 // Le <span> capte le survol, qu'un bouton désactivé ne remonte pas.
 function HintWhenDisabled({
   hint,
@@ -161,6 +169,9 @@ export function LocalPathForm({
   const [commentaire, setCommentaire] = useState(initial?.commentaire ?? "");
   const [gestionnaire, setGestionnaire] =
     useState<LocalPathGestionnaire | null>(initial?.gestionnaire ?? null);
+  const [dateDAffectation, setDateDAffectation] = useState(
+    initial?.dateDAffectation ?? todayIsoDate(),
+  );
   const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
   const [checkedSegmentIds, setCheckedSegmentIds] = useState<Set<string>>(
     new Set(),
@@ -264,7 +275,7 @@ export function LocalPathForm({
             etat: LocalPathEtat.BON,
             fermeALaCirculation: null,
             servitudes: [],
-            bornage: null,
+            delimitation: null,
           },
         ]
       : [];
@@ -411,6 +422,7 @@ export function LocalPathForm({
       classement,
       numero: 0,
       gestionnaire,
+      dateDAffectation,
       commentaire: null,
       segments: all.filter((_, i) => portion.indices.has(i)),
     });
@@ -420,6 +432,7 @@ export function LocalPathForm({
       classement,
       numero: Number(numero),
       gestionnaire,
+      dateDAffectation,
       commentaire: commentaire.trim() || null,
       segments: all.filter((_, i) => !portion.indices.has(i)),
     });
@@ -473,6 +486,7 @@ export function LocalPathForm({
       classement,
       numero: parsedNumero,
       gestionnaire,
+      dateDAffectation,
       commentaire: commentaire.trim() || null,
       segments: drawer.toSegmentsInput(),
     });
@@ -615,6 +629,16 @@ export function LocalPathForm({
             )
           }
           clearable
+          disabled={pending}
+        />
+
+        <Input
+          label="Date d'affectation"
+          type="date"
+          fullWidth
+          required
+          value={dateDAffectation}
+          onChange={(e) => setDateDAffectation(e.target.value)}
           disabled={pending}
         />
 

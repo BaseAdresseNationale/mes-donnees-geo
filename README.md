@@ -67,14 +67,16 @@ Modèle métier :
 
 - `LocalPath` : `id` (UUID v4) · `codeInsee` · `statut` (`draft` / `published` /
   `certified`) · `nom?` · `classement` (`chemin_rural` / `voie_communale`) ·
-  `numero` · `commentaire?` · `segments: LocalPathSegment[]`
+  `numero` · `dateDAffectation` (date, obligatoire, défaut = jour de création) ·
+  `commentaire?` · `segments: LocalPathSegment[]`
 - `LocalPathSegment` : `path: GeoJSON.LineString` · `ordre` · `type`
   (`chemin` / `impasse` / `tronçon` / `sentier` / `place` / `rue`, défaut
   `tronçon`) · `revetement` (`Revêtu` / `Empierré` / `Non revêtu`) · `etat`
   (`En projet` / `En construction` / `Bon` / `Moyen` / `Mauvais` /
   `Très mauvais`, défaut `Bon`) · `largeurMoyenne?` · `fermeALaCirculation?` ·
-  `servitudes: LocalPathServitude[]` · `bornage?` (`total` / `unilatéral` /
-  `partiel` / `non borné`) · `source` (`manuel` / `bd_topo`) · `sourceRef?`
+  `servitudes: LocalPathServitude[]` · `delimitation?` (`indéterminé` /
+  `bornage` / `alignement individuel` / `plan d'alignement` / `plan parcellaire` /
+  `aucune`) · `source` (`manuel` / `bd_topo`) · `sourceRef?`
 - champs base entity (`createdAt`, `updatedAt`, `deletedAt?`)
 
 Persistance :
@@ -87,7 +89,7 @@ Persistance :
     requêtes spatiales (`$queryRaw` uniquement, `Unsupported` côté Prisma).
 - Enums PostgreSQL `rural_path_status`, `rural_path_classement`,
   `rural_path_type`, `rural_path_revetement`, `rural_path_etat`,
-  `rural_path_servitude`, `rural_path_bornage` et `rural_path_source`.
+  `rural_path_servitude`, `rural_path_delimitation` et `rural_path_source`.
 
 Routes Next :
 
@@ -112,7 +114,7 @@ Toutes ces routes exigent une session (`requireSession`) et sont scopées au
 `codeInsee` de la session. La validation métier partagée
 (`src/components/voies-locales/validation.ts`) est appelée en amont côté client
 _et_ ré-appliquée côté serveur (defense in depth) : chaque segment est un
-`LineString` valide, `type`/`revetement`/`etat`/`servitudes`/`bornage` dans les
+`LineString` valide, `type`/`revetement`/`etat`/`servitudes`/`delimitation` dans les
 enums, `nom` ≤ 200 caractères, coordonnées dans WGS84.
 
 Édition cartographique :
@@ -122,7 +124,7 @@ enums, `nom` ≤ 200 caractères, coordonnées dans WGS84.
   `MapContext.mapRef`. Deux modes : `linestring` (tracer un nouveau segment)
   et `select` (déplacer/supprimer des vertices d'un segment existant).
 - Chaque `LineString` dessinée devient un **segment** du chemin. Les attributs
-  de chaque segment (type, revêtement, état, largeur, servitudes, bornage,
+  de chaque segment (type, revêtement, état, largeur, servitudes, délimitation,
   fermeture à la circulation) se saisissent dans l'accordéon du formulaire
   (revêtement par défaut `Non revêtu`). La sauvegarde envoie la liste ordonnée
   des segments via l'API REST ci-dessus.

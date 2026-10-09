@@ -90,13 +90,15 @@ enum LocalPathServitude {
   @@map("local_path_servitude")
 }
 
-enum LocalPathBornage {
-  TOTAL      @map("total")
-  UNILATERAL @map("unilateral")
-  PARTIEL    @map("partiel")
-  NON_BORNE  @map("non_borne")
+enum LocalPathDelimitation {
+  INDETERMINE           @map("indetermine")
+  BORNAGE               @map("bornage")
+  ALIGNEMENT_INDIVIDUEL @map("alignement_individuel")
+  PLAN_D_ALIGNEMENT     @map("plan_d_alignement")
+  PLAN_PARCELLAIRE      @map("plan_parcellaire")
+  AUCUNE                @map("aucune")
 
-  @@map("local_path_bornage")
+  @@map("local_path_delimitation")
 }
 
 enum LocalPathSource {
@@ -138,19 +140,20 @@ enum LocalPathDeletionReason {
 }
 
 model LocalPath {
-  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  codeInsee      String                   @map("code_insee") @db.VarChar(5)
-  statut         LocalPathStatus          @default(DRAFT)
-  nom            String?
-  classement     LocalPathClassement
-  numero         Int
-  gestionnaire   LocalPathGestionnaire?
-  commentaire    String?
-  deletionReason LocalPathDeletionReason? @map("deletion_reason")
-  segments       LocalPathSegment[]
-  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
-  deletedAt      DateTime?                @map("deleted_at") @db.Timestamptz(6)
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeInsee        String                   @map("code_insee") @db.VarChar(5)
+  statut           LocalPathStatus          @default(DRAFT)
+  nom              String?
+  classement       LocalPathClassement
+  numero           Int
+  gestionnaire     LocalPathGestionnaire?
+  dateDAffectation DateTime                 @default(now()) @map("date_d_affectation") @db.Date
+  commentaire      String?
+  deletionReason   LocalPathDeletionReason? @map("deletion_reason")
+  segments         LocalPathSegment[]
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?                @map("deleted_at") @db.Timestamptz(6)
 
   @@index([codeInsee])
   @@index([deletedAt])
@@ -170,7 +173,7 @@ model LocalPathSegment {
   etat                LocalPathEtat                              @default(BON)
   fermeALaCirculation Boolean?                                   @map("ferme_a_la_circulation")
   servitudes          LocalPathServitude[]                       @default([])
-  bornage             LocalPathBornage?
+  delimitation        LocalPathDelimitation?
   source              LocalPathSource                            @default(MANUEL)
   // Identifiant de l'objet dans la source externe (ex. "cleabs" BD TOPO), pour éviter les doublons au réimport.
   sourceRef           String?                                    @map("source_ref")
