@@ -11,6 +11,7 @@ import {
 import { flushSync } from "react-dom";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { Feature, Position, LineString as GeoLineString } from "geojson";
+import type { GeoJSONStoreFeatures } from "terra-draw";
 import {
   LocalPathBornage,
   LocalPathEtat,
@@ -563,6 +564,17 @@ export function useLocalPathDrawer(
         outlineWidth: 2,
         width: 6,
       };
+      // terra-draw fixe le zIndex des midpoints à 50 (au-dessus des points de
+      // sélection, à 30) sans l'exposer dans `styles` : on le abaisse ici.
+      const MIDPOINT_Z_INDEX = 10;
+      class LocalPathSelectMode extends TerraDrawSelectMode {
+        styleFeature(feature: GeoJSONStoreFeatures) {
+          const style = super.styleFeature(feature);
+          return feature.properties.midPoint
+            ? { ...style, zIndex: MIDPOINT_Z_INDEX }
+            : style;
+        }
+      }
       const instance = new TerraDraw({
         adapter: new adapterMod.TerraDrawMapLibreGLAdapter({
           map: nativeMap,
@@ -614,7 +626,7 @@ export function useLocalPathDrawer(
               },
             },
           }),
-          new TerraDrawSelectMode({
+          new LocalPathSelectMode({
             // Raccourcis clavier natifs désactivés : la suppression est gérée
             // par nous (`removeSegment`, extrémités uniquement + sync voisin).
             keyEvents: {
@@ -628,7 +640,7 @@ export function useLocalPathDrawer(
                 feature: {
                   draggable: false,
                   coordinates: {
-                    midpoints: false,
+                    midpoints: { draggable: true },
                     draggable: true,
                     deletable: true,
                   },
@@ -645,8 +657,8 @@ export function useLocalPathDrawer(
               selectionPointWidth: pointStyle.width,
               midPointColor: pointStyle.color,
               midPointOutlineColor: pointStyle.outlineColor,
-              midPointOutlineWidth: pointStyle.outlineWidth,
-              midPointWidth: pointStyle.width,
+              midPointOutlineWidth: 1,
+              midPointWidth: 3,
             },
           }),
         ],
