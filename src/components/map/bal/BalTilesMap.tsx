@@ -1,0 +1,98 @@
+"use client";
+
+import { useContext, useEffect, useRef } from "react";
+import { Layer, MapLayerMouseEvent, Source } from "react-map-gl/maplibre";
+import MapContext from "@/contexts/MapContext";
+import DrawContext from "@/contexts/DrawContext";
+import {
+  BAL_TILES_MAX_ZOOM,
+  BAL_TILES_MIN_ZOOM,
+  BAL_TILES_SOURCE_ID,
+  BALLayers,
+} from "./bal.layers";
+
+// La route de tuiles de mes-adresses-api est publique : le navigateur
+// l'appelle directement, sans passer par le proxy /api/adresses.
+function balTilesUrl(balId: string): string {
+  const apiUrl = (process.env.NEXT_PUBLIC_MES_ADRESSES_API_URL ?? "").replace(
+    /\/+$/,
+    "",
+  );
+  return `${apiUrl}/v2/bases-locales/${balId}/tiles/{z}/{x}/{y}.pbf`;
+}
+
+export function BalTilesMap({ balId }: { balId: string }) {
+  const { mapRef } = useContext(MapContext);
+  const { isDrawing } = useContext(DrawContext);
+
+  const hoveredStateId = useRef<{
+    id: string;
+    source: string;
+    sourceLayer: string;
+  } | null>(null);
+
+  // Survol : mise en évidence de l'entité via le feature-state "hover"
+  useEffect(() => {
+    if (!mapRef || isDrawing) {
+      return;
+    }
+
+    const clearHover = () => {
+      if (hoveredStateId.current) {
+        mapRef.setFeatureState(hoveredStateId.current, { hover: false });
+        hoveredStateId.current = null;
+      }
+    };
+
+    const handleMouseMove = (e: MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      if (!feature) {
+        return;
+      }
+
+      clearHover();
+      hoveredStateId.current = {
+        id: feature.id as string,
+        source: feature.source,
+        sourceLayer: feature.sourceLayer as string,
+      };
+      mapRef.setFeatureState(hoveredStateId.current, { hover: true });
+      mapRef.getCanvas().style.cursor = "pointer";
+    };
+
+    const handleMouseLeave = () => {
+      clearHover();
+      mapRef.getCanvas().style.cursor = "";
+    };
+
+    BALLayers.forEach(({ id }) => {
+      mapRef.on("mousemove", id!, handleMouseMove);
+      mapRef.on("mouseleave", id!, handleMouseLeave);
+    });
+
+    return () => {
+      BALLayers.forEach(({ id }) => {
+        mapRef.off("mousemove", id!, handleMouseMove);
+        mapRef.off("mouseleave", id!, handleMouseLeave);
+      });
+      handleMouseLeave();
+    };
+  }, [mapRef, isDrawing, balId]);
+
+  return (
+    <Source
+      // Nouvelle source à chaque BAL pour ne pas garder les tuiles précédentes
+      key={balId}
+      id={BAL_TILES_SOURCE_ID}
+      type="vector"
+      tiles={[balTilesUrl(balId)]}
+      minzoom={BAL_TILES_MIN_ZOOM}
+      maxzoom={BAL_TILES_MAX_ZOOM}
+      promoteId="id"
+    >
+      {BALLayers.map((layer) => (
+        <Layer key={layer.id} {...layer} />
+      ))}
+    </Source>
+  );
+}
