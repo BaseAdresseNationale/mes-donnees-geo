@@ -1,7 +1,8 @@
-export interface NameListItem {
+// type (et non interface) pour être compatible avec le Row de l'ui-kit
+export type NameListItem = {
   id: string;
   nom: string;
-}
+};
 
 // Ne garde que ce qu'affiche la liste (payload minimal vers le client),
 // trié par nom.

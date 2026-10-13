@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { Pagination, usePagination } from "@gouvfr-lasuite/ui-components";
+import { DataGrid, usePagination } from "@gouvfr-lasuite/ui-components";
 import type { NameListItem } from "./name-list.utils";
 import styles from "./NameList.module.css";
 
 export const NAME_LIST_PAGE_SIZE = 20;
+
+export const NAME_LIST_COLUMNS = [{ field: "nom" }];
 
 interface NameListProps {
   items: NameListItem[];
@@ -15,6 +17,8 @@ interface NameListProps {
   emptyMessage: string;
 }
 
+// Équivalent du DataList de l'ui-kit (pas d'en-tête ni de tri), avec en plus
+// la pagination intégrée au DataGrid. La liste complète est paginée côté front.
 export function NameList({
   items,
   label,
@@ -23,40 +27,31 @@ export function NameList({
   emptyMessage,
 }: NameListProps) {
   const pagination = usePagination({ pageSize: NAME_LIST_PAGE_SIZE });
-  const { page, setPage, pagesCount, setPagesCount, pageSize } = pagination;
+  const { page, setPage, setPagesCount, pageSize } = pagination;
 
   useEffect(() => {
     setPagesCount(Math.max(1, Math.ceil(items.length / pageSize)));
     setPage(1);
   }, [items, pageSize, setPage, setPagesCount]);
 
-  if (items.length === 0) {
-    return (
-      <section className={styles.container} aria-label={label}>
-        <p className={styles.empty}>{emptyMessage}</p>
-      </section>
-    );
-  }
-
   const pageItems = items.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <section className={styles.container} aria-label={label}>
-      <p className={styles.count}>
-        {items.length} {items.length > 1 ? plural : singular}
-      </p>
-      <ul className={styles.list}>
-        {pageItems.map((item) => (
-          <li key={item.id} className={styles.item}>
-            {item.nom}
-          </li>
-        ))}
-      </ul>
-      {pagesCount !== undefined && pagesCount > 1 && (
-        <div className={styles.pagination}>
-          <Pagination {...pagination} />
-        </div>
+      {items.length > 0 && (
+        <p className={styles.counter}>
+          {items.length} {items.length > 1 ? plural : singular}
+        </p>
       )}
+      <DataGrid
+        columns={NAME_LIST_COLUMNS}
+        rows={pageItems}
+        pagination={pagination}
+        displayHeader={false}
+        enableSorting={false}
+        emptyPlaceholderLabel={emptyMessage}
+        hideEmptyPlaceholderImage
+      />
     </section>
   );
 }

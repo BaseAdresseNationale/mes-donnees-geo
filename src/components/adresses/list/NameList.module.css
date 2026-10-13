@@ -1,71 +1,32 @@
+/* Le panneau du plugin a une hauteur fixe : c'est la liste qui défile */
 .container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  overflow: hidden;
-  min-height: 0;
   flex: 1;
-}
-
-.count {
-  flex-shrink: 0;
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--color-muted, #555);
-}
-
-.empty {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--color-muted, #555);
-}
-
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  min-height: 0;
   overflow-y: auto;
-  flex: 1;
-  min-height: 0;
 }
 
-.item {
-  flex-shrink: 0;
-  padding: 0.5rem 0.625rem;
-  background: #fff;
-  border: 1px solid var(--color-border, #e5e5e5);
-  border-radius: 4px;
-  font-size: 0.9375rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.counter {
+  padding-left: 0.75em;
 }
 
-.pagination {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-}
-
+/* Barre de chargement (l'ui-kit ne fournit pas de skeleton) */
 .skeleton {
+  height: 0.875rem;
   border-radius: 4px;
-  background: linear-gradient(90deg, #ececec 25%, #f6f6f6 50%, #ececec 75%);
+  background: linear-gradient(
+    90deg,
+    var(--c--contextuals--background--semantic--neutral--tertiary, #ececec) 25%,
+    var(--c--contextuals--background--surface--secondary, #f6f6f6) 50%,
+    var(--c--contextuals--background--semantic--neutral--tertiary, #ececec) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
-.skeletonCount {
-  flex-shrink: 0;
+.skeletonCounter {
+  display: inline-block;
   width: 5rem;
-  height: 1rem;
-}
-
-.skeletonText {
-  height: 1.125rem;
+  vertical-align: middle;
 }
 
 @keyframes shimmer {
