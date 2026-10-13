@@ -1,27 +1,8 @@
 "use client";
 
-import { DataList, Input } from "@gouvfr-lasuite/ui-components";
+import { Input } from "@gouvfr-lasuite/ui-components";
 import { NAME_LIST_PAGE_SIZE } from "./NameList";
 import styles from "./NameList.module.css";
-
-// Lignes de la grille ui-kit, avec une barre animée à la place du nom.
-// Largeurs variées pour imiter des noms de longueurs différentes.
-const PLACEHOLDER_ROWS = Array.from(
-  { length: NAME_LIST_PAGE_SIZE },
-  (_, i) => ({
-    id: String(i),
-    width: `${45 + ((i * 37) % 45)}%`,
-  }),
-);
-
-const SKELETON_COLUMNS = [
-  {
-    field: "nom",
-    renderCell: ({ row }: { row: (typeof PLACEHOLDER_ROWS)[number] }) => (
-      <div className={styles.skeleton} style={{ width: row.width }} />
-    ),
-  },
-];
 
 export function NameListSkeleton({ searchLabel }: { searchLabel: string }) {
   return (
@@ -33,17 +14,26 @@ export function NameListSkeleton({ searchLabel }: { searchLabel: string }) {
       {/* Même champ que NameList, désactivé : la mise en page ne bouge pas */}
       <div className={styles.search}>
         <Input
-          label={searchLabel}
+          aria-label={searchLabel}
+          placeholder={searchLabel}
+          hideLabel
           fullWidth
           disabled
+          className={styles.searchInput}
           icon={<span className="material-icons">search</span>}
         />
       </div>
-      <DataList
-        columns={SKELETON_COLUMNS}
-        rows={PLACEHOLDER_ROWS}
-        className={styles.grid}
-      />
+      <ul className={styles.list} aria-hidden="true">
+        {Array.from({ length: NAME_LIST_PAGE_SIZE }, (_, index) => (
+          <li key={index} className={styles.item}>
+            <div
+              className={styles.skeleton}
+              // Largeurs variées pour imiter des noms de longueurs différentes
+              style={{ width: `${45 + ((index * 37) % 45)}%` }}
+            />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

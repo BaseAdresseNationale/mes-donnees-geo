@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DataGrid, Input, usePagination } from "@gouvfr-lasuite/ui-components";
+import {
+  Input,
+  Pagination,
+  usePagination,
+} from "@gouvfr-lasuite/ui-components";
 import { normalizeSearch, type NameListItem } from "./name-list.utils";
 import styles from "./NameList.module.css";
 
 export const NAME_LIST_PAGE_SIZE = 20;
-
-export const NAME_LIST_COLUMNS = [{ field: "nom" }];
 
 interface NameListProps {
   items: NameListItem[];
@@ -15,8 +17,8 @@ interface NameListProps {
   searchLabel: string;
 }
 
-// Équivalent du DataList de l'ui-kit (pas d'en-tête ni de tri), avec en plus
-// la pagination intégrée au DataGrid. La liste complète est paginée côté front.
+// Liste de noms inspirée de RuralPathList (recherche + cartes), paginée côté
+// front puisque l'API renvoie la liste complète.
 export function NameList({ items, label, searchLabel }: NameListProps) {
   const [query, setQuery] = useState("");
 
@@ -28,7 +30,7 @@ export function NameList({ items, label, searchLabel }: NameListProps) {
   }, [items, query]);
 
   const pagination = usePagination({ pageSize: NAME_LIST_PAGE_SIZE });
-  const { page, setPage, setPagesCount, pageSize } = pagination;
+  const { page, setPage, pagesCount, setPagesCount, pageSize } = pagination;
 
   useEffect(() => {
     setPagesCount(Math.max(1, Math.ceil(filteredItems.length / pageSize)));
@@ -41,23 +43,38 @@ export function NameList({ items, label, searchLabel }: NameListProps) {
     <section className={styles.container} aria-label={label}>
       <div className={styles.search}>
         <Input
-          label={searchLabel}
+          aria-label={searchLabel}
+          placeholder={searchLabel}
+          hideLabel
           fullWidth
+          className={styles.searchInput}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           icon={<span className="material-icons">search</span>}
         />
       </div>
-      <DataGrid
-        columns={NAME_LIST_COLUMNS}
-        rows={pageItems}
-        className={styles.grid}
-        pagination={pagination}
-        displayHeader={false}
-        enableSorting={false}
-        emptyPlaceholderLabel="Aucun résultat pour cette recherche."
-        hideEmptyPlaceholderImage
-      />
+
+      {filteredItems.length === 0 ? (
+        <p className={styles.empty}>
+          {items.length === 0
+            ? "Aucun élément dans cette BAL."
+            : "Aucun résultat pour cette recherche."}
+        </p>
+      ) : (
+        <ul className={styles.list}>
+          {pageItems.map((item) => (
+            <li key={item.id} className={styles.item}>
+              <span className={styles.itemTitle}>{item.nom}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {pagesCount !== undefined && pagesCount > 1 && (
+        <div className={styles.pagination}>
+          <Pagination {...pagination} displayGoto={false} />
+        </div>
+      )}
     </section>
   );
 }
