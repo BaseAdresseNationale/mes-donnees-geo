@@ -7,7 +7,11 @@ import {
 } from "./generated/sdk.gen";
 import type { BaseLocale } from "./generated/types.gen";
 import { stripToken } from "./proxy";
-import { createTrustedClient, mesAdressesApiUrl } from "./server-client";
+import {
+  createServerBalClient,
+  createTrustedClient,
+  mesAdressesApiUrl,
+} from "./server-client";
 
 // Durée pendant laquelle on réutilise la liste des BAL (et leurs tokens)
 // d'une commune avant de la redemander à mes-adresses-api.
@@ -79,6 +83,16 @@ export async function getBalToken(
 ): Promise<string | null> {
   const bals = await listCommuneBals(session);
   return bals.find((bal) => bal.id === balId)?.token ?? null;
+}
+
+// Client authentifié avec le token de la BAL, à passer aux fonctions du SDK
+// généré (option `client`). null si la BAL n'appartient pas à la commune.
+export async function getServerBalClient(
+  session: SessionUser,
+  balId: string,
+): Promise<ReturnType<typeof createServerBalClient> | null> {
+  const token = await getBalToken(session, balId);
+  return token ? createServerBalClient(token) : null;
 }
 
 // À appeler quand l'API refuse un token issu du cache (ex : token renouvelé
