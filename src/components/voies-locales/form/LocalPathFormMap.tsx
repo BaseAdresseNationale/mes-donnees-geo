@@ -18,6 +18,14 @@ import {
 } from "@/components/voies-locales/types";
 import type { LocalPath } from "@/components/voies-locales/types";
 import { Segment } from "../useLocalPathDrawer";
+import {
+  BD_TOPO_SNAP_LAYER_ID,
+  BD_TOPO_SNAP_MAX_ZOOM,
+  BD_TOPO_SNAP_MIN_ZOOM,
+  BD_TOPO_SNAP_SOURCE_ID,
+  BD_TOPO_SNAP_SOURCE_LAYER,
+  BD_TOPO_TILES_URL,
+} from "../bd-topo-snap";
 import styles from "./LocalPathFormMap.module.css";
 
 const EDIT_SOURCE_ID = "voies-locales-edit";
@@ -300,6 +308,24 @@ export function VoiesLocalesFormMap({
 
   return (
     <>
+      {/* Invisible : sert uniquement à aimanter le tracé sur la BD TOPO. */}
+      <Source
+        id={BD_TOPO_SNAP_SOURCE_ID}
+        type="vector"
+        tiles={[BD_TOPO_TILES_URL]}
+        minzoom={BD_TOPO_SNAP_MIN_ZOOM}
+        maxzoom={BD_TOPO_SNAP_MAX_ZOOM}
+      >
+        <Layer
+          {...({
+            id: BD_TOPO_SNAP_LAYER_ID,
+            type: "line",
+            "source-layer": BD_TOPO_SNAP_SOURCE_LAYER,
+            minzoom: BD_TOPO_SNAP_MIN_ZOOM,
+            paint: { "line-opacity": 0, "line-width": 1 },
+          } as LayerProps)}
+        />
+      </Source>
       <Source id={OTHER_SOURCE_ID} type="geojson" data={otherFeatureCollection}>
         <Layer
           {...({

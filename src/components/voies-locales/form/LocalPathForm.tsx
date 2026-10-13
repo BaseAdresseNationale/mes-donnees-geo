@@ -265,6 +265,7 @@ export function LocalPathForm({
           {
             id: "__preview__",
             coordinates: drawer.previewCoordinates,
+            sourceRef: null,
             type: LocalPathType.TRONCON,
             revetement: LocalPathRevetement.NON_REVETU,
             largeurMoyenne: null,

@@ -10,6 +10,8 @@ import {
 
 export interface LocalPathSegmentInput {
   path: GeoJSON.LineString;
+  /** Cleabs BD TOPO séparées par des virgules (segment manuel aimanté). */
+  sourceRef: string | null;
   type: LocalPathType;
   revetement: LocalPathRevetement;
   largeurMoyenne: number | null;
@@ -52,6 +54,8 @@ const GESTIONNAIRE_VALUES = new Set<string>(
 
 const NAME_MAX_LENGTH = 200;
 const COMMENTAIRE_MAX_LENGTH = 2000;
+const SOURCE_REF_MAX_LENGTH = 2000;
+const SOURCE_REF_PATTERN = /^[A-Za-z0-9]{1,64}(,[A-Za-z0-9]{1,64})*$/;
 
 function isIsoDate(v: unknown): v is string {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
@@ -177,10 +181,26 @@ function validateSegment(raw: unknown, index: number): SegmentValidationResult {
     delimitation = s.delimitation as LocalPathDelimitation;
   }
 
+  let sourceRef: string | null = null;
+  if (s.sourceRef !== undefined && s.sourceRef !== null) {
+    if (
+      typeof s.sourceRef !== "string" ||
+      s.sourceRef.length > SOURCE_REF_MAX_LENGTH ||
+      !SOURCE_REF_PATTERN.test(s.sourceRef)
+    ) {
+      return {
+        ok: false,
+        error: `Segment ${index + 1} : référence source invalide.`,
+      };
+    }
+    sourceRef = s.sourceRef;
+  }
+
   return {
     ok: true,
     data: {
       path: s.path as GeoJSON.LineString,
+      sourceRef,
       type,
       revetement: s.revetement as LocalPathRevetement,
       largeurMoyenne,

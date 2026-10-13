@@ -17,10 +17,12 @@ import {
   LocalPathEtat,
   LocalPathRevetement,
   LocalPathServitude,
+  LocalPathSource,
   LocalPathType,
 } from "@/generated/prisma/browser";
 import type { LocalPath, LocalPathSegment } from "./types";
 import DrawContext from "@/contexts/DrawContext";
+import { snapToBdTopo } from "./bd-topo-snap";
 
 type CartesianPoint = { x: number; y: number };
 
@@ -63,10 +65,13 @@ export interface SegmentAttributes {
 export interface Segment extends SegmentAttributes {
   id: string;
   coordinates: Position[];
+  // Cleabs BD TOPO (séparées par des virgules) sur lesquelles le tracé manuel a été aimanté.
+  sourceRef: string | null;
 }
 
 export interface SegmentInput {
   path: GeoJSON.LineString;
+  sourceRef: string | null;
   type: LocalPathType;
   revetement: LocalPathRevetement;
   largeurMoyenne: number | null;
@@ -177,6 +182,12 @@ function roundCoordinates(coords: Position[]): Position[] {
   return coords.map(roundCoordinate);
 }
 
+// Seules les cleabs d'un aimantage manuel sont conservées : les segments
+// importés de la BD TOPO repassent en manuel à l'enregistrement (dette connue).
+function manualSourceRef(s: LocalPathSegment): string | null {
+  return s.source === LocalPathSource.MANUEL ? (s.sourceRef ?? null) : null;
+}
+
 function toLineStringFeature(
   id: string,
   coordinates: Position[],
@@ -196,19 +207,28 @@ function computeChainAfterAppend(
   chain: Segment[],
   id: string,
   coords: Position[],
+  sourceRef: string | null,
 ): Segment[] | null {
   if (chain.length === 0) {
-    return [{ id, ...DEFAULT_ATTRIBUTES, coordinates: coords }];
+    return [{ id, ...DEFAULT_ATTRIBUTES, coordinates: coords, sourceRef }];
   }
   const chainStart = chain[0].coordinates[0];
   const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
   const newStart = coords[0];
   if (isSamePoint(newStart, chainEnd)) {
-    return [...chain, { id, ...DEFAULT_ATTRIBUTES, coordinates: coords }];
+    return [
+      ...chain,
+      { id, ...DEFAULT_ATTRIBUTES, coordinates: coords, sourceRef },
+    ];
   }
   if (isSamePoint(newStart, chainStart)) {
     return [
-      { id, ...DEFAULT_ATTRIBUTES, coordinates: [...coords].reverse() },
+      {
+        id,
+        ...DEFAULT_ATTRIBUTES,
+        coordinates: [...coords].reverse(),
+        sourceRef,
+      },
       ...chain,
     ];
   }
@@ -245,6 +265,8 @@ export function useLocalPathDrawer(
   const selectedIdRef = useRef<string | null>(null);
   const setMapMessageRef = useRef(setMapMessage);
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cleabs BD TOPO des points aimantés pendant le tracé en cours (clé "lng,lat").
+  const snappedRefsRef = useRef(new Map<string, string>());
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -279,6 +301,18 @@ export function useLocalPathDrawer(
     },
     [guidanceMessage],
   );
+
+  // Cleabs des sommets du segment qui ont été aimantés sur la BD TOPO, puis
+  // remise à zéro du registre (un registre par tracé).
+  const takeSnappedRef = useCallback((coords: Position[]): string | null => {
+    const refs = new Set<string>();
+    for (const c of coords) {
+      const ref = snappedRefsRef.current.get(`${c[0]},${c[1]}`);
+      if (ref) refs.add(ref);
+    }
+    snappedRefsRef.current.clear();
+    return refs.size > 0 ? [...refs].join(",") : null;
+  }, []);
 
   // Met à jour l'état React (mode/message) sans toucher à terra-draw : utile
   // quand terra-draw a déjà changé de mode lui-même (ex. `instance.selectFeature`).
@@ -449,6 +483,7 @@ export function useLocalPathDrawer(
         ) {
           wipFeatureRef.current = false;
           setPreviewCoordinates(null);
+          snappedRefsRef.current.clear();
           showTemporaryError(MSG_INVALID_SEGMENT);
           // Différé : on est encore dans la pile d'appel du clic qui vient de
           // créer ce tracé ; annuler ici casserait l'état interne du mode.
@@ -473,11 +508,17 @@ export function useLocalPathDrawer(
       if (!f || f.geometry?.type !== "LineString") return;
       const coords = (f.geometry as GeoLineString).coordinates;
       if (!coords || coords.length < 2) {
+        snappedRefsRef.current.clear();
         draw.removeFeatures([id]);
         return;
       }
 
-      const next = computeChainAfterAppend(segmentsRef.current, id, coords);
+      const next = computeChainAfterAppend(
+        segmentsRef.current,
+        id,
+        coords,
+        takeSnappedRef(coords),
+      );
       if (next) {
         segmentsRef.current = next;
         setSegments(next);
@@ -487,7 +528,7 @@ export function useLocalPathDrawer(
         showTemporaryError(MSG_INVALID_SEGMENT);
       }
     },
-    [showTemporaryError],
+    [showTemporaryError, takeSnappedRef],
   );
 
   // Termine immédiatement le segment en cours de tracé (sans attendre un
@@ -509,10 +550,16 @@ export function useLocalPathDrawer(
     wipFeatureRef.current = false;
     setPreviewCoordinates(null);
     if (!coords || coords.length < 2) {
+      snappedRefsRef.current.clear();
       draw.removeFeatures([wipId]);
       return false;
     }
-    const next = computeChainAfterAppend(segmentsRef.current, wipId, coords);
+    const next = computeChainAfterAppend(
+      segmentsRef.current,
+      wipId,
+      coords,
+      takeSnappedRef(coords),
+    );
     if (!next) {
       draw.removeFeatures([wipId]);
       showTemporaryError(MSG_INVALID_SEGMENT);
@@ -529,7 +576,7 @@ export function useLocalPathDrawer(
     setSegments(next);
     setMapMessageRef.current(MSG_DRAW_CONTINUE);
     return true;
-  }, [showTemporaryError]);
+  }, [showTemporaryError, takeSnappedRef]);
 
   // Cycle de vie Terra Draw.
   useEffect(() => {
@@ -601,32 +648,47 @@ export function useLocalPathDrawer(
               coordinatePointWidth: pointStyle.width,
             },
             snapping: {
-              // N'aimante que le premier point d'un nouveau segment, vers
-              // l'une des deux extrémités du chemin déjà tracé.
+              // Premier point d'un nouveau segment : aimanté à l'une des deux
+              // extrémités du chemin déjà tracé. Sinon (chemin vide ou points
+              // suivants) : aimanté à un tronçon BD TOPO situé à moins de 5 m.
               toCustom: (
                 event: TerraDrawMouseEvent,
                 context: SnappableContext,
               ) => {
-                if (context.currentCoordinate !== 0) return undefined;
                 const chain = segmentsRef.current;
-                if (chain.length === 0) return undefined;
-                const candidates: Position[] = [
-                  chain[0].coordinates[0],
-                  chain[chain.length - 1].coordinates.at(-1)!,
-                ];
-                let best: Position | undefined;
-                let bestDist = Infinity;
-                for (const c of candidates) {
-                  const p = context.project(c[0], c[1]);
-                  const dx = p.x - event.containerX;
-                  const dy = p.y - event.containerY;
-                  const d = Math.sqrt(dx * dx + dy * dy);
-                  if (d < bestDist) {
-                    bestDist = d;
-                    best = c;
+                if (context.currentCoordinate === 0 && chain.length > 0) {
+                  const candidates: Position[] = [
+                    chain[0].coordinates[0],
+                    chain[chain.length - 1].coordinates.at(-1)!,
+                  ];
+                  let best: Position | undefined;
+                  let bestDist = Infinity;
+                  for (const c of candidates) {
+                    const p = context.project(c[0], c[1]);
+                    const dx = p.x - event.containerX;
+                    const dy = p.y - event.containerY;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < bestDist) {
+                      bestDist = d;
+                      best = c;
+                    }
                   }
+                  return bestDist <= SNAP_PIXEL_DISTANCE ? best : undefined;
                 }
-                return bestDist <= SNAP_PIXEL_DISTANCE ? best : undefined;
+                const hit = snapToBdTopo(
+                  nativeMap,
+                  { x: event.containerX, y: event.containerY },
+                  { lng: event.lng, lat: event.lat },
+                );
+                if (!hit) return undefined;
+                // Arrondi identique à terra-draw : la coordonnée posée doit
+                // retrouver sa clé dans le registre au moment de finir le segment.
+                const coordinate = roundCoordinate(hit.coordinate);
+                snappedRefsRef.current.set(
+                  `${coordinate[0]},${coordinate[1]}`,
+                  hit.cleabs,
+                );
+                return coordinate;
               },
             },
           }),
@@ -709,6 +771,7 @@ export function useLocalPathDrawer(
         if (modeRef.current !== "draw") return;
         wipFeatureRef.current = false;
         setPreviewCoordinates(null);
+        snappedRefsRef.current.clear();
         // Différé : re-déclencher le même mode force terra-draw à nettoyer
         // (stop+cleanup+start) le tracé en cours sans casser son état interne.
         setTimeout(() => drawRef.current?.setMode("linestring"), 0);
@@ -806,6 +869,7 @@ export function useLocalPathDrawer(
         const initSegments: Segment[] = initial.segments.map((s) => ({
           id: s.id,
           coordinates: roundCoordinates(s.path.coordinates),
+          sourceRef: manualSourceRef(s),
           type: s.type,
           revetement: s.revetement,
           largeurMoyenne: s.largeurMoyenne ?? null,
@@ -959,6 +1023,7 @@ export function useLocalPathDrawer(
       let toAdd: Segment[] = otherPath.segments.map((s) => ({
         id: s.id,
         coordinates: roundCoordinates(s.path.coordinates),
+        sourceRef: manualSourceRef(s),
         type: s.type,
         revetement: s.revetement,
         largeurMoyenne: s.largeurMoyenne ?? null,
@@ -1003,6 +1068,7 @@ export function useLocalPathDrawer(
     (): SegmentInput[] =>
       segments.map((s) => ({
         path: { type: "LineString", coordinates: s.coordinates },
+        sourceRef: s.sourceRef,
         type: s.type,
         revetement: s.revetement,
         largeurMoyenne: s.largeurMoyenne,
