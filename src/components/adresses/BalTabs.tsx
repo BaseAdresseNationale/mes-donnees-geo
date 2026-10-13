@@ -5,10 +5,23 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import styles from "./BalTabs.module.css";
 
 // Onglets d'une BAL : chacun correspond à une route sous /adresses/{balId}
+// Chaque onglet est habillé en panneau de signalisation : entrée
+// d'agglomération pour la commune, plaque de rue bleue pour les voies,
+// flèche marron de lieu-dit pour les toponymes.
 const TABS = [
-  { id: "commune", label: "Commune", suffix: "" },
-  { id: "voies", label: "Voies", suffix: "/voies" },
-  { id: "toponymes", label: "Toponymes", suffix: "/toponymes" },
+  {
+    id: "commune",
+    label: "Commune",
+    suffix: "",
+    className: styles.communeSign,
+  },
+  { id: "voies", label: "Voies", suffix: "/voies", className: styles.voieSign },
+  {
+    id: "toponymes",
+    label: "Toponymes",
+    suffix: "/toponymes",
+    className: styles.toponymeSign,
+  },
 ] as const;
 
 export function BalTabs() {
@@ -34,6 +47,7 @@ export function BalTabs() {
             size="small"
             fullWidth
             active={isActive}
+            className={tab.className}
             aria-current={isActive ? "page" : undefined}
             onClick={() => {
               if (!isActive) {

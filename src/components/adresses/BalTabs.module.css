@@ -1,8 +1,126 @@
 .tabs {
   flex-shrink: 0;
   display: flex;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
   background: #fff;
+}
+
+/*
+ * Onglets en panneaux de ville. Sélecteurs préfixés par .c__button pour
+ * passer devant les styles du Button de l'ui-kit (variant tertiary).
+ * Onglet inactif : panneau un peu estompé ; onglet actif : pleine couleur.
+ */
+.tabs :global(.c__button).communeSign,
+.tabs :global(.c__button).voieSign,
+.tabs :global(.c__button).toponymeSign {
+  position: relative;
+  isolation: isolate;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0.55;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+}
+
+.tabs :global(.c__button).communeSign:hover,
+.tabs :global(.c__button).voieSign:hover,
+.tabs :global(.c__button).toponymeSign:hover {
+  color: #fff;
+  opacity: 0.85;
+}
+
+.tabs :global(.c__button).communeSign:global(.c__button--active),
+.tabs :global(.c__button).voieSign:global(.c__button--active),
+.tabs :global(.c__button).toponymeSign:global(.c__button--active) {
+  color: #fff;
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+/*
+ * Entrée d'agglomération : fond blanc, large bord rouge entouré d'un liseré
+ * blanc, texte noir en capitales espacées.
+ */
+.tabs :global(.c__button).communeSign,
+.tabs :global(.c__button).communeSign:hover,
+.tabs :global(.c__button).communeSign:global(.c__button--active) {
+  color: #000;
+  background: #fff;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow:
+    0 0 0 1px #d0d0d0,
+    inset 0 0 0 1.5px #fff,
+    inset 0 0 0 4px #e30613;
+}
+
+.tabs :global(.c__button).communeSign:global(.c__button--active) {
+  box-shadow:
+    0 0 0 1px #d0d0d0,
+    inset 0 0 0 1.5px #fff,
+    inset 0 0 0 4px #e30613,
+    0 2px 4px rgb(0 0 0 / 25%);
+}
+
+/* Plaque de rue : fond bleu, filet blanc intérieur, coins arrondis */
+.tabs :global(.c__button).voieSign,
+.tabs :global(.c__button).voieSign:hover,
+.tabs :global(.c__button).voieSign:global(.c__button--active) {
+  background: #2b3990;
+  border-radius: 4px;
+  box-shadow:
+    inset 0 0 0 2px #2b3990,
+    inset 0 0 0 3.5px #fff;
+}
+
+.tabs :global(.c__button).voieSign:global(.c__button--active) {
+  box-shadow:
+    inset 0 0 0 2px #2b3990,
+    inset 0 0 0 3.5px #fff,
+    0 2px 4px rgb(0 0 0 / 25%);
+}
+
+/*
+ * Lieu-dit : flèche marron pointant à droite. La forme est dessinée sur un
+ * pseudo-élément (clip-path) pour ne pas rogner le contour de focus du bouton.
+ */
+.tabs :global(.c__button).toponymeSign,
+.tabs :global(.c__button).toponymeSign:hover,
+.tabs :global(.c__button).toponymeSign:global(.c__button--active) {
+  background: transparent;
+  padding-right: 1.25rem;
+}
+
+.tabs :global(.c__button).toponymeSign::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #7a3b1d;
+  border-radius: 3px 0 0 3px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 0.75rem) 0,
+    100% 50%,
+    calc(100% - 0.75rem) 100%,
+    0 100%
+  );
+}
+
+.tabs :global(.c__button).toponymeSign:global(.c__button--active) {
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 25%));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs :global(.c__button).communeSign,
+  .tabs :global(.c__button).voieSign,
+  .tabs :global(.c__button).toponymeSign {
+    transition: none;
+  }
 }
