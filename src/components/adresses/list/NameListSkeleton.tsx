@@ -1,6 +1,6 @@
 "use client";
 
-import { DataList } from "@gouvfr-lasuite/ui-components";
+import { DataList, Input } from "@gouvfr-lasuite/ui-components";
 import { NAME_LIST_PAGE_SIZE } from "./NameList";
 import styles from "./NameList.module.css";
 
@@ -23,13 +23,22 @@ const SKELETON_COLUMNS = [
   },
 ];
 
-export function NameListSkeleton() {
+export function NameListSkeleton({ searchLabel }: { searchLabel: string }) {
   return (
     <section
       className={styles.container}
       aria-busy="true"
       aria-label="Chargement de la liste"
     >
+      {/* Même champ que NameList, désactivé : la mise en page ne bouge pas */}
+      <div className={styles.search}>
+        <Input
+          label={searchLabel}
+          fullWidth
+          disabled
+          icon={<span className="material-icons">search</span>}
+        />
+      </div>
       <DataList
         columns={SKELETON_COLUMNS}
         rows={PLACEHOLDER_ROWS}

@@ -25,7 +25,7 @@ export default async function BalVoiesPage({
     <NameList
       items={toNameListItems(voies)}
       label="Liste des voies"
-      emptyMessage="Aucune voie dans cette BAL."
+      searchLabel="Rechercher une voie"
     />
   );
 }
