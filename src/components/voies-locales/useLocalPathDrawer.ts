@@ -185,9 +185,7 @@ function roundCoordinates(coords: Position[]): Position[] {
 }
 
 function sameCoordinates(a: Position[], b: Position[]): boolean {
-  return (
-    a.length === b.length && a.every((c, i) => samePointExact(c, b[i]))
-  );
+  return a.length === b.length && a.every((c, i) => samePointExact(c, b[i]));
 }
 
 function toLineStringFeature(

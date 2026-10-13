@@ -107,10 +107,9 @@ export function buildExportRows(paths: PublishedPath[]): ExportRow[] {
           : null,
         geometry: seg.path,
         revetement: REVETEMENT_LABELS[seg.revetement],
-        geom_source:
-          seg.sourceRef
-            ? `${SOURCE_LABELS[seg.source]} (${seg.sourceRef})`
-            : SOURCE_LABELS[seg.source],
+        geom_source: seg.sourceRef
+          ? `${SOURCE_LABELS[seg.source]} (${seg.sourceRef})`
+          : SOURCE_LABELS[seg.source],
       });
     }
   }
