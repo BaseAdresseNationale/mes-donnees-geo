@@ -12,20 +12,12 @@ export const NAME_LIST_COLUMNS = [{ field: "nom" }];
 interface NameListProps {
   items: NameListItem[];
   label: string;
-  singular: string;
-  plural: string;
   emptyMessage: string;
 }
 
 // Équivalent du DataList de l'ui-kit (pas d'en-tête ni de tri), avec en plus
 // la pagination intégrée au DataGrid. La liste complète est paginée côté front.
-export function NameList({
-  items,
-  label,
-  singular,
-  plural,
-  emptyMessage,
-}: NameListProps) {
+export function NameList({ items, label, emptyMessage }: NameListProps) {
   const pagination = usePagination({ pageSize: NAME_LIST_PAGE_SIZE });
   const { page, setPage, setPagesCount, pageSize } = pagination;
 
@@ -38,14 +30,10 @@ export function NameList({
 
   return (
     <section className={styles.container} aria-label={label}>
-      {items.length > 0 && (
-        <p className={styles.counter}>
-          {items.length} {items.length > 1 ? plural : singular}
-        </p>
-      )}
       <DataGrid
         columns={NAME_LIST_COLUMNS}
         rows={pageItems}
+        className={styles.grid}
         pagination={pagination}
         displayHeader={false}
         enableSorting={false}

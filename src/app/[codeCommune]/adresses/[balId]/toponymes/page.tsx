@@ -25,8 +25,6 @@ export default async function BalToponymesPage({
     <NameList
       items={toNameListItems(toponymes)}
       label="Liste des toponymes"
-      singular="toponyme"
-      plural="toponymes"
       emptyMessage="Aucun toponyme dans cette BAL."
     />
   );

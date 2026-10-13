@@ -30,11 +30,11 @@ export function NameListSkeleton() {
       aria-busy="true"
       aria-label="Chargement de la liste"
     >
-      {/* Même <p> que le compteur de NameList pour garder la même hauteur */}
-      <p className={styles.counter}>
-        <span className={`${styles.skeleton} ${styles.skeletonCounter}`} />
-      </p>
-      <DataList columns={SKELETON_COLUMNS} rows={PLACEHOLDER_ROWS} />
+      <DataList
+        columns={SKELETON_COLUMNS}
+        rows={PLACEHOLDER_ROWS}
+        className={styles.grid}
+      />
     </section>
   );
 }

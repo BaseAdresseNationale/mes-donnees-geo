@@ -1,12 +1,26 @@
-/* Le panneau du plugin a une hauteur fixe : c'est la liste qui défile */
+/* Le panneau du plugin a une hauteur fixe : la grille prend la place
+   restante, seules ses lignes défilent et la pagination reste en bas. */
 .container {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
-.counter {
-  padding-left: 0.75em;
+.grid {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Pas d'espace entre la liste et la pagination (gap de .c__datagrid) */
+.grid:global(.c__datagrid) {
+  gap: 0;
+}
+
+/* Conteneur du tableau de l'ui-kit (déjà en overflow: auto) */
+.grid :global(.c__datagrid__table__container) {
+  flex: 1;
+  min-height: 0;
 }
 
 /* Barre de chargement (l'ui-kit ne fournit pas de skeleton) */
