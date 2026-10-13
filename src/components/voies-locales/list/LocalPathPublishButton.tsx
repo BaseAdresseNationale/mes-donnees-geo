@@ -1,6 +1,11 @@
 "use client";
 
-import { Button, Icon } from "@gouvfr-lasuite/ui-components";
+import {
+  Button,
+  Icon,
+  useToastProvider,
+  VariantType,
+} from "@gouvfr-lasuite/ui-components";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -30,12 +35,12 @@ export function LocalPathPublishButton({
   onHighlight: (request: PublishHighlightRequest | null) => void;
 }) {
   const router = useRouter();
+  const { toast } = useToastProvider();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   // Tout est coché par défaut : on mémorise les exclusions pour que les nouveaux changements le soient aussi.
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const selectedIds = useMemo(
     () => changes.filter((c) => !excluded.has(c.id)).map((c) => c.id),
@@ -74,7 +79,6 @@ export function LocalPathPublishButton({
 
   async function publish() {
     setPending(true);
-    setError(null);
     try {
       const response = await fetch("/api/voies-locales/publication", {
         method: "POST",
@@ -85,13 +89,25 @@ export function LocalPathPublishButton({
         const body = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(body?.error ?? "La publication a échoué.");
+        toast(body?.error ?? "La publication a échoué.", VariantType.ERROR, {
+          duration: 8000,
+        });
         return;
       }
+      const { publishedCount } = (await response.json()) as {
+        publishedCount: number;
+      };
+      toast(
+        `${publishedCount} voie${publishedCount > 1 ? "s" : ""} publiée${publishedCount > 1 ? "s" : ""} sur data.gouv.fr.`,
+        VariantType.SUCCESS,
+        { duration: 5000 },
+      );
       setIsOpen(false);
       router.refresh();
     } catch {
-      setError("La publication a échoué.");
+      toast("La publication a échoué.", VariantType.ERROR, {
+        duration: 8000,
+      });
     } finally {
       setPending(false);
     }
@@ -142,9 +158,7 @@ export function LocalPathPublishButton({
                 const allChecked = ids.every((id) => !excluded.has(id));
                 return (
                   <section key={kind} className={styles.group}>
-                    <label
-                      className={`${styles.groupHeader} ${styles[kind]}`}
-                    >
+                    <label className={`${styles.groupHeader} ${styles[kind]}`}>
                       <input
                         type="checkbox"
                         checked={allChecked}
@@ -230,11 +244,6 @@ export function LocalPathPublishButton({
             </div>
           )}
 
-          {error && (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          )}
           <div className={styles.footer}>
             <Button
               color="brand"

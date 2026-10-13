@@ -200,7 +200,9 @@ export function LeftPanelList<T>({
                 type="button"
                 size="nano"
                 color="neutral"
-                onClick={() => selection.onSelectAll(selectableItems.map(getKey))}
+                onClick={() =>
+                  selection.onSelectAll(selectableItems.map(getKey))
+                }
               >
                 Tout sélectionner ({selectableItems.length})
               </Button>

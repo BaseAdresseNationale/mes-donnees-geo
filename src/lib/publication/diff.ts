@@ -151,7 +151,8 @@ function describeChanges(
     for (const { label, read } of SEGMENT_ATTRIBUTES) {
       const b = read(bs);
       const a = read(as);
-      if (b !== a) fields.push({ label: `${prefix}${label}`, before: b, after: a });
+      if (b !== a)
+        fields.push({ label: `${prefix}${label}`, before: b, after: a });
     }
   }
 

@@ -358,19 +358,18 @@ export async function createLocalPathsFromImport(
   let nextNumero = (maxNumero._max.numero ?? 0) + 1;
 
   return Promise.all(
-      inputs.map((input) =>
-        transaction.localPath.create({
-          data: {
-            codeInsee: codeCommune,
-            nom: input.nom,
-            statut: LocalPathStatusEnum.A_QUALIFIER,
-            classement: input.classement,
-            numero: input.numero ?? nextNumero++,
-            segments: { create: segmentsCreateData(input.segments) },
-          },
-          select: SELECT,
-        }),
-      ),
-    )
-    .then((rows) => rows.map((r) => toDomain(r as unknown as Row)));
+    inputs.map((input) =>
+      transaction.localPath.create({
+        data: {
+          codeInsee: codeCommune,
+          nom: input.nom,
+          statut: LocalPathStatusEnum.A_QUALIFIER,
+          classement: input.classement,
+          numero: input.numero ?? nextNumero++,
+          segments: { create: segmentsCreateData(input.segments) },
+        },
+        select: SELECT,
+      }),
+    ),
+  ).then((rows) => rows.map((r) => toDomain(r as unknown as Row)));
 }

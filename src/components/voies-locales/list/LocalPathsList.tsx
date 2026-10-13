@@ -340,9 +340,7 @@ export function LocalPathList({
                   {STATUS_LABEL[p.statut]}
                 </span>
                 {marker && (
-                  <span
-                    className={`${styles.statusBadge} ${marker.className}`}
-                  >
+                  <span className={`${styles.statusBadge} ${marker.className}`}>
                     {marker.label}
                   </span>
                 )}

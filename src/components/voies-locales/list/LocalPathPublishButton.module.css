@@ -188,12 +188,6 @@
   color: var(--color-muted, #555);
 }
 
-.error {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: #ce0500;
-}
-
 .footer {
   display: flex;
   justify-content: flex-end;

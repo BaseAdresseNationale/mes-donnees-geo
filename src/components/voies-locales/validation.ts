@@ -103,7 +103,10 @@ function validateSegment(raw: unknown, index: number): SegmentValidationResult {
     type = s.type as LocalPathType;
   }
 
-  if (typeof s.revetement !== "string" || !REVETEMENT_VALUES.has(s.revetement)) {
+  if (
+    typeof s.revetement !== "string" ||
+    !REVETEMENT_VALUES.has(s.revetement)
+  ) {
     return { ok: false, error: `Segment ${index + 1} : revêtement invalide.` };
   }
 
