@@ -18,6 +18,8 @@ import {
   Select,
   Tooltip,
   useModals,
+  useToastProvider,
+  VariantType,
 } from "@gouvfr-lasuite/ui-components";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
@@ -39,6 +41,7 @@ import {
   LocalPathDeletionReason,
   LocalPathGestionnaire,
   LocalPathRevetement,
+  LocalPathSource,
   LocalPathType,
   LocalPathEtat,
 } from "@/generated/prisma/browser";
@@ -141,6 +144,13 @@ function DeletionReasonPrompt({
   );
 }
 
+async function readError(res: Response, fallback: string): Promise<string> {
+  const body = (await res.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  return body?.error ?? fallback;
+}
+
 export function LocalPathForm({
   codeCommune,
   initial,
@@ -150,10 +160,11 @@ export function LocalPathForm({
   const { mapRef, setMapMessage, setMapChildren, flyToBounds } =
     useContext(MapContext);
   const modals = useModals();
+  const { toast } = useToastProvider();
   const [pending, startTransition] = useTransition();
-  const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "success" | "error"
-  >("idle");
+
+  const notifyError = (message: string) =>
+    toast(message, VariantType.ERROR, { duration: 8000 });
 
   const [nom, setNom] = useState(initial?.nom ?? "");
   const [classement, setClassement] = useState<LocalPathClassement>(
@@ -174,15 +185,6 @@ export function LocalPathForm({
   );
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const deletionReasonRef = useRef<LocalPathDeletionReason | null>(null);
-
-  useEffect(() => {
-    if (submitStatus !== "idle") {
-      const timeout = setTimeout(() => {
-        setSubmitStatus("idle");
-      }, 3000);
-      return () => clearTimeout(timeout);
-    }
-  }, [submitStatus]);
 
   // Fly to the initial path if provided
   useEffect(() => {
@@ -266,6 +268,7 @@ export function LocalPathForm({
             id: "__preview__",
             coordinates: drawer.previewCoordinates,
             sourceRef: null,
+            source: LocalPathSource.MANUEL,
             type: LocalPathType.TRONCON,
             revetement: LocalPathRevetement.NON_REVETU,
             largeurMoyenne: null,
@@ -432,7 +435,11 @@ export function LocalPathForm({
       segments: all.filter((_, i) => !portion.indices.has(i)),
     });
     if (!detached.ok || !remaining.ok) {
-      setSubmitStatus("error");
+      notifyError(
+        (!detached.ok && detached.error) ||
+          (!remaining.ok && remaining.error) ||
+          "La défusion a échoué.",
+      );
       return;
     }
 
@@ -445,7 +452,7 @@ export function LocalPathForm({
           body: JSON.stringify(detached.data),
         });
         if (!created.ok) {
-          setSubmitStatus("error");
+          notifyError(await readError(created, "La défusion a échoué."));
           return;
         }
         const newPath = (await created.json()) as LocalPath;
@@ -455,7 +462,7 @@ export function LocalPathForm({
           body: JSON.stringify(remaining.data),
         });
         if (!updated.ok) {
-          setSubmitStatus("error");
+          notifyError(await readError(updated, "La défusion a échoué."));
           return;
         }
         if (drawer.mergedPathIds.length > 0) {
@@ -465,9 +472,12 @@ export function LocalPathForm({
             ),
           );
         }
+        toast("Les segments ont été défusionnés.", VariantType.SUCCESS, {
+          duration: 5000,
+        });
         router.push(`/${codeCommune}/voies-locales/${newPath.id}`);
       } catch {
-        setSubmitStatus("error");
+        notifyError("La défusion a échoué.");
       }
     });
   }
@@ -485,7 +495,7 @@ export function LocalPathForm({
       segments: drawer.toSegmentsInput(),
     });
     if (!validation.ok) {
-      setSubmitStatus("error");
+      notifyError(validation.error);
       return;
     }
 
@@ -500,15 +510,11 @@ export function LocalPathForm({
           body: JSON.stringify(validation.data),
         });
         if (!res.ok) {
-          const payload = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          setSubmitStatus("error");
+          notifyError(await readError(res, "L'enregistrement a échoué."));
           return;
         }
-        const saved = (await res.json()) as LocalPath;
         // Les chemins fusionnés n'existent plus en tant que chemins distincts :
-        // leurs segments viennent d'être absorbés dans `saved`.
+        // leurs segments viennent d'être absorbés dans la voie enregistrée.
         if (drawer.mergedPathIds.length > 0) {
           await Promise.allSettled(
             drawer.mergedPathIds.map((id) =>
@@ -516,10 +522,12 @@ export function LocalPathForm({
             ),
           );
         }
-        router.push(`/${codeCommune}/voies-locales/${saved.id}`);
-        setSubmitStatus("success");
+        toast("Voie enregistrée avec succès.", VariantType.SUCCESS, {
+          duration: 5000,
+        });
+        router.push(`/${codeCommune}/voies-locales`);
       } catch {
-        setSubmitStatus("error");
+        notifyError("L'enregistrement a échoué.");
       }
     });
   }
@@ -539,7 +547,6 @@ export function LocalPathForm({
       ),
     });
     if (decision !== "delete") return;
-    setSubmitStatus("idle");
     startTransition(async () => {
       try {
         const res = await fetch(`/api/voies-locales/${initial.id}`, {
@@ -548,12 +555,13 @@ export function LocalPathForm({
           body: JSON.stringify({ deletionReason: deletionReasonRef.current }),
         });
         if (!res.ok) {
-          setSubmitStatus("error");
+          notifyError(await readError(res, "La suppression a échoué."));
           return;
         }
+        toast("Voie supprimée.", VariantType.SUCCESS, { duration: 5000 });
         router.push(`/${codeCommune}/voies-locales`);
       } catch {
-        setSubmitStatus("error");
+        notifyError("La suppression a échoué.");
       }
     });
   }
@@ -801,18 +809,6 @@ export function LocalPathForm({
             )}
           />
         </section>
-
-        {submitStatus === "error" && (
-          <p className={styles.error} role="alert">
-            Une erreur est survenue.
-          </p>
-        )}
-
-        {submitStatus === "success" && (
-          <p className={styles.successMessage} role="status">
-            Chemin enregistré avec succès.
-          </p>
-        )}
 
         <div className={styles.actions}>
           <Button

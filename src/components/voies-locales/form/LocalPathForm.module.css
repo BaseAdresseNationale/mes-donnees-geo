@@ -25,24 +25,6 @@
   font-weight: 600;
 }
 
-.error {
-  padding: 0.5rem 0.625rem;
-  border: 1px solid #ce0500;
-  background: #fff4f4;
-  color: #ce0500;
-  border-radius: 4px;
-  font-size: 0.8125rem;
-}
-
-.successMessage {
-  padding: 0.5rem 0.625rem;
-  border: 1px solid #2e7d32;
-  background: #e6f4ea;
-  color: #2e7d32;
-  border-radius: 4px;
-  font-size: 0.8125rem;
-}
-
 .pathIdentifier {
   display: flex;
   gap: 0.5rem;
