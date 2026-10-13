@@ -102,3 +102,49 @@ export function snapToBdTopo(
   }
   return best;
 }
+
+// Marge : la géométrie des tuiles varie légèrement selon le zoom.
+const VERIFY_TOLERANCE_METERS = BD_TOPO_SNAP_METERS + 1;
+
+/**
+ * Ne garde que les cleabs dont le tronçon passe encore à proximité d'au moins un
+ * sommet du segment, d'après les tuiles chargées. Sans données fiables (zoom
+ * trop faible, segment hors de la vue, tronçon non chargé), tout est conservé.
+ */
+export function keepSnappedCleabs(
+  map: MapLibreMap,
+  coordinates: Position[],
+  sourceRef: string,
+): string | null {
+  if (!map.getLayer(BD_TOPO_SNAP_LAYER_ID)) return sourceRef;
+  if (map.getZoom() < BD_TOPO_SNAP_MIN_ZOOM) return sourceRef;
+  const bounds = map.getBounds();
+  if (!coordinates.every((c) => bounds.contains([c[0], c[1]]))) {
+    return sourceRef;
+  }
+
+  const kept = sourceRef.split(",").filter((cleabs) => {
+    const features = map.querySourceFeatures(BD_TOPO_SNAP_SOURCE_ID, {
+      sourceLayer: BD_TOPO_SNAP_SOURCE_LAYER,
+      filter: ["==", ["get", "cleabs"], cleabs],
+    });
+    if (features.length === 0) return true;
+    const lines = features.flatMap((feature) =>
+      feature.geometry.type === "LineString"
+        ? [feature.geometry.coordinates]
+        : feature.geometry.type === "MultiLineString"
+          ? feature.geometry.coordinates
+          : [],
+    );
+    return coordinates.some((c) => {
+      const kx =
+        METERS_PER_DEGREE_LNG_AT_EQUATOR * Math.cos((c[1] * Math.PI) / 180);
+      return lines.some(
+        (line) =>
+          (nearestOnLine(line, c[0], c[1], kx)?.distance ?? Infinity) <=
+          VERIFY_TOLERANCE_METERS,
+      );
+    });
+  });
+  return kept.length > 0 ? kept.join(",") : null;
+}

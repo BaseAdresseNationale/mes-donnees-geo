@@ -108,7 +108,7 @@ export function buildExportRows(paths: PublishedPath[]): ExportRow[] {
         geometry: seg.path,
         revetement: REVETEMENT_LABELS[seg.revetement],
         geom_source:
-          seg.source === "BD_TOPO" && seg.sourceRef
+          seg.sourceRef
             ? `${SOURCE_LABELS[seg.source]} (${seg.sourceRef})`
             : SOURCE_LABELS[seg.source],
       });

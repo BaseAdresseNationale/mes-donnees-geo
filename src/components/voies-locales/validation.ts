@@ -5,11 +5,13 @@ import {
   LocalPathGestionnaire,
   LocalPathRevetement,
   LocalPathServitude,
+  LocalPathSource,
   LocalPathType,
 } from "@/generated/prisma/browser";
 
 export interface LocalPathSegmentInput {
   path: GeoJSON.LineString;
+  source: LocalPathSource;
   /** Cleabs BD TOPO séparées par des virgules (segment manuel aimanté). */
   sourceRef: string | null;
   type: LocalPathType;
@@ -54,6 +56,7 @@ const GESTIONNAIRE_VALUES = new Set<string>(
 
 const NAME_MAX_LENGTH = 200;
 const COMMENTAIRE_MAX_LENGTH = 2000;
+const SOURCE_VALUES = new Set<string>(Object.values(LocalPathSource));
 const SOURCE_REF_MAX_LENGTH = 2000;
 const SOURCE_REF_PATTERN = /^[A-Za-z0-9]{1,64}(,[A-Za-z0-9]{1,64})*$/;
 
@@ -181,6 +184,14 @@ function validateSegment(raw: unknown, index: number): SegmentValidationResult {
     delimitation = s.delimitation as LocalPathDelimitation;
   }
 
+  let source: LocalPathSource = LocalPathSource.MANUEL;
+  if (s.source !== undefined && s.source !== null) {
+    if (typeof s.source !== "string" || !SOURCE_VALUES.has(s.source)) {
+      return { ok: false, error: `Segment ${index + 1} : source invalide.` };
+    }
+    source = s.source as LocalPathSource;
+  }
+
   let sourceRef: string | null = null;
   if (s.sourceRef !== undefined && s.sourceRef !== null) {
     if (
@@ -200,6 +211,7 @@ function validateSegment(raw: unknown, index: number): SegmentValidationResult {
     ok: true,
     data: {
       path: s.path as GeoJSON.LineString,
+      source,
       sourceRef,
       type,
       revetement: s.revetement as LocalPathRevetement,

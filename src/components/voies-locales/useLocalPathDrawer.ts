@@ -22,7 +22,7 @@ import {
 } from "@/generated/prisma/browser";
 import type { LocalPath, LocalPathSegment } from "./types";
 import DrawContext from "@/contexts/DrawContext";
-import { snapToBdTopo } from "./bd-topo-snap";
+import { keepSnappedCleabs, snapToBdTopo } from "./bd-topo-snap";
 
 type CartesianPoint = { x: number; y: number };
 
@@ -65,12 +65,14 @@ export interface SegmentAttributes {
 export interface Segment extends SegmentAttributes {
   id: string;
   coordinates: Position[];
-  // Cleabs BD TOPO (séparées par des virgules) sur lesquelles le tracé manuel a été aimanté.
+  source: LocalPathSource;
+  // Cleabs BD TOPO, séparées par des virgules.
   sourceRef: string | null;
 }
 
 export interface SegmentInput {
   path: GeoJSON.LineString;
+  source: LocalPathSource;
   sourceRef: string | null;
   type: LocalPathType;
   revetement: LocalPathRevetement;
@@ -182,10 +184,10 @@ function roundCoordinates(coords: Position[]): Position[] {
   return coords.map(roundCoordinate);
 }
 
-// Seules les cleabs d'un aimantage manuel sont conservées : les segments
-// importés de la BD TOPO repassent en manuel à l'enregistrement (dette connue).
-function manualSourceRef(s: LocalPathSegment): string | null {
-  return s.source === LocalPathSource.MANUEL ? (s.sourceRef ?? null) : null;
+function sameCoordinates(a: Position[], b: Position[]): boolean {
+  return (
+    a.length === b.length && a.every((c, i) => samePointExact(c, b[i]))
+  );
 }
 
 function toLineStringFeature(
@@ -210,7 +212,15 @@ function computeChainAfterAppend(
   sourceRef: string | null,
 ): Segment[] | null {
   if (chain.length === 0) {
-    return [{ id, ...DEFAULT_ATTRIBUTES, coordinates: coords, sourceRef }];
+    return [
+      {
+        id,
+        ...DEFAULT_ATTRIBUTES,
+        coordinates: coords,
+        source: LocalPathSource.MANUEL,
+        sourceRef,
+      },
+    ];
   }
   const chainStart = chain[0].coordinates[0];
   const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
@@ -218,7 +228,13 @@ function computeChainAfterAppend(
   if (isSamePoint(newStart, chainEnd)) {
     return [
       ...chain,
-      { id, ...DEFAULT_ATTRIBUTES, coordinates: coords, sourceRef },
+      {
+        id,
+        ...DEFAULT_ATTRIBUTES,
+        coordinates: coords,
+        source: LocalPathSource.MANUEL,
+        sourceRef,
+      },
     ];
   }
   if (isSamePoint(newStart, chainStart)) {
@@ -227,6 +243,7 @@ function computeChainAfterAppend(
         id,
         ...DEFAULT_ATTRIBUTES,
         coordinates: [...coords].reverse(),
+        source: LocalPathSource.MANUEL,
         sourceRef,
       },
       ...chain,
@@ -392,7 +409,13 @@ export function useLocalPathDrawer(
       if (!f || f.geometry?.type !== "LineString") return seg;
       const coords = (f.geometry as GeoLineString).coordinates;
       if (!coords || coords.length < 2) return seg;
-      return { ...seg, coordinates: coords };
+      if (sameCoordinates(coords, seg.coordinates)) return seg;
+      // Géométrie modifiée : le tracé n'est plus celui de la BD TOPO.
+      return {
+        ...seg,
+        coordinates: coords,
+        source: LocalPathSource.MANUEL,
+      };
     });
 
     // Un sommet aux extrémités d'un segment est partagé avec le segment voisin
@@ -408,7 +431,11 @@ export function useLocalPathDrawer(
         if (!samePointExact(left.coordinates.at(-1)!, newStart)) {
           const coords = [...left.coordinates];
           coords[coords.length - 1] = newStart;
-          next[k - 1] = { ...left, coordinates: coords };
+          next[k - 1] = {
+            ...left,
+            coordinates: coords,
+            source: LocalPathSource.MANUEL,
+          };
           neighborUpdates.push({ id: left.id, coordinates: coords });
         }
       }
@@ -417,7 +444,11 @@ export function useLocalPathDrawer(
         if (!samePointExact(right.coordinates[0], newEnd)) {
           const coords = [...right.coordinates];
           coords[0] = newEnd;
-          next[k + 1] = { ...right, coordinates: coords };
+          next[k + 1] = {
+            ...right,
+            coordinates: coords,
+            source: LocalPathSource.MANUEL,
+          };
           neighborUpdates.push({ id: right.id, coordinates: coords });
         }
       }
@@ -430,6 +461,7 @@ export function useLocalPathDrawer(
     // (`EDIT_LINE_LAYER_ID`, qui dépend de ce state via plusieurs composants)
     // ne se met visuellement à jour qu'à l'arrêt du geste (désélection).
     flushSync(() => setSegments(next));
+    segmentsRef.current = next;
 
     for (const u of neighborUpdates) {
       try {
@@ -744,7 +776,27 @@ export function useLocalPathDrawer(
         // Le mode select émet aussi "finish" après un glisser de sommet
         // (dragCoordinate/dragCoordinateResize/dragFeature) : ce n'est pas
         // un nouveau segment tracé, sinon il serait dupliqué dans la chaîne.
-        if (modeRef.current !== "draw") return;
+        if (modeRef.current !== "draw") {
+          // Fin de geste : les tuiles sont chargées là où le sommet a bougé, on
+          // retire les cleabs des segments manuels qui ne sont plus aimantés.
+          const current = segmentsRef.current;
+          const next = current.map((seg) => {
+            if (seg.source !== LocalPathSource.MANUEL || !seg.sourceRef) {
+              return seg;
+            }
+            const sourceRef = keepSnappedCleabs(
+              nativeMap,
+              seg.coordinates,
+              seg.sourceRef,
+            );
+            return sourceRef === seg.sourceRef ? seg : { ...seg, sourceRef };
+          });
+          if (next.some((seg, i) => seg !== current[i])) {
+            segmentsRef.current = next;
+            setSegments(next);
+          }
+          return;
+        }
         const [id] = args as [string | number];
         handleFinish(String(id));
       });
@@ -869,7 +921,8 @@ export function useLocalPathDrawer(
         const initSegments: Segment[] = initial.segments.map((s) => ({
           id: s.id,
           coordinates: roundCoordinates(s.path.coordinates),
-          sourceRef: manualSourceRef(s),
+          sourceRef: s.sourceRef ?? null,
+          source: s.source,
           type: s.type,
           revetement: s.revetement,
           largeurMoyenne: s.largeurMoyenne ?? null,
@@ -1023,7 +1076,8 @@ export function useLocalPathDrawer(
       let toAdd: Segment[] = otherPath.segments.map((s) => ({
         id: s.id,
         coordinates: roundCoordinates(s.path.coordinates),
-        sourceRef: manualSourceRef(s),
+        sourceRef: s.sourceRef ?? null,
+        source: s.source,
         type: s.type,
         revetement: s.revetement,
         largeurMoyenne: s.largeurMoyenne ?? null,
@@ -1042,12 +1096,14 @@ export function useLocalPathDrawer(
       if (best.place === "append") {
         toAdd[0] = {
           ...toAdd[0],
+          source: LocalPathSource.MANUEL,
           coordinates: [chainEnd, ...toAdd[0].coordinates.slice(1)],
         };
       } else {
         const lastIdx = toAdd.length - 1;
         toAdd[lastIdx] = {
           ...toAdd[lastIdx],
+          source: LocalPathSource.MANUEL,
           coordinates: [...toAdd[lastIdx].coordinates.slice(0, -1), chainStart],
         };
       }
@@ -1069,6 +1125,7 @@ export function useLocalPathDrawer(
       segments.map((s) => ({
         path: { type: "LineString", coordinates: s.coordinates },
         sourceRef: s.sourceRef,
+        source: s.source,
         type: s.type,
         revetement: s.revetement,
         largeurMoyenne: s.largeurMoyenne,
