@@ -1,5 +1,5 @@
-import { VoieFormSkeleton } from "@/components/adresses/voie/VoieFormSkeleton";
+import { NumeroFormSkeleton } from "@/components/adresses/numero/NumeroFormSkeleton";
 
 export default function Loading() {
-  return <VoieFormSkeleton />;
+  return <NumeroFormSkeleton />;
 }
