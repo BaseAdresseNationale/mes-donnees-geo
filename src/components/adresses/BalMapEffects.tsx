@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import MapContext from "@/contexts/MapContext";
 import { useCommune } from "@/contexts/CommuneContext";
 import { BalTilesMap } from "@/components/map/bal/BalTilesMap";
@@ -14,6 +14,9 @@ export function BalMapEffects({ balId }: { balId: string }) {
   const { contour: communeContour } = useCommune();
 
   const tab = getBalTab(usePathname());
+  // Sur la page d'une voie, c'est la voie qui est centrée (VoieMapEffects) :
+  // le centrage initial sur la commune passerait après et l'écraserait.
+  const { voieId } = useParams<{ voieId?: string }>();
 
   const initialFlyToDoneRef = useRef(false);
 
@@ -26,12 +29,15 @@ export function BalMapEffects({ balId }: { balId: string }) {
   }, [setMapChildren, balId, tab]);
 
   useEffect(() => {
+    if (voieId) {
+      initialFlyToDoneRef.current = true;
+    }
     if (!initialFlyToDoneRef.current) {
       if (flyToBounds()) {
         initialFlyToDoneRef.current = true;
       }
     }
-  }, [communeContour, flyToBounds]);
+  }, [communeContour, flyToBounds, voieId]);
 
   return null;
 }

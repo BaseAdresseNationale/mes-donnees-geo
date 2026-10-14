@@ -8,7 +8,7 @@ export default async function BalVoiesPage({
 }: {
   params: Promise<{ codeCommune: string; balId: string }>;
 }) {
-  const { balId } = await params;
+  const { codeCommune, balId } = await params;
   const client = await requireBalClient(balId);
 
   const { data: voies } = await findBaseLocaleVoies({
@@ -22,6 +22,7 @@ export default async function BalVoiesPage({
       items={toNameListItems(voies)}
       label="Liste des voies"
       searchLabel="Rechercher une voie"
+      hrefPrefix={`/${codeCommune}/adresses/${balId}/voies`}
     />
   );
 }

@@ -39,6 +39,7 @@ export function BalTabs() {
     <nav className={styles.tabs} aria-label="Navigation de la BAL">
       {TABS.map((tab) => {
         const isActive = tab.id === activeTabId;
+        const href = `/${codeCommune}/adresses/${balId}${tab.suffix}`;
         return (
           <Button
             key={tab.id}
@@ -49,9 +50,11 @@ export function BalTabs() {
             active={isActive}
             className={tab.className}
             aria-current={isActive ? "page" : undefined}
+            // Navigue aussi depuis une sous-page de l'onglet actif
+            // (ex. /voies/{voieId} → liste des voies)
             onClick={() => {
-              if (!isActive) {
-                router.push(`/${codeCommune}/adresses/${balId}${tab.suffix}`);
+              if (pathname !== href) {
+                router.push(href);
               }
             }}
           >

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   Input,
@@ -15,11 +16,20 @@ interface NameListProps {
   items: NameListItem[];
   label: string;
   searchLabel: string;
+  emptyMessage?: string;
+  // Si fourni, chaque élément est un lien vers {hrefPrefix}/{id}
+  hrefPrefix?: string;
 }
 
 // Liste de noms inspirée de RuralPathList (recherche + cartes), paginée côté
 // front puisque l'API renvoie la liste complète.
-export function NameList({ items, label, searchLabel }: NameListProps) {
+export function NameList({
+  items,
+  label,
+  searchLabel,
+  emptyMessage = "Aucun élément dans cette BAL.",
+  hrefPrefix,
+}: NameListProps) {
   const [query, setQuery] = useState("");
 
   // Recherche par nom sur la liste complète, avant pagination
@@ -57,14 +67,25 @@ export function NameList({ items, label, searchLabel }: NameListProps) {
       {filteredItems.length === 0 ? (
         <p className={styles.empty}>
           {items.length === 0
-            ? "Aucun élément dans cette BAL."
+            ? emptyMessage
             : "Aucun résultat pour cette recherche."}
         </p>
       ) : (
         <ul className={styles.list}>
           {pageItems.map((item) => (
-            <li key={item.id} className={styles.item}>
-              <span className={styles.itemTitle}>{item.nom}</span>
+            <li key={item.id}>
+              {hrefPrefix ? (
+                <Link
+                  href={`${hrefPrefix}/${item.id}`}
+                  className={`${styles.item} ${styles.itemLink}`}
+                >
+                  <span className={styles.itemTitle}>{item.nom}</span>
+                </Link>
+              ) : (
+                <div className={styles.item}>
+                  <span className={styles.itemTitle}>{item.nom}</span>
+                </div>
+              )}
             </li>
           ))}
         </ul>
