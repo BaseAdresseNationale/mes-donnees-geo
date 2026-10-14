@@ -10,6 +10,7 @@ export default async function VoiePage({
   params: Promise<{ codeCommune: string; balId: string; voieId: string }>;
 }) {
   const { codeCommune, balId, voieId } = await params;
+  const voieHref = `/${codeCommune}/adresses/${balId}/voies/${voieId}`;
 
   const [voie, { data: numeros }] = await Promise.all([
     requireBalVoie(balId, voieId),
@@ -24,7 +25,7 @@ export default async function VoiePage({
       <DetailHeader
         nom={voie.nom}
         nbNumeros={voie.nbNumeros}
-        editHref={`/${codeCommune}/adresses/${balId}/voies/${voieId}/edit`}
+        editHref={`${voieHref}/edit`}
         editLabel="Modifier la voie"
       />
       <NameList
@@ -36,6 +37,10 @@ export default async function VoiePage({
         label="Numéros de la voie"
         searchLabel="Rechercher un numéro"
         emptyMessage="Aucun numéro sur cette voie."
+        hrefPrefix={`${voieHref}/numeros`}
+        hrefSuffix="/edit"
+        addHref={`${voieHref}/numeros/new`}
+        addLabel="Ajouter un numéro"
       />
     </>
   );

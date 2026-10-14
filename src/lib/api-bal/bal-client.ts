@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { getServerBalClient } from "./bal-access";
-import { findVoie } from "./generated/sdk.gen";
+import { findNumero, findVoie } from "./generated/sdk.gen";
 
 // Identifiant au format ObjectId (24 caractères hexadécimaux)
 const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
@@ -44,3 +44,32 @@ export const requireBalVoie = cache(async (balId: string, voieId: string) => {
 
   return voie;
 });
+
+// Numéro d'une voie de la BAL pour les pages sous /numeros/{numeroId}.
+// 404 si le numéro n'existe pas ou n'appartient pas à la BAL / voie de l'URL.
+export const requireBalNumero = cache(
+  async (balId: string, voieId: string, numeroId: string) => {
+    const client = await requireBalClient(balId);
+    if (!OBJECT_ID_RE.test(voieId) || !OBJECT_ID_RE.test(numeroId)) {
+      notFound();
+    }
+
+    const { data: numero, response } = await findNumero({
+      client,
+      path: { numeroId },
+    });
+    if (
+      response?.status === 404 ||
+      (numero && (numero.balId !== balId || numero.voieId !== voieId))
+    ) {
+      notFound();
+    }
+    if (!numero) {
+      throw new Error(
+        `Impossible de récupérer le numéro ${numeroId} (HTTP ${response?.status}).`,
+      );
+    }
+
+    return numero;
+  },
+);

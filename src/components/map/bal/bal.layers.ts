@@ -213,5 +213,8 @@ export function getBalLayers(tab: BalTab): LayerProps[] {
   return BAL_LAYERS_BY_TAB[tab];
 }
 
+// Couches des numéros (ex. pour masquer le numéro en cours d'édition)
+export const BAL_NUMERO_LAYER_IDS = ["bal-numero-point", "bal-numero-label"];
+
 // Ids de toutes les couches (pour les événements de survol)
 export const BAL_LAYER_IDS = VISIBLE_LAYER_IDS.commune;

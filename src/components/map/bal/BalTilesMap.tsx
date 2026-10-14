@@ -7,7 +7,7 @@ import {
   MapRef,
   Source,
 } from "react-map-gl/maplibre";
-import type { VectorTileSource } from "maplibre-gl";
+import type { FilterSpecification, VectorTileSource } from "maplibre-gl";
 import MapContext from "@/contexts/MapContext";
 import DrawContext from "@/contexts/DrawContext";
 import {
@@ -15,6 +15,7 @@ import {
   BAL_TILES_MIN_ZOOM,
   BAL_TILES_SOURCE_ID,
   BAL_LAYER_IDS,
+  BAL_NUMERO_LAYER_IDS,
   getBalLayers,
 } from "./bal.layers";
 import type { BalTab } from "@/components/adresses/bal-tab";
@@ -40,7 +41,17 @@ export function reloadBalTiles(mapRef: MapRef | null) {
   }
 }
 
-export function BalTilesMap({ balId, tab }: { balId: string; tab: BalTab }) {
+export function BalTilesMap({
+  balId,
+  tab,
+  hiddenNumeroId,
+}: {
+  balId: string;
+  tab: BalTab;
+  // Numéro en cours d'édition : représenté par ses marqueurs déplaçables,
+  // on ne l'affiche pas en double depuis les tuiles.
+  hiddenNumeroId?: string;
+}) {
   const { mapRef } = useContext(MapContext);
   const { isDrawing } = useContext(DrawContext);
 
@@ -111,9 +122,28 @@ export function BalTilesMap({ balId, tab }: { balId: string; tab: BalTab }) {
       maxzoom={BAL_TILES_MAX_ZOOM}
       promoteId="id"
     >
-      {getBalLayers(tab).map((layer) => (
-        <Layer key={layer.id} {...layer} />
-      ))}
+      {getBalLayers(tab).map((layer) => {
+        // Le filtre n'est ajouté qu'aux couches concernées : une clé `filter`
+        // à undefined est refusée par maplibre à la création de la couche.
+        const hideNumero =
+          hiddenNumeroId !== undefined &&
+          BAL_NUMERO_LAYER_IDS.includes(layer.id!);
+        return (
+          <Layer
+            key={layer.id}
+            {...layer}
+            {...(hideNumero
+              ? {
+                  filter: [
+                    "!=",
+                    ["get", "id"],
+                    hiddenNumeroId,
+                  ] as FilterSpecification,
+                }
+              : {})}
+          />
+        );
+      })}
     </Source>
   );
 }

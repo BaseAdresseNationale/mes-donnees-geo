@@ -37,6 +37,10 @@ interface MapContextValue {
   mapRefCb: (instance: MapRef | null) => void;
   mapChildren: React.ReactNode | null;
   setMapChildren: (children: React.ReactNode) => void;
+  // Second emplacement, rendu au-dessus de mapChildren : éléments de carte
+  // d'un formulaire (marqueurs, sélection…) sans remplacer ceux du plugin.
+  mapOverlayChildren: React.ReactNode | null;
+  setMapOverlayChildren: (children: React.ReactNode) => void;
   mapMessage: string | null;
   setMapMessage: React.Dispatch<React.SetStateAction<string | null>>;
   mapToolChildren: React.ReactNode | null;
@@ -59,6 +63,8 @@ export const MapContext = createContext<MapContextValue>({
   mapRefCb: () => {},
   mapChildren: null,
   setMapChildren: () => {},
+  mapOverlayChildren: null,
+  setMapOverlayChildren: () => {},
   mapMessage: null,
   setMapMessage: () => {},
   mapToolChildren: null,
@@ -78,6 +84,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
     }
   }, []);
   const [mapChildren, setMapChildren] = useState<React.ReactNode>(null);
+  const [mapOverlayChildren, setMapOverlayChildren] =
+    useState<React.ReactNode>(null);
   const [mapToolChildren, setMapToolChildren] = useState<React.ReactNode>(null);
   const [mapMessage, setMapMessage] = useState<string | null>(null);
   const [savedFlyToBounds, setSavedFlyToBounds] = useState<
@@ -142,6 +150,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
       mapRefCb,
       mapChildren,
       setMapChildren,
+      mapOverlayChildren,
+      setMapOverlayChildren,
       mapMessage,
       setMapMessage,
       mapToolChildren,
@@ -157,6 +167,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
       mapRefCb,
       mapChildren,
       setMapChildren,
+      mapOverlayChildren,
+      setMapOverlayChildren,
       mapMessage,
       setMapMessage,
       mapToolChildren,

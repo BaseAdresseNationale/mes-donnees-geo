@@ -19,8 +19,9 @@ interface NameListProps {
   // Champ de recherche affiché seulement si fourni
   searchLabel?: string;
   emptyMessage?: string;
-  // Si fourni, chaque élément est un lien vers {hrefPrefix}/{id}
+  // Si fourni, chaque élément est un lien vers {hrefPrefix}/{id}{hrefSuffix}
   hrefPrefix?: string;
+  hrefSuffix?: string;
   // false : tous les éléments sur une seule page, sans pagination
   paginated?: boolean;
   // Si fourni, bouton « ajouter » à droite de la recherche
@@ -36,6 +37,7 @@ export function NameList({
   searchLabel,
   emptyMessage = "Aucun élément dans cette BAL.",
   hrefPrefix,
+  hrefSuffix = "",
   paginated = true,
   addHref,
   addLabel = "Ajouter",
@@ -93,7 +95,7 @@ export function NameList({
             <li key={item.id}>
               {hrefPrefix ? (
                 <Link
-                  href={`${hrefPrefix}/${item.id}`}
+                  href={`${hrefPrefix}/${item.id}${hrefSuffix}`}
                   className={`${styles.item} ${styles.itemLink}`}
                 >
                   <span className={styles.itemTitle}>{item.nom}</span>

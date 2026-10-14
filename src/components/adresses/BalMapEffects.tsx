@@ -17,21 +17,24 @@ export function BalMapEffects({ balId }: { balId: string }) {
   // Sur la page d'une voie ou d'un toponyme, c'est lui qui est centré
   // (BboxMapEffects) : le centrage initial sur la commune passerait après et
   // l'écraserait.
-  const { voieId, toponymeId } = useParams<{
+  const { voieId, toponymeId, numeroId } = useParams<{
     voieId?: string;
     toponymeId?: string;
+    numeroId?: string;
   }>();
   const hasDetailTarget = Boolean(voieId || toponymeId);
 
   const initialFlyToDoneRef = useRef(false);
 
   useEffect(() => {
-    setMapChildren(<BalTilesMap balId={balId} tab={tab} />);
+    setMapChildren(
+      <BalTilesMap balId={balId} tab={tab} hiddenNumeroId={numeroId} />,
+    );
 
     return () => {
       setMapChildren(null);
     };
-  }, [setMapChildren, balId, tab]);
+  }, [setMapChildren, balId, tab, numeroId]);
 
   useEffect(() => {
     if (hasDetailTarget) {

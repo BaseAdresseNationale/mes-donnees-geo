@@ -12,6 +12,7 @@ import {
   getLangueLabel,
 } from "@/lib/api-bal/langues-regionales";
 import { reloadBalTiles } from "@/components/map/bal/BalTilesMap";
+import { parseApiFieldErrors } from "@/components/adresses/form/api-errors";
 import styles from "./VoieForm.module.css";
 
 const COMMENT_MAX_LENGTH = 5000;
@@ -25,29 +26,12 @@ interface LangueRow {
 
 type FieldErrors = Partial<Record<"nom" | "nomAlt" | "comment", string>>;
 
-// Erreurs de validation de l'API : ["voie_nom:…", "lang_alt:…", "comment:…"]
+// Préfixes des erreurs de validation de l'API → champs du formulaire
 const API_FIELDS: Record<string, keyof FieldErrors> = {
   voie_nom: "nom",
   lang_alt: "nomAlt",
   comment: "comment",
 };
-
-function parseApiErrors(error: unknown): FieldErrors | null {
-  const messages =
-    error && typeof error === "object" && "message" in error
-      ? error.message
-      : null;
-  if (!Array.isArray(messages)) return null;
-
-  const errors: FieldErrors = {};
-  for (const message of messages) {
-    if (typeof message !== "string") continue;
-    const [field, ...rest] = message.split(":");
-    const key = API_FIELDS[field];
-    if (key && rest.length > 0) errors[key] = rest.join(":").trim();
-  }
-  return Object.keys(errors).length > 0 ? errors : null;
-}
 
 function toLangueRows(nomAlt: ExtendedVoieDto["nomAlt"] | null): LangueRow[] {
   return Object.entries(nomAlt ?? {}).map(([code, nom], index) => ({
@@ -130,7 +114,7 @@ export function VoieForm({
         : await createVoie({ client, path: { baseLocaleId: balId }, body });
 
       if (error || !data || !response?.ok) {
-        const errors = parseApiErrors(error);
+        const errors = parseApiFieldErrors(error, API_FIELDS);
         if (errors) {
           setFieldErrors(errors);
         } else if (response?.status === 403) {
