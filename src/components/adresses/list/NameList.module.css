@@ -1,0 +1,159 @@
+/* Repris de RuralPathsList.module.css : le panneau a une hauteur fixe,
+   seule la liste défile, la pagination reste en bas.
+   Pas de marge horizontale ici mais sur chaque bloc : la liste occupe toute
+   la largeur, sa barre de défilement est collée au bord droit du panneau. */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  overflow: hidden;
+  min-height: 0;
+  flex: 1;
+}
+
+.search {
+  flex-shrink: 0;
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.searchInput {
+  height: 40px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Les éléments gardent leur hauteur : c'est la liste qui défile */
+.list > li {
+  flex-shrink: 0;
+}
+
+/* Ligne = carte : le contenu (lien ou texte) prend la place, le bouton
+   éventuel est à l'intérieur, à droite. Un bouton ne peut pas être dans un
+   lien, d'où la carte portée par la ligne et non par le lien. */
+.row {
+  display: flex;
+  align-items: center;
+  padding-right: 0.25rem;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e5e5);
+  border-radius: 4px;
+}
+
+.itemContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 4px;
+}
+
+.error {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  color: #ce0500;
+}
+
+.item {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.625rem;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e5e5);
+  border-radius: 4px;
+}
+
+/* Élément cliquable (repris de RuralPathsList.module.css) */
+.itemLink {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* Survol / focus du lien : toute la carte est mise en évidence */
+.row:has(.itemLink:hover),
+.row:has(.itemLink:focus-visible) {
+  border-color: var(--color-primary, #000091);
+  background: #f6f8ff;
+}
+
+.itemLink:focus-visible {
+  outline: 2px solid var(--color-focus, #0a76f6);
+  outline-offset: 2px;
+}
+
+.itemTitle {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 1rem;
+  margin: 0;
+  text-align: center;
+  color: var(--color-muted, #555);
+  font-size: 0.875rem;
+}
+
+.pagination {
+  flex-shrink: 0;
+  padding: 0 0.75rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* Barre de chargement (l'ui-kit ne fournit pas de skeleton) */
+.skeleton {
+  height: 1.375rem;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--c--contextuals--background--semantic--neutral--tertiary, #ececec) 25%,
+    var(--c--contextuals--background--surface--secondary, #f6f6f6) 50%,
+    var(--c--contextuals--background--semantic--neutral--tertiary, #ececec) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

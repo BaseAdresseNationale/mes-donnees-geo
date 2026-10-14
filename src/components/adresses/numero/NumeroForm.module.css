@@ -1,0 +1,16 @@
+/* Spécifique au numéro : numéro et suffixe sur une ligne (le reste est dans
+   form/form.module.css) */
+.row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.numero {
+  flex: 1;
+  min-width: 0;
+}
+
+.suffixe {
+  flex: 0 0 35%;
+  min-width: 0;
+}

@@ -74,6 +74,13 @@ div[id^="c__modals-portal"] {
   z-index: 1000;
 }
 
+/* Largeur minimale du panneau de gauche : MainLayout fixe son minimum à 300px
+   sans permettre de le changer, on l'impose sur le panneau redimensionnable
+   (react-resizable-panels) qui contient .c__left-panel. */
+[data-panel]:has(> .c__left-panel) {
+  min-width: 400px;
+}
+
 /* --- Panoramax --- */
 
 @keyframes panoramax-dive-flash {

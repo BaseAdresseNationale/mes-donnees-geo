@@ -51,6 +51,7 @@ export function MapLayout({
   const {
     mapRefCb,
     mapChildren,
+    mapOverlayChildren,
     mapMessage,
     mapToolChildren,
     activeDataLayers,
@@ -145,6 +146,7 @@ export function MapLayout({
           )}
 
           {mapChildren}
+          {mapOverlayChildren}
 
           <PanoramaxLensDrag />
           <ScaleControl position="bottom-right" />

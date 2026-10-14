@@ -16,7 +16,10 @@ import { ALL_PLUGINS } from "@/plugins/config";
 
 export const FLY_TO_DURATION_MS = 1500;
 export const FLY_TO_PADDING = 64;
-export const FLY_TO_MAX_ZOOM = 17;
+export const FLY_TO_MAX_ZOOM = 19;
+// Zoom minimum atteint même si les bounds ne tiennent plus en entier :
+// en dessous, les couches de données (tuiles BAL notamment) ne s'affichent pas.
+export const FLY_TO_MIN_ZOOM = 13;
 
 export enum AvailableDataLayer {
   BAN = "ban",
@@ -37,6 +40,10 @@ interface MapContextValue {
   mapRefCb: (instance: MapRef | null) => void;
   mapChildren: React.ReactNode | null;
   setMapChildren: (children: React.ReactNode) => void;
+  // Second emplacement, rendu au-dessus de mapChildren : éléments de carte
+  // d'un formulaire (marqueurs, sélection…) sans remplacer ceux du plugin.
+  mapOverlayChildren: React.ReactNode | null;
+  setMapOverlayChildren: (children: React.ReactNode) => void;
   mapMessage: string | null;
   setMapMessage: React.Dispatch<React.SetStateAction<string | null>>;
   mapToolChildren: React.ReactNode | null;
@@ -59,6 +66,8 @@ export const MapContext = createContext<MapContextValue>({
   mapRefCb: () => {},
   mapChildren: null,
   setMapChildren: () => {},
+  mapOverlayChildren: null,
+  setMapOverlayChildren: () => {},
   mapMessage: null,
   setMapMessage: () => {},
   mapToolChildren: null,
@@ -79,6 +88,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
     }
   }, []);
   const [mapChildren, setMapChildren] = useState<React.ReactNode>(null);
+  const [mapOverlayChildren, setMapOverlayChildren] =
+    useState<React.ReactNode>(null);
   const [mapToolChildren, setMapToolChildren] = useState<React.ReactNode>(null);
   const [mapMessage, setMapMessage] = useState<string | null>(null);
   const [savedFlyToBounds, setSavedFlyToBounds] = useState<
@@ -132,7 +143,7 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
 
       m.flyTo({
         center: camera.center,
-        zoom: camera.zoom,
+        zoom: Math.max(camera.zoom ?? 0, FLY_TO_MIN_ZOOM),
         maxDuration: FLY_TO_DURATION_MS,
       });
 
@@ -159,6 +170,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
       mapRefCb,
       mapChildren,
       setMapChildren,
+      mapOverlayChildren,
+      setMapOverlayChildren,
       mapMessage,
       setMapMessage,
       mapToolChildren,
@@ -174,6 +187,8 @@ export function MapContextProvider(props: { children: React.ReactNode }) {
       mapRefCb,
       mapChildren,
       setMapChildren,
+      mapOverlayChildren,
+      setMapOverlayChildren,
       mapMessage,
       setMapMessage,
       mapToolChildren,
