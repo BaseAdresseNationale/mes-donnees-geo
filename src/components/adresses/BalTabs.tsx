@@ -3,7 +3,7 @@
 import { Button } from "@gouvfr-lasuite/ui-components";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import styles from "./BalTabs.module.css";
-import { getBalTab } from "./bal-tab";
+import { getBalTab, getFormBackHref } from "./bal-tab";
 
 // Onglets d'une BAL : chacun correspond à une route sous /adresses/{balId}
 // Chaque onglet est habillé en panneau de signalisation : entrée
@@ -34,6 +34,25 @@ export function BalTabs() {
   const router = useRouter();
 
   const activeTabId = getBalTab(pathname);
+  const formBackHref = getFormBackHref(pathname);
+
+  // Dans un formulaire de création / modification, les onglets laissent la
+  // place à un bouton de retour
+  if (formBackHref) {
+    return (
+      <nav className={styles.tabs} aria-label="Navigation de la BAL">
+        <Button
+          variant="tertiary"
+          color="neutral"
+          size="small"
+          icon={<span className="material-icons">arrow_back</span>}
+          onClick={() => router.push(formBackHref)}
+        >
+          Retour
+        </Button>
+      </nav>
+    );
+  }
 
   return (
     <nav className={styles.tabs} aria-label="Navigation de la BAL">
