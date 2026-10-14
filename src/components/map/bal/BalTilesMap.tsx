@@ -8,8 +8,10 @@ import {
   BAL_TILES_MAX_ZOOM,
   BAL_TILES_MIN_ZOOM,
   BAL_TILES_SOURCE_ID,
-  BALLayers,
+  BAL_LAYER_IDS,
+  getBalLayers,
 } from "./bal.layers";
+import type { BalTab } from "@/components/adresses/bal-tab";
 
 // La route de tuiles de mes-adresses-api est publique : le navigateur
 // l'appelle directement, sans passer par le proxy /api/adresses.
@@ -21,7 +23,7 @@ function balTilesUrl(balId: string): string {
   return `${apiUrl}/v2/bases-locales/${balId}/tiles/{z}/{x}/{y}.pbf`;
 }
 
-export function BalTilesMap({ balId }: { balId: string }) {
+export function BalTilesMap({ balId, tab }: { balId: string; tab: BalTab }) {
   const { mapRef } = useContext(MapContext);
   const { isDrawing } = useContext(DrawContext);
 
@@ -65,15 +67,17 @@ export function BalTilesMap({ balId }: { balId: string }) {
       mapRef.getCanvas().style.cursor = "";
     };
 
-    BALLayers.forEach(({ id }) => {
-      mapRef.on("mousemove", id!, handleMouseMove);
-      mapRef.on("mouseleave", id!, handleMouseLeave);
+    // Les couches masquées ne déclenchent pas d'événement : on peut écouter
+    // toutes les couches quel que soit l'onglet.
+    BAL_LAYER_IDS.forEach((id) => {
+      mapRef.on("mousemove", id, handleMouseMove);
+      mapRef.on("mouseleave", id, handleMouseLeave);
     });
 
     return () => {
-      BALLayers.forEach(({ id }) => {
-        mapRef.off("mousemove", id!, handleMouseMove);
-        mapRef.off("mouseleave", id!, handleMouseLeave);
+      BAL_LAYER_IDS.forEach((id) => {
+        mapRef.off("mousemove", id, handleMouseMove);
+        mapRef.off("mouseleave", id, handleMouseLeave);
       });
       handleMouseLeave();
     };
@@ -90,7 +94,7 @@ export function BalTilesMap({ balId }: { balId: string }) {
       maxzoom={BAL_TILES_MAX_ZOOM}
       promoteId="id"
     >
-      {BALLayers.map((layer) => (
+      {getBalLayers(tab).map((layer) => (
         <Layer key={layer.id} {...layer} />
       ))}
     </Source>

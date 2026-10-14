@@ -3,6 +3,7 @@
 import { Button } from "@gouvfr-lasuite/ui-components";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import styles from "./BalTabs.module.css";
+import { getBalTab } from "./bal-tab";
 
 // Onglets d'une BAL : chacun correspond à une route sous /adresses/{balId}
 // Chaque onglet est habillé en panneau de signalisation : entrée
@@ -32,13 +33,12 @@ export function BalTabs() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const activeTab =
-    TABS.find((tab) => tab.suffix && pathname.endsWith(tab.suffix)) ?? TABS[0];
+  const activeTabId = getBalTab(pathname);
 
   return (
     <nav className={styles.tabs} aria-label="Navigation de la BAL">
       {TABS.map((tab) => {
-        const isActive = tab.id === activeTab.id;
+        const isActive = tab.id === activeTabId;
         return (
           <Button
             key={tab.id}

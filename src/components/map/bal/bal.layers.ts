@@ -3,6 +3,7 @@ import type {
   SymbolLayerSpecification,
 } from "maplibre-gl";
 import type { LayerProps } from "react-map-gl/maplibre";
+import type { BalTab } from "@/components/adresses/bal-tab";
 
 // Couches des tuiles vectorielles d'une BAL servies par mes-adresses-api
 // (/v2/bases-locales/{balId}/tiles/{z}/{x}/{y}.pbf). Styles repris de
@@ -19,6 +20,8 @@ export const BAL_TILES_MAX_ZOOM = 19;
 const NUMEROS_LABEL_MIN = 17;
 
 const HALO_COLOR = "#f8f4f0";
+// Numéros rattachés à aucun toponyme (même gris que l'API)
+const NO_TOPONYME_COLOR = "#c1c4d6";
 const LABEL_COLOR = "#000";
 
 const isHovered: ExpressionSpecification = [
@@ -62,56 +65,67 @@ export const voieTraceLayer = {
   },
 } as LayerProps;
 
-export const numeroPointLayer = {
-  id: "bal-numero-point",
-  source: BAL_TILES_SOURCE_ID,
-  "source-layer": "numeros-points",
-  type: "circle",
-  minzoom: BAL_TILES_MIN_ZOOM,
-  maxzoom: NUMEROS_LABEL_MIN,
-  paint: {
-    "circle-color": ["get", "color"],
-    "circle-opacity": ["case", isHovered, 1, 0.7],
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.8, 17, 6],
-    "circle-stroke-color": HALO_COLOR,
-    "circle-stroke-width": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      12,
-      0.3,
-      17,
-      0.8,
-    ],
-  },
-} as LayerProps;
+// Couleur des numéros : celle de leur voie, ou de leur toponyme
+const NUMERO_VOIE_COLOR: ExpressionSpecification = ["get", "color"];
+const NUMERO_TOPONYME_COLOR: ExpressionSpecification = [
+  "case",
+  ["has", "idToponyme"],
+  ["get", "colorToponyme"],
+  NO_TOPONYME_COLOR,
+];
 
-export const numeroLabelLayer = {
-  id: "bal-numero-label",
-  source: BAL_TILES_SOURCE_ID,
-  "source-layer": "numeros-points",
-  type: "symbol",
-  minzoom: NUMEROS_LABEL_MIN,
-  paint: {
-    "text-color": "#fff",
-    "text-halo-color": ["get", "color"],
-    "text-halo-width": haloWidth,
-    "text-opacity": ["case", isHovered, 1, 0.8],
-  },
-  layout: {
-    "text-font": ["Noto Sans Bold"],
-    "text-size": 13,
-    "text-field": [
-      "case",
-      ["has", "suffixe"],
-      ["format", ["get", "numero"], {}, " ", {}, ["get", "suffixe"], {}],
-      ["get", "numero"],
-    ],
-    "text-allow-overlap": true,
-    "text-variable-anchor": ["left", "right"],
-    "text-radial-offset": 0.5,
-  },
-} as LayerProps;
+const numeroPointLayer = (color: ExpressionSpecification) =>
+  ({
+    id: "bal-numero-point",
+    source: BAL_TILES_SOURCE_ID,
+    "source-layer": "numeros-points",
+    type: "circle",
+    minzoom: BAL_TILES_MIN_ZOOM,
+    maxzoom: NUMEROS_LABEL_MIN,
+    paint: {
+      "circle-color": color,
+      "circle-opacity": ["case", isHovered, 1, 0.7],
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.8, 17, 6],
+      "circle-stroke-color": HALO_COLOR,
+      "circle-stroke-width": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        0.3,
+        17,
+        0.8,
+      ],
+    },
+  }) as LayerProps;
+
+const numeroLabelLayer = (color: ExpressionSpecification) =>
+  ({
+    id: "bal-numero-label",
+    source: BAL_TILES_SOURCE_ID,
+    "source-layer": "numeros-points",
+    type: "symbol",
+    minzoom: NUMEROS_LABEL_MIN,
+    paint: {
+      "text-color": "#fff",
+      "text-halo-color": color,
+      "text-halo-width": haloWidth,
+      "text-opacity": ["case", isHovered, 1, 0.8],
+    },
+    layout: {
+      "text-font": ["Noto Sans Bold"],
+      "text-size": 13,
+      "text-field": [
+        "case",
+        ["has", "suffixe"],
+        ["format", ["get", "numero"], {}, " ", {}, ["get", "suffixe"], {}],
+        ["get", "numero"],
+      ],
+      "text-allow-overlap": true,
+      "text-variable-anchor": ["left", "right"],
+      "text-radial-offset": 0.5,
+    },
+  }) as LayerProps;
 
 export const voieLabelLayer = {
   id: "bal-voie-label",
@@ -143,11 +157,61 @@ export const toponymeLabelLayer = {
   },
 } as LayerProps;
 
-// Ordre de rendu : tracés, puis points, puis libellés au-dessus
-export const BALLayers: LayerProps[] = [
-  voieTraceLayer,
-  numeroPointLayer,
-  numeroLabelLayer,
-  voieLabelLayer,
-  toponymeLabelLayer,
-];
+// Couches visibles selon l'onglet de la BAL. Toutes les couches restent sur
+// la carte (seule leur visibilité change) : leur ordre ne bouge pas et la
+// source n'est pas rechargée quand on change d'onglet.
+const VISIBLE_LAYER_IDS: Record<BalTab, string[]> = {
+  commune: [
+    "bal-voie-trace",
+    "bal-numero-point",
+    "bal-numero-label",
+    "bal-voie-label",
+    "bal-toponyme-label",
+  ],
+  voies: [
+    "bal-voie-trace",
+    "bal-numero-point",
+    "bal-numero-label",
+    "bal-voie-label",
+  ],
+  toponymes: ["bal-numero-point", "bal-numero-label", "bal-toponyme-label"],
+};
+
+function buildBalLayers(tab: BalTab): LayerProps[] {
+  const numeroColor =
+    tab === "toponymes" ? NUMERO_TOPONYME_COLOR : NUMERO_VOIE_COLOR;
+
+  // Ordre de rendu : tracés, puis points, puis libellés au-dessus
+  return [
+    voieTraceLayer,
+    numeroPointLayer(numeroColor),
+    numeroLabelLayer(numeroColor),
+    voieLabelLayer,
+    toponymeLabelLayer,
+  ].map(
+    (layer) =>
+      ({
+        ...layer,
+        layout: {
+          ...(layer as { layout?: object }).layout,
+          visibility: VISIBLE_LAYER_IDS[tab].includes(layer.id!)
+            ? "visible"
+            : "none",
+        },
+      }) as LayerProps,
+  );
+}
+
+// Calculées une fois par onglet : objets stables d'un rendu à l'autre
+const BAL_LAYERS_BY_TAB: Record<BalTab, LayerProps[]> = {
+  commune: buildBalLayers("commune"),
+  voies: buildBalLayers("voies"),
+  toponymes: buildBalLayers("toponymes"),
+};
+
+export function getBalLayers(tab: BalTab): LayerProps[] {
+  return BAL_LAYERS_BY_TAB[tab];
+}
+
+// Ids de toutes les couches (pour les événements de survol)
+export const BAL_LAYER_IDS = VISIBLE_LAYER_IDS.commune;
