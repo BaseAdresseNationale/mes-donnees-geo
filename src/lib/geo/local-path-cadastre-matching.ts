@@ -2,7 +2,6 @@ import along from "@turf/along";
 import bbox from "@turf/bbox";
 import { lineString } from "@turf/helpers";
 import turfLength from "@turf/length";
-import nearestPointOnLine from "@turf/nearest-point-on-line";
 import type { LineString, Position } from "geojson";
 import {
   LocalPathClassement,
@@ -16,8 +15,8 @@ import type { BdTopoTronconCandidate } from "./bd-topo";
 const MATCH_BUFFER_METERS = 8;
 // Pas de tolérance pour l'échantillonnage des tronçons.
 const SAMPLE_STEP_METERS = 5;
-// Marge large (imprécision bbox/degrés) pour ne jamais écarter à tort un candidat au pré-filtre.
-const BBOX_MARGIN_DEGREES = 0.005;
+// Marge du pré-filtre bbox (~55 m en latitude), très supérieure à MATCH_BUFFER_METERS.
+const BBOX_MARGIN_DEGREES = 0.0005;
 // En-deçà de ce seuil, le trou entre deux portions est ignoré (l'éditeur tolère ~2 m).
 const GAP_FILL_MIN_METERS = 2;
 // Longueur max d'un raccordement en ligne droite ; au-delà, on scinde en 2 chemins distincts.
@@ -79,6 +78,7 @@ interface CadastralGroup {
   /** Libellé normalisé du 1er membre du groupe, utilisé comme référence pour la similarité. */
   label: string;
   lines: LineString[];
+  lineBboxes: Bbox[];
   bbox: Bbox;
 }
 
@@ -146,27 +146,43 @@ interface NearestCadastral {
 
 // Point le plus proche sur l'ensemble des lignes cadastrales du groupe : distance (m)
 // + cap local du segment cadastral concerné (pour le test d'orientation).
+// Projection planaire locale : exacte à quelques mètres, bien plus rapide que
+// `nearestPointOnLine` de turf (appelé des millions de fois sur de grosses communes).
 function nearestCadastral(
   coord: Position,
   lines: LineString[],
 ): NearestCadastral {
-  let best: NearestCadastral = { distance: Infinity, bearing: null };
+  const metersPerDegree = (Math.PI / 180) * 6_371_000;
+  const kx = Math.cos((coord[1] * Math.PI) / 180) * metersPerDegree;
+  const ky = metersPerDegree;
+  let bestSq = Infinity;
+  let bestLine: Position[] | null = null;
+  let bestIndex = 0;
   for (const line of lines) {
     const coords = line.coordinates;
-    if (coords.length < 2) continue;
-    const snapped = nearestPointOnLine(lineString(coords), coord, {
-      units: "meters",
-    });
-    const distance = snapped.properties.dist ?? Infinity;
-    if (distance < best.distance) {
-      const index = Math.min(snapped.properties.index ?? 0, coords.length - 2);
-      best = {
-        distance,
-        bearing: initialBearing(coords[index], coords[index + 1]),
-      };
+    for (let i = 0; i < coords.length - 1; i++) {
+      const ax = (coords[i][0] - coord[0]) * kx;
+      const ay = (coords[i][1] - coord[1]) * ky;
+      const dx = (coords[i + 1][0] - coord[0]) * kx - ax;
+      const dy = (coords[i + 1][1] - coord[1]) * ky - ay;
+      const lenSq = dx * dx + dy * dy;
+      const t =
+        lenSq === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
+      const px = ax + t * dx;
+      const py = ay + t * dy;
+      const sq = px * px + py * py;
+      if (sq < bestSq) {
+        bestSq = sq;
+        bestLine = coords;
+        bestIndex = i;
+      }
     }
   }
-  return best;
+  if (!bestLine) return { distance: Infinity, bearing: null };
+  return {
+    distance: Math.sqrt(bestSq),
+    bearing: initialBearing(bestLine[bestIndex], bestLine[bestIndex + 1]),
+  };
 }
 
 // Normalise un libellé pour la comparaison (accents/casse/espaces insensibles).
@@ -228,6 +244,7 @@ function groupCadastralPaths(
       : undefined;
     if (existing) {
       existing.lines.push(cadastral.path);
+      existing.lineBboxes.push(lineBbox);
       existing.bbox = mergeBbox(existing.bbox, lineBbox);
       existing.numero ??= cadastral.numero;
       existing.nom ??= cadastral.nom;
@@ -241,6 +258,7 @@ function groupCadastralPaths(
         classement: cadastral.classement,
         label,
         lines: [cadastral.path],
+        lineBboxes: [lineBbox],
         bbox: lineBbox,
       });
     }
@@ -395,16 +413,12 @@ function bdTopoSegment(portion: Portion): AssembledSegment {
 function coverageRatio(path: LineString, cover: LineString): number {
   const line = lineString(path.coordinates);
   const length = turfLength(line, { units: "meters" });
-  const coverLine = lineString(cover.coordinates);
   const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
   let inside = 0;
   for (let i = 0; i <= count; i++) {
     const coord = along(line, (length * i) / count, { units: "meters" })
       .geometry.coordinates as Position;
-    const dist =
-      nearestPointOnLine(coverLine, coord, { units: "meters" }).properties
-        .dist ?? Infinity;
-    if (dist <= DEDUP_TOL_METERS) inside++;
+    if (nearestCadastral(coord, [cover]).distance <= DEDUP_TOL_METERS) inside++;
   }
   return inside / (count + 1);
 }
@@ -574,7 +588,12 @@ export async function assembleLocalPathsFromCadastre(
         lastYield = Date.now();
       }
       if (!bboxesOverlap(candidateBbox, group.bbox)) continue;
-      for (const path of corridorPortions(candidate.path, group.lines)) {
+      // Seules les lignes proches du tronçon peuvent être à ≤ MATCH_BUFFER_METERS de lui.
+      const nearbyLines = group.lines.filter((_, i) =>
+        bboxesOverlap(candidateBbox, group.lineBboxes[i]),
+      );
+      if (nearbyLines.length === 0) continue;
+      for (const path of corridorPortions(candidate.path, nearbyLines)) {
         portions.push({ path, candidate });
       }
     }
