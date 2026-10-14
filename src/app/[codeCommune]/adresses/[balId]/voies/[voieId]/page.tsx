@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import { requireBalClient } from "@/lib/api-bal/bal-client";
 import { findVoie, findVoieNumeros } from "@/lib/api-bal/generated/sdk.gen";
 import { NameList } from "@/components/adresses/list/NameList";
-import { VoieHeader } from "@/components/adresses/voie/VoieHeader";
-import { VoieMapEffects } from "@/components/adresses/voie/VoieMapEffects";
+import { DetailHeader } from "@/components/adresses/detail/DetailHeader";
+import { BboxMapEffects } from "@/components/adresses/detail/BboxMapEffects";
 
 // Identifiant au format ObjectId (24 caractères hexadécimaux)
 const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
@@ -36,8 +36,8 @@ export default async function VoiePage({
 
   return (
     <>
-      <VoieMapEffects bbox={voie.bbox} />
-      <VoieHeader nom={voie.nom} nbNumeros={voie.nbNumeros} />
+      <BboxMapEffects bbox={voie.bbox} />
+      <DetailHeader nom={voie.nom} nbNumeros={voie.nbNumeros} />
       <NameList
         // Ordre de l'API conservé (numéro puis suffixe) : pas de tri par nom
         items={numerosResult.data.map((numero) => ({

@@ -1,8 +1,8 @@
 import listStyles from "@/components/adresses/list/NameList.module.css";
-import styles from "./VoieHeader.module.css";
+import styles from "./DetailHeader.module.css";
 
-// Mêmes dimensions que VoieHeader pendant le chargement
-export function VoieHeaderSkeleton() {
+// Mêmes dimensions que DetailHeader pendant le chargement
+export function DetailHeaderSkeleton() {
   return (
     <header className={styles.header} aria-hidden="true">
       <div className={`${listStyles.skeleton} ${styles.skeletonTitle}`} />

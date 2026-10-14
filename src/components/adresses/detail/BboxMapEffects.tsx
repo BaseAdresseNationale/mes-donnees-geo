@@ -3,16 +3,24 @@
 import { useContext, useEffect, useRef } from "react";
 import MapContext from "@/contexts/MapContext";
 
-// Centre la carte sur la voie (bbox calculée par l'API à partir de son tracé
-// ou de ses numéros ; null si elle n'a ni l'un ni l'autre).
-export function VoieMapEffects({ bbox }: { bbox: number[] | null }) {
+// Centre la carte sur la bbox [minLng, minLat, maxLng, maxLat] d'une voie ou
+// d'un toponyme, calculée par l'API (absente si l'entité n'a pas de géométrie).
+function isBbox(value: unknown): value is [number, number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 4 &&
+    value.every((n) => typeof n === "number")
+  );
+}
+
+export function BboxMapEffects({ bbox }: { bbox: unknown }) {
   const { flyToBounds } = useContext(MapContext);
 
   // Bbox déjà centrée : on ne recentre pas à chaque rendu
   const flownBboxRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!bbox || bbox.length !== 4) return;
+    if (!isBbox(bbox)) return;
 
     const key = bbox.join(",");
     if (flownBboxRef.current === key) return;

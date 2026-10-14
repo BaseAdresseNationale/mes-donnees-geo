@@ -1,0 +1,38 @@
+/* Conteneur qui défile ; en bloc (et non en flex) pour que chaque NameList
+   prenne la hauteur de son contenu au lieu de se partager la place. */
+.groups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.75rem 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted, #555);
+}
+
+.empty {
+  padding: 1rem;
+  margin: 0;
+  text-align: center;
+  color: var(--color-muted, #555);
+  font-size: 0.875rem;
+}

@@ -8,7 +8,7 @@ export default async function BalToponymesPage({
 }: {
   params: Promise<{ codeCommune: string; balId: string }>;
 }) {
-  const { balId } = await params;
+  const { codeCommune, balId } = await params;
   const client = await requireBalClient(balId);
 
   const { data: toponymes } = await findBaseLocaleToponymes({
@@ -22,6 +22,7 @@ export default async function BalToponymesPage({
       items={toNameListItems(toponymes)}
       label="Liste des toponymes"
       searchLabel="Rechercher un toponyme"
+      hrefPrefix={`/${codeCommune}/adresses/${balId}/toponymes`}
     />
   );
 }

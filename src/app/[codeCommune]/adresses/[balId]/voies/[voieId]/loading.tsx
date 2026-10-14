@@ -1,10 +1,10 @@
 import { NameListSkeleton } from "@/components/adresses/list/NameListSkeleton";
-import { VoieHeaderSkeleton } from "@/components/adresses/voie/VoieHeaderSkeleton";
+import { DetailHeaderSkeleton } from "@/components/adresses/detail/DetailHeaderSkeleton";
 
 export default function Loading() {
   return (
     <>
-      <VoieHeaderSkeleton />
+      <DetailHeaderSkeleton />
       <NameListSkeleton searchLabel="Rechercher un numéro" />
     </>
   );

@@ -15,10 +15,13 @@ export const NAME_LIST_PAGE_SIZE = 20;
 interface NameListProps {
   items: NameListItem[];
   label: string;
-  searchLabel: string;
+  // Champ de recherche affiché seulement si fourni
+  searchLabel?: string;
   emptyMessage?: string;
   // Si fourni, chaque élément est un lien vers {hrefPrefix}/{id}
   hrefPrefix?: string;
+  // false : tous les éléments sur une seule page, sans pagination
+  paginated?: boolean;
 }
 
 // Liste de noms inspirée de RuralPathList (recherche + cartes), paginée côté
@@ -29,6 +32,7 @@ export function NameList({
   searchLabel,
   emptyMessage = "Aucun élément dans cette BAL.",
   hrefPrefix,
+  paginated = true,
 }: NameListProps) {
   const [query, setQuery] = useState("");
 
@@ -47,22 +51,26 @@ export function NameList({
     setPage(1);
   }, [filteredItems, pageSize, setPage, setPagesCount]);
 
-  const pageItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
+  const pageItems = paginated
+    ? filteredItems.slice((page - 1) * pageSize, page * pageSize)
+    : filteredItems;
 
   return (
     <section className={styles.container} aria-label={label}>
-      <div className={styles.search}>
-        <Input
-          aria-label={searchLabel}
-          placeholder={searchLabel}
-          hideLabel
-          fullWidth
-          className={styles.searchInput}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          icon={<span className="material-icons">search</span>}
-        />
-      </div>
+      {searchLabel && (
+        <div className={styles.search}>
+          <Input
+            aria-label={searchLabel}
+            placeholder={searchLabel}
+            hideLabel
+            fullWidth
+            className={styles.searchInput}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            icon={<span className="material-icons">search</span>}
+          />
+        </div>
+      )}
 
       {filteredItems.length === 0 ? (
         <p className={styles.empty}>
@@ -91,7 +99,7 @@ export function NameList({
         </ul>
       )}
 
-      {pagesCount !== undefined && pagesCount > 1 && (
+      {paginated && pagesCount !== undefined && pagesCount > 1 && (
         <div className={styles.pagination}>
           <Pagination {...pagination} displayGoto={false} />
         </div>

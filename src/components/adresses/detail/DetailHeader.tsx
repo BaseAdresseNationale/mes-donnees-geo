@@ -1,11 +1,12 @@
-import styles from "./VoieHeader.module.css";
+import styles from "./DetailHeader.module.css";
 
-interface VoieHeaderProps {
+interface DetailHeaderProps {
   nom: string;
   nbNumeros: number;
 }
 
-export function VoieHeader({ nom, nbNumeros }: VoieHeaderProps) {
+// En-tête des pages voie / toponyme : nom et nombre de numéros
+export function DetailHeader({ nom, nbNumeros }: DetailHeaderProps) {
   return (
     <header className={styles.header}>
       <h2 className={styles.title}>{nom}</h2>

@@ -14,9 +14,14 @@ export function BalMapEffects({ balId }: { balId: string }) {
   const { contour: communeContour } = useCommune();
 
   const tab = getBalTab(usePathname());
-  // Sur la page d'une voie, c'est la voie qui est centrée (VoieMapEffects) :
-  // le centrage initial sur la commune passerait après et l'écraserait.
-  const { voieId } = useParams<{ voieId?: string }>();
+  // Sur la page d'une voie ou d'un toponyme, c'est lui qui est centré
+  // (BboxMapEffects) : le centrage initial sur la commune passerait après et
+  // l'écraserait.
+  const { voieId, toponymeId } = useParams<{
+    voieId?: string;
+    toponymeId?: string;
+  }>();
+  const hasDetailTarget = Boolean(voieId || toponymeId);
 
   const initialFlyToDoneRef = useRef(false);
 
@@ -29,7 +34,7 @@ export function BalMapEffects({ balId }: { balId: string }) {
   }, [setMapChildren, balId, tab]);
 
   useEffect(() => {
-    if (voieId) {
+    if (hasDetailTarget) {
       initialFlyToDoneRef.current = true;
     }
     if (!initialFlyToDoneRef.current) {
@@ -37,7 +42,7 @@ export function BalMapEffects({ balId }: { balId: string }) {
         initialFlyToDoneRef.current = true;
       }
     }
-  }, [communeContour, flyToBounds, voieId]);
+  }, [communeContour, flyToBounds, hasDetailTarget]);
 
   return null;
 }
