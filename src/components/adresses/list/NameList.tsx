@@ -7,6 +7,7 @@ import {
   Pagination,
   usePagination,
 } from "@gouvfr-lasuite/ui-components";
+import { IconLinkButton } from "@/components/adresses/detail/IconLinkButton";
 import { normalizeSearch, type NameListItem } from "./name-list.utils";
 import styles from "./NameList.module.css";
 
@@ -22,6 +23,9 @@ interface NameListProps {
   hrefPrefix?: string;
   // false : tous les éléments sur une seule page, sans pagination
   paginated?: boolean;
+  // Si fourni, bouton « ajouter » à droite de la recherche
+  addHref?: string;
+  addLabel?: string;
 }
 
 // Liste de noms inspirée de RuralPathList (recherche + cartes), paginée côté
@@ -33,6 +37,8 @@ export function NameList({
   emptyMessage = "Aucun élément dans cette BAL.",
   hrefPrefix,
   paginated = true,
+  addHref,
+  addLabel = "Ajouter",
 }: NameListProps) {
   const [query, setQuery] = useState("");
 
@@ -69,6 +75,9 @@ export function NameList({
             onChange={(e) => setQuery(e.target.value)}
             icon={<span className="material-icons">search</span>}
           />
+          {addHref && (
+            <IconLinkButton href={addHref} label={addLabel} icon="add" />
+          )}
         </div>
       )}
 

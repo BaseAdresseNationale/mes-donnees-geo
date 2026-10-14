@@ -1,7 +1,13 @@
 "use client";
 
 import { useContext, useEffect, useRef } from "react";
-import { Layer, MapLayerMouseEvent, Source } from "react-map-gl/maplibre";
+import {
+  Layer,
+  MapLayerMouseEvent,
+  MapRef,
+  Source,
+} from "react-map-gl/maplibre";
+import type { VectorTileSource } from "maplibre-gl";
 import MapContext from "@/contexts/MapContext";
 import DrawContext from "@/contexts/DrawContext";
 import {
@@ -21,6 +27,17 @@ function balTilesUrl(balId: string): string {
     "",
   );
   return `${apiUrl}/v2/bases-locales/${balId}/tiles/{z}/{x}/{y}.pbf`;
+}
+
+// Force le rechargement des tuiles de la BAL (ex. après la modification
+// d'une voie) : l'API les génère à la volée, il suffit de les redemander.
+export function reloadBalTiles(mapRef: MapRef | null) {
+  const source = mapRef
+    ?.getMap()
+    .getSource<VectorTileSource>(BAL_TILES_SOURCE_ID);
+  if (source?.tiles) {
+    source.setTiles(source.tiles);
+  }
 }
 
 export function BalTilesMap({ balId, tab }: { balId: string; tab: BalTab }) {

@@ -1,46 +1,35 @@
-import { notFound } from "next/navigation";
-import { requireBalClient } from "@/lib/api-bal/bal-client";
-import { findVoie, findVoieNumeros } from "@/lib/api-bal/generated/sdk.gen";
+import { requireBalClient, requireBalVoie } from "@/lib/api-bal/bal-client";
+import { findVoieNumeros } from "@/lib/api-bal/generated/sdk.gen";
 import { NameList } from "@/components/adresses/list/NameList";
 import { DetailHeader } from "@/components/adresses/detail/DetailHeader";
 import { BboxMapEffects } from "@/components/adresses/detail/BboxMapEffects";
-
-// Identifiant au format ObjectId (24 caractères hexadécimaux)
-const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
 
 export default async function VoiePage({
   params,
 }: {
   params: Promise<{ codeCommune: string; balId: string; voieId: string }>;
 }) {
-  const { balId, voieId } = await params;
-  const client = await requireBalClient(balId);
-  if (!OBJECT_ID_RE.test(voieId)) notFound();
+  const { codeCommune, balId, voieId } = await params;
 
-  const [voieResult, numerosResult] = await Promise.all([
-    findVoie({ client, path: { voieId } }),
-    findVoieNumeros({ client, path: { voieId } }),
+  const [voie, { data: numeros }] = await Promise.all([
+    requireBalVoie(balId, voieId),
+    requireBalClient(balId).then((client) =>
+      findVoieNumeros({ client, path: { voieId }, throwOnError: true }),
+    ),
   ]);
-
-  // Les lectures de l'API sont publiques : on vérifie que la voie appartient
-  // bien à la BAL de l'URL.
-  const voie = voieResult.data;
-  if (voieResult.response?.status === 404 || (voie && voie.balId !== balId)) {
-    notFound();
-  }
-  if (!voie || !numerosResult.data) {
-    throw new Error(
-      `Impossible de récupérer la voie ${voieId} (HTTP ${voieResult.response?.status} / ${numerosResult.response?.status}).`,
-    );
-  }
 
   return (
     <>
       <BboxMapEffects bbox={voie.bbox} />
-      <DetailHeader nom={voie.nom} nbNumeros={voie.nbNumeros} />
+      <DetailHeader
+        nom={voie.nom}
+        nbNumeros={voie.nbNumeros}
+        editHref={`/${codeCommune}/adresses/${balId}/voies/${voieId}/edit`}
+        editLabel="Modifier la voie"
+      />
       <NameList
         // Ordre de l'API conservé (numéro puis suffixe) : pas de tri par nom
-        items={numerosResult.data.map((numero) => ({
+        items={numeros.map((numero) => ({
           id: numero.id,
           nom: numero.numeroComplet,
         }))}
