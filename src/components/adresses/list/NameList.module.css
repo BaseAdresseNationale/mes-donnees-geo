@@ -43,6 +43,35 @@
   flex-shrink: 0;
 }
 
+/* Ligne = carte : le contenu (lien ou texte) prend la place, le bouton
+   éventuel est à l'intérieur, à droite. Un bouton ne peut pas être dans un
+   lien, d'où la carte portée par la ligne et non par le lien. */
+.row {
+  display: flex;
+  align-items: center;
+  padding-right: 0.25rem;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e5e5);
+  border-radius: 4px;
+}
+
+.itemContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 4px;
+}
+
+.error {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #ce0500;
+}
+
 .item {
   flex-shrink: 0;
   display: flex;
@@ -61,8 +90,9 @@
   cursor: pointer;
 }
 
-.itemLink:hover,
-.itemLink:focus-visible {
+/* Survol / focus du lien : toute la carte est mise en évidence */
+.row:has(.itemLink:hover),
+.row:has(.itemLink:focus-visible) {
   border-color: var(--color-primary, #000091);
   background: #f6f8ff;
 }

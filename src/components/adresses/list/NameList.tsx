@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Button,
   Input,
   Pagination,
   usePagination,
 } from "@gouvfr-lasuite/ui-components";
 import { IconLinkButton } from "@/components/adresses/detail/IconLinkButton";
 import { normalizeSearch, type NameListItem } from "./name-list.utils";
+import { useArchiveItem, type ArchiveKind } from "./useArchiveItem";
 import styles from "./NameList.module.css";
 
 export const NAME_LIST_PAGE_SIZE = 20;
@@ -27,6 +29,8 @@ interface NameListProps {
   // Si fourni, bouton « ajouter » à droite de la recherche
   addHref?: string;
   addLabel?: string;
+  // Si fourni, bouton « archiver » sur chaque ligne
+  archive?: { balId: string; kind: ArchiveKind };
 }
 
 // Liste de noms inspirée de RuralPathList (recherche + cartes), paginée côté
@@ -41,8 +45,14 @@ export function NameList({
   paginated = true,
   addHref,
   addLabel = "Ajouter",
+  archive,
 }: NameListProps) {
   const [query, setQuery] = useState("");
+  const {
+    archive: archiveItem,
+    archivingId,
+    error: archiveError,
+  } = useArchiveItem(archive?.balId ?? "", archive?.kind ?? "numero");
 
   // Recherche par nom sur la liste complète, avant pagination
   const filteredItems = useMemo(() => {
@@ -83,6 +93,12 @@ export function NameList({
         </div>
       )}
 
+      {archiveError && (
+        <p className={styles.error} role="alert">
+          {archiveError}
+        </p>
+      )}
+
       {filteredItems.length === 0 ? (
         <p className={styles.empty}>
           {items.length === 0
@@ -92,18 +108,31 @@ export function NameList({
       ) : (
         <ul className={styles.list}>
           {pageItems.map((item) => (
-            <li key={item.id}>
+            <li key={item.id} className={styles.row}>
               {hrefPrefix ? (
                 <Link
                   href={`${hrefPrefix}/${item.id}${hrefSuffix}`}
-                  className={`${styles.item} ${styles.itemLink}`}
+                  className={`${styles.itemContent} ${styles.itemLink}`}
                 >
                   <span className={styles.itemTitle}>{item.nom}</span>
                 </Link>
               ) : (
-                <div className={styles.item}>
+                <div className={styles.itemContent}>
                   <span className={styles.itemTitle}>{item.nom}</span>
                 </div>
+              )}
+              {archive && (
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  color="neutral"
+                  size="small"
+                  icon={<span className="material-icons">delete</span>}
+                  aria-label={`Archiver ${item.nom}`}
+                  title="Archiver"
+                  onClick={() => archiveItem(item.id, item.nom)}
+                  disabled={archivingId !== null}
+                />
               )}
             </li>
           ))}

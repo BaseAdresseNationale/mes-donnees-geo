@@ -25,6 +25,7 @@ export default async function BalToponymesPage({
       hrefPrefix={`/${codeCommune}/adresses/${balId}/toponymes`}
       addHref={`/${codeCommune}/adresses/${balId}/toponymes/new`}
       addLabel="Ajouter un toponyme"
+      archive={{ balId, kind: "toponyme" }}
     />
   );
 }

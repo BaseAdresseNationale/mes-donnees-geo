@@ -11,9 +11,12 @@ export interface VoieNumeros {
 // Numéros regroupés par voie : nom de la voie et nombre de numéros, puis la
 // liste de ses numéros. Seul l'ensemble défile.
 export function NumerosByVoie({
+  balId,
   voies,
   emptyMessage,
 }: {
+  // BAL des numéros (bouton « archiver » sur chaque numéro)
+  balId: string;
   voies: VoieNumeros[];
   emptyMessage: string;
 }) {
@@ -37,6 +40,7 @@ export function NumerosByVoie({
             items={numeros}
             label={`Numéros de ${voieNom}`}
             paginated={false}
+            archive={{ balId, kind: "numero" }}
           />
         </section>
       ))}

@@ -49,6 +49,7 @@ export default async function ToponymePage({
         editLabel="Modifier le toponyme"
       />
       <NumerosByVoie
+        balId={balId}
         voies={groupByVoie(numeros.toSorted(compareNumerosByVoie))}
         emptyMessage="Aucun numéro associé à ce toponyme."
       />
