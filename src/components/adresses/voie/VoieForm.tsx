@@ -2,12 +2,22 @@
 
 import { useContext, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, TextArea } from "@gouvfr-lasuite/ui-components";
+import {
+  Button,
+  Input,
+  Radio,
+  RadioGroup,
+  TextArea,
+} from "@gouvfr-lasuite/ui-components";
 import MapContext from "@/contexts/MapContext";
 import { createBalClient } from "@/lib/api-bal/browser-client";
 import { createVoie, updateVoie } from "@/lib/api-bal/generated/sdk.gen";
-import type { ExtendedVoieDto } from "@/lib/api-bal/generated/types.gen";
+import type {
+  ExtendedVoieDto,
+  UpdateVoieDto,
+} from "@/lib/api-bal/generated/types.gen";
 import { reloadBalTiles } from "@/components/map/bal/BalTilesMap";
+import { useLineDraw } from "@/components/map/bal/useLineDraw";
 import { parseApiFieldErrors } from "@/components/adresses/form/api-errors";
 import {
   LanguesRegionalesField,
@@ -18,14 +28,32 @@ import styles from "@/components/adresses/form/form.module.css";
 
 const COMMENT_MAX_LENGTH = 5000;
 
-type FieldErrors = Partial<Record<"nom" | "nomAlt" | "comment", string>>;
+type TypeNumerotation = ExtendedVoieDto["typeNumerotation"];
+
+const TYPES_NUMEROTATION: { value: TypeNumerotation; label: string }[] = [
+  { value: "numerique", label: "Numérique" },
+  { value: "metrique", label: "Métrique (tracé de la voie)" },
+];
+
+type FieldErrors = Partial<
+  Record<"nom" | "nomAlt" | "trace" | "comment", string>
+>;
 
 // Préfixes des erreurs de validation de l'API → champs du formulaire
 const API_FIELDS: Record<string, keyof FieldErrors> = {
   voie_nom: "nom",
   lang_alt: "nomAlt",
+  trace: "trace",
   comment: "comment",
 };
+
+// Coordonnées du tracé d'une voie (null si elle n'en a pas)
+function traceCoordinates(trace: unknown): number[][] | null {
+  const coordinates = (trace as { coordinates?: unknown } | null)?.coordinates;
+  return Array.isArray(coordinates) && coordinates.length >= 2
+    ? (coordinates as number[][])
+    : null;
+}
 
 // Formulaire d'une voie : modification si `voie` est fourni, sinon création.
 export function VoieForm({
@@ -49,9 +77,19 @@ export function VoieForm({
   const [langues, setLangues] = useState(() =>
     toLangueRows(voie?.nomAlt ?? null),
   );
+  const [typeNumerotation, setTypeNumerotation] = useState<TypeNumerotation>(
+    voie?.typeNumerotation ?? "numerique",
+  );
+  const [trace, setTrace] = useState<number[][] | null>(() =>
+    traceCoordinates(voie?.trace),
+  );
   const [comment, setComment] = useState(voie?.comment ?? "");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Numérotation métrique : le tracé se dessine / se modifie sur la carte
+  const isMetrique = typeNumerotation === "metrique";
+  useLineDraw(isMetrique && !pending, trace, setTrace);
 
   function submit() {
     setFormError(null);
@@ -64,6 +102,12 @@ export function VoieForm({
     const body = {
       nom: nom.trim(),
       nomAlt: toNomAlt(langues),
+      typeNumerotation,
+      // Tracé seulement en métrique ; null pour le retirer. Le type généré
+      // n'autorise pas null, mais l'API l'accepte (comme mes-adresses).
+      trace: (isMetrique && trace
+        ? { type: "LineString", coordinates: trace }
+        : null) as UpdateVoieDto["trace"],
       comment: comment.trim() || null,
     };
 
@@ -128,6 +172,52 @@ export function VoieForm({
         error={fieldErrors.nomAlt}
         disabled={pending}
       />
+
+      <fieldset className={styles.fieldset}>
+        <legend className={styles.legend}>Type de numérotation</legend>
+        <RadioGroup>
+          {TYPES_NUMEROTATION.map(({ value, label }) => (
+            <Radio
+              key={value}
+              name="typeNumerotation"
+              label={label}
+              value={value}
+              checked={typeNumerotation === value}
+              onChange={() => setTypeNumerotation(value)}
+              disabled={pending}
+            />
+          ))}
+        </RadioGroup>
+      </fieldset>
+
+      {isMetrique && (
+        <fieldset className={styles.fieldset}>
+          <legend className={styles.legend}>Tracé de la voie</legend>
+          <p className={styles.hint}>
+            {trace
+              ? `Tracé de ${trace.length} points. Déplacez les points sur la carte pour le modifier.`
+              : "Dessinez le tracé de la voie sur la carte : cliquez pour placer les points, puis sur le dernier point pour terminer."}
+          </p>
+          {fieldErrors.trace && (
+            <p className={styles.fieldError}>{fieldErrors.trace}</p>
+          )}
+          {trace && (
+            <div>
+              <Button
+                type="button"
+                variant="secondary"
+                color="error"
+                size="small"
+                icon={<span className="material-icons">delete</span>}
+                onClick={() => setTrace(null)}
+                disabled={pending}
+              >
+                Effacer le tracé
+              </Button>
+            </div>
+          )}
+        </fieldset>
+      )}
 
       <TextArea
         label="Commentaire"

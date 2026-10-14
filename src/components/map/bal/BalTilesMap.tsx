@@ -16,6 +16,7 @@ import {
   BAL_TILES_SOURCE_ID,
   BAL_LAYER_IDS,
   BAL_NUMERO_LAYER_IDS,
+  BAL_VOIE_TRACE_LAYER_ID,
   getBalLayers,
 } from "./bal.layers";
 import type { BalTab } from "@/components/adresses/bal-tab";
@@ -45,12 +46,16 @@ export function BalTilesMap({
   balId,
   tab,
   hiddenNumeroId,
+  hiddenVoieId,
 }: {
   balId: string;
   tab: BalTab;
   // Numéro en cours d'édition : représenté par ses marqueurs déplaçables,
   // on ne l'affiche pas en double depuis les tuiles.
   hiddenNumeroId?: string;
+  // Voie en cours d'édition : son tracé est représenté par la ligne
+  // modifiable, on ne l'affiche pas en double depuis les tuiles.
+  hiddenVoieId?: string;
 }) {
   const { mapRef } = useContext(MapContext);
   const { isDrawing } = useContext(DrawContext);
@@ -125,19 +130,22 @@ export function BalTilesMap({
       {getBalLayers(tab).map((layer) => {
         // Le filtre n'est ajouté qu'aux couches concernées : une clé `filter`
         // à undefined est refusée par maplibre à la création de la couche.
-        const hideNumero =
-          hiddenNumeroId !== undefined &&
-          BAL_NUMERO_LAYER_IDS.includes(layer.id!);
+        const hiddenId =
+          hiddenNumeroId && BAL_NUMERO_LAYER_IDS.includes(layer.id!)
+            ? hiddenNumeroId
+            : hiddenVoieId && layer.id === BAL_VOIE_TRACE_LAYER_ID
+              ? hiddenVoieId
+              : undefined;
         return (
           <Layer
             key={layer.id}
             {...layer}
-            {...(hideNumero
+            {...(hiddenId
               ? {
                   filter: [
                     "!=",
                     ["get", "id"],
-                    hiddenNumeroId,
+                    hiddenId,
                   ] as FilterSpecification,
                 }
               : {})}

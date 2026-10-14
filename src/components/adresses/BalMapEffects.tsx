@@ -13,7 +13,8 @@ export function BalMapEffects({ balId }: { balId: string }) {
   const { setMapChildren, flyToBounds } = useContext(MapContext);
   const { contour: communeContour } = useCommune();
 
-  const tab = getBalTab(usePathname());
+  const pathname = usePathname();
+  const tab = getBalTab(pathname);
   // Sur la page d'une voie ou d'un toponyme, c'est lui qui est centré
   // (BboxMapEffects) : le centrage initial sur la commune passerait après et
   // l'écraserait.
@@ -23,18 +24,26 @@ export function BalMapEffects({ balId }: { balId: string }) {
     numeroId?: string;
   }>();
   const hasDetailTarget = Boolean(voieId || toponymeId);
+  // Formulaire de la voie : son tracé est édité sur la carte
+  const editedVoieId =
+    voieId && !numeroId && pathname.endsWith("/edit") ? voieId : undefined;
 
   const initialFlyToDoneRef = useRef(false);
 
   useEffect(() => {
     setMapChildren(
-      <BalTilesMap balId={balId} tab={tab} hiddenNumeroId={numeroId} />,
+      <BalTilesMap
+        balId={balId}
+        tab={tab}
+        hiddenNumeroId={numeroId}
+        hiddenVoieId={editedVoieId}
+      />,
     );
 
     return () => {
       setMapChildren(null);
     };
-  }, [setMapChildren, balId, tab, numeroId]);
+  }, [setMapChildren, balId, tab, numeroId, editedVoieId]);
 
   useEffect(() => {
     if (hasDetailTarget) {
