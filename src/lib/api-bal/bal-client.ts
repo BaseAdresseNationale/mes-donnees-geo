@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { getServerBalClient } from "./bal-access";
-import { findNumero, findVoie } from "./generated/sdk.gen";
+import { findNumero, findToponyme, findVoie } from "./generated/sdk.gen";
 
 // Identifiant au format ObjectId (24 caractères hexadécimaux)
 const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
@@ -71,5 +71,29 @@ export const requireBalNumero = cache(
     }
 
     return numero;
+  },
+);
+
+// Toponyme de la BAL pour les pages sous /toponymes/{toponymeId}.
+// 404 si le toponyme n'existe pas ou n'appartient pas à la BAL de l'URL.
+export const requireBalToponyme = cache(
+  async (balId: string, toponymeId: string) => {
+    const client = await requireBalClient(balId);
+    if (!OBJECT_ID_RE.test(toponymeId)) notFound();
+
+    const { data: toponyme, response } = await findToponyme({
+      client,
+      path: { toponymeId },
+    });
+    if (response?.status === 404 || (toponyme && toponyme.balId !== balId)) {
+      notFound();
+    }
+    if (!toponyme) {
+      throw new Error(
+        `Impossible de récupérer le toponyme ${toponymeId} (HTTP ${response?.status}).`,
+      );
+    }
+
+    return toponyme;
   },
 );

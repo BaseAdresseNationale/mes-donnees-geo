@@ -1,5 +1,5 @@
 import listStyles from "@/components/adresses/list/NameList.module.css";
-import styles from "./VoieForm.module.css";
+import styles from "@/components/adresses/form/form.module.css";
 
 // Skeleton du formulaire de voie (création / modification)
 export function VoieFormSkeleton() {

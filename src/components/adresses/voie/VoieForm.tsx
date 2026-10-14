@@ -2,27 +2,21 @@
 
 import { useContext, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Select, TextArea } from "@gouvfr-lasuite/ui-components";
+import { Button, Input, TextArea } from "@gouvfr-lasuite/ui-components";
 import MapContext from "@/contexts/MapContext";
 import { createBalClient } from "@/lib/api-bal/browser-client";
 import { createVoie, updateVoie } from "@/lib/api-bal/generated/sdk.gen";
 import type { ExtendedVoieDto } from "@/lib/api-bal/generated/types.gen";
-import {
-  LANGUES_REGIONALES,
-  getLangueLabel,
-} from "@/lib/api-bal/langues-regionales";
 import { reloadBalTiles } from "@/components/map/bal/BalTilesMap";
 import { parseApiFieldErrors } from "@/components/adresses/form/api-errors";
-import styles from "./VoieForm.module.css";
+import {
+  LanguesRegionalesField,
+  toLangueRows,
+  toNomAlt,
+} from "@/components/adresses/form/LanguesRegionalesField";
+import styles from "@/components/adresses/form/form.module.css";
 
 const COMMENT_MAX_LENGTH = 5000;
-
-interface LangueRow {
-  // Clé React stable, indépendante de la langue choisie
-  key: number;
-  code: string;
-  nom: string;
-}
 
 type FieldErrors = Partial<Record<"nom" | "nomAlt" | "comment", string>>;
 
@@ -32,14 +26,6 @@ const API_FIELDS: Record<string, keyof FieldErrors> = {
   lang_alt: "nomAlt",
   comment: "comment",
 };
-
-function toLangueRows(nomAlt: ExtendedVoieDto["nomAlt"] | null): LangueRow[] {
-  return Object.entries(nomAlt ?? {}).map(([code, nom], index) => ({
-    key: index,
-    code,
-    nom: typeof nom === "string" ? nom : "",
-  }));
-}
 
 // Formulaire d'une voie : modification si `voie` est fourni, sinon création.
 export function VoieForm({
@@ -63,28 +49,9 @@ export function VoieForm({
   const [langues, setLangues] = useState(() =>
     toLangueRows(voie?.nomAlt ?? null),
   );
-  const [nextKey, setNextKey] = useState(langues.length);
   const [comment, setComment] = useState(voie?.comment ?? "");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-
-  const usedCodes = new Set(langues.map((langue) => langue.code));
-  const allLanguesUsed = usedCodes.size >= LANGUES_REGIONALES.length;
-
-  function updateLangue(key: number, patch: Partial<LangueRow>) {
-    setLangues((rows) =>
-      rows.map((row) => (row.key === key ? { ...row, ...patch } : row)),
-    );
-  }
-
-  function addLangue() {
-    setLangues((rows) => [...rows, { key: nextKey, code: "", nom: "" }]);
-    setNextKey((key) => key + 1);
-  }
-
-  function removeLangue(key: number) {
-    setLangues((rows) => rows.filter((row) => row.key !== key));
-  }
 
   function submit() {
     setFormError(null);
@@ -94,16 +61,9 @@ export function VoieForm({
     }
     setFieldErrors({});
 
-    // Lignes incomplètes ignorées ; l'API refuse un objet vide (null attendu)
-    const nomAlt = Object.fromEntries(
-      langues
-        .filter((langue) => langue.code && langue.nom.trim())
-        .map((langue) => [langue.code, langue.nom.trim()]),
-    );
-
     const body = {
       nom: nom.trim(),
-      nomAlt: Object.keys(nomAlt).length > 0 ? nomAlt : null,
+      nomAlt: toNomAlt(langues),
       comment: comment.trim() || null,
     };
 
@@ -162,70 +122,12 @@ export function VoieForm({
         disabled={pending}
       />
 
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Langues régionales</legend>
-        {langues.map((langue) => (
-          <div key={langue.key} className={styles.langueRow}>
-            <div className={styles.langueSelect}>
-              <Select
-                label="Langue"
-                options={LANGUES_REGIONALES.filter(
-                  ({ code }) => code === langue.code || !usedCodes.has(code),
-                ).map(({ code, label }) => ({ value: code, label }))}
-                value={langue.code || undefined}
-                onChange={(e) =>
-                  updateLangue(langue.key, {
-                    code:
-                      typeof e.target.value === "string" ? e.target.value : "",
-                  })
-                }
-                clearable={false}
-                fullWidth
-                disabled={pending}
-              />
-            </div>
-            <div className={styles.langueNom}>
-              <Input
-                label={
-                  langue.code ? `Nom en ${getLangueLabel(langue.code)}` : "Nom"
-                }
-                fullWidth
-                value={langue.nom}
-                onChange={(e) =>
-                  updateLangue(langue.key, { nom: e.target.value })
-                }
-                disabled={pending || !langue.code}
-              />
-            </div>
-            <Button
-              type="button"
-              variant="tertiary"
-              color="neutral"
-              icon={<span className="material-icons">delete</span>}
-              aria-label="Retirer cette langue"
-              title="Retirer cette langue"
-              onClick={() => removeLangue(langue.key)}
-              disabled={pending}
-            />
-          </div>
-        ))}
-        {fieldErrors.nomAlt && (
-          <p className={styles.fieldError}>{fieldErrors.nomAlt}</p>
-        )}
-        <div>
-          <Button
-            type="button"
-            variant="secondary"
-            color="neutral"
-            size="small"
-            icon={<span className="material-icons">add</span>}
-            onClick={addLangue}
-            disabled={pending || allLanguesUsed}
-          >
-            Ajouter une langue régionale
-          </Button>
-        </div>
-      </fieldset>
+      <LanguesRegionalesField
+        rows={langues}
+        onChange={setLangues}
+        error={fieldErrors.nomAlt}
+        disabled={pending}
+      />
 
       <TextArea
         label="Commentaire"

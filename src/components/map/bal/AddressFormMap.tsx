@@ -1,28 +1,32 @@
 "use client";
 
 import { useContext, useEffect, useRef } from "react";
-import { Layer, Marker, type MapLayerMouseEvent } from "react-map-gl/maplibre";
+import {
+  Layer,
+  Marker,
+  Source,
+  type MapLayerMouseEvent,
+} from "react-map-gl/maplibre";
 import MapContext from "@/contexts/MapContext";
 import { getPositionTypeLabel } from "@/lib/api-bal/positions";
-import styles from "./NumeroFormMap.module.css";
+import type { FormPosition } from "@/components/adresses/form/positions";
+import { BAL_TILES_SOURCE_ID } from "./bal.layers";
+import styles from "./AddressFormMap.module.css";
 
 // Couches sur la source "cadastre" déclarée dans MapLayout
 const CADASTRE_SOURCE_ID = "cadastre";
 const PARCELLES_SOURCE_LAYER = "parcelles";
 const PARCELLES_MIN_ZOOM = 14;
-const PARCELLES_CLICK_LAYER_ID = "numero-parcelles-click";
-const PARCELLES_SELECTED_LAYER_ID = "numero-parcelles-selected";
+const PARCELLES_CLICK_LAYER_ID = "form-parcelles-click";
+const PARCELLES_SELECTED_LAYER_ID = "form-parcelles-selected";
 const SELECTED_COLOR = "#18753c";
 
-export interface FormPosition {
-  // Clé stable côté formulaire (indépendante du rang)
-  key: number;
-  type: string;
-  longitude: number;
-  latitude: number;
-}
+// Contour dessiné et numéros mis en évidence (association à un toponyme)
+const POLYGON_SOURCE_ID = "form-polygon";
+const HIGHLIGHT_LAYER_ID = "form-numeros-highlighted";
+const HIGHLIGHT_COLOR = "#e1000f";
 
-interface NumeroFormMapProps {
+interface AddressFormMapProps {
   label: string;
   positions: FormPosition[];
   onMovePosition: (key: number, longitude: number, latitude: number) => void;
@@ -30,18 +34,25 @@ interface NumeroFormMapProps {
   onToggleParcelle: (id: string) => void;
   // Sélection de parcelles active seulement quand le cadastre est affiché
   parcellesSelectable: boolean;
+  // Contour [[lon, lat], …] à afficher (ex. sélection de numéros)
+  polygon?: number[][] | null;
+  // Numéros des tuiles BAL à mettre en évidence
+  highlightedNumeroIds?: string[];
 }
 
-// Éléments de carte du formulaire d'un numéro : un marqueur déplaçable par
-// position, et sélection des parcelles cadastrales au clic.
-export function NumeroFormMap({
+// Éléments de carte des formulaires voie / numéro / toponyme : un marqueur
+// déplaçable par position, sélection des parcelles cadastrales au clic, et
+// éventuellement un contour et des numéros mis en évidence.
+export function AddressFormMap({
   label,
   positions,
   onMovePosition,
   parcelles,
   onToggleParcelle,
   parcellesSelectable,
-}: NumeroFormMapProps) {
+  polygon,
+  highlightedNumeroIds,
+}: AddressFormMapProps) {
   const { mapRef } = useContext(MapContext);
 
   // Dernier callback sans ré-abonner les événements à chaque rendu
@@ -101,6 +112,49 @@ export function NumeroFormMap({
         layout={{ visibility: parcellesSelectable ? "visible" : "none" }}
         paint={{ "fill-color": "#000", "fill-opacity": 0 }}
       />
+
+      {polygon && polygon.length >= 4 && (
+        <Source
+          id={POLYGON_SOURCE_ID}
+          type="geojson"
+          data={{
+            type: "Feature",
+            properties: {},
+            geometry: { type: "Polygon", coordinates: [polygon] },
+          }}
+        >
+          <Layer
+            id={`${POLYGON_SOURCE_ID}-fill`}
+            type="fill"
+            paint={{ "fill-color": HIGHLIGHT_COLOR, "fill-opacity": 0.08 }}
+          />
+          <Layer
+            id={`${POLYGON_SOURCE_ID}-line`}
+            type="line"
+            paint={{
+              "line-color": HIGHLIGHT_COLOR,
+              "line-width": 2,
+              "line-dasharray": [2, 1],
+            }}
+          />
+        </Source>
+      )}
+
+      {highlightedNumeroIds && highlightedNumeroIds.length > 0 && (
+        <Layer
+          id={HIGHLIGHT_LAYER_ID}
+          type="circle"
+          source={BAL_TILES_SOURCE_ID}
+          source-layer="numeros-points"
+          filter={["in", ["get", "id"], ["literal", highlightedNumeroIds]]}
+          paint={{
+            "circle-radius": 7,
+            "circle-color": HIGHLIGHT_COLOR,
+            "circle-stroke-color": "#fff",
+            "circle-stroke-width": 2,
+          }}
+        />
+      )}
 
       {/* Positions : poignées déplaçables */}
       {positions.map((position) => (

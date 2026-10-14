@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import listStyles from "@/components/adresses/list/NameList.module.css";
+import formStyles from "@/components/adresses/form/form.module.css";
 import styles from "./NumeroForm.module.css";
 
 // Barre animée de la taille d'un élément du formulaire
@@ -19,7 +20,7 @@ const BUTTON = { width: "11rem", height: "2rem" };
 export function NumeroFormSkeleton() {
   return (
     <div
-      className={styles.form}
+      className={formStyles.form}
       aria-busy="true"
       aria-label="Chargement du formulaire"
     >
@@ -36,11 +37,11 @@ export function NumeroFormSkeleton() {
 
       <Bar style={FIELD} />
 
-      <div className={styles.fieldset}>
+      <div className={formStyles.fieldset}>
         <Bar style={LEGEND} />
         <Bar style={HINT} />
-        <div className={styles.positionRow}>
-          <div className={styles.positionType}>
+        <div className={formStyles.positionRow}>
+          <div className={formStyles.positionType}>
             <Bar style={FIELD} />
           </div>
           <Bar style={{ width: "7rem", height: "0.875rem" }} />
@@ -49,10 +50,10 @@ export function NumeroFormSkeleton() {
         <Bar style={BUTTON} />
       </div>
 
-      <div className={styles.fieldset}>
+      <div className={formStyles.fieldset}>
         <Bar style={LEGEND} />
         <Bar style={HINT} />
-        <div className={styles.parcelles}>
+        <div className={formStyles.chips}>
           {[7.5, 8, 7].map((width, index) => (
             <Bar
               key={index}
@@ -68,7 +69,7 @@ export function NumeroFormSkeleton() {
 
       <Bar style={{ width: "100%", height: "5.5rem" }} />
 
-      <div className={styles.actions}>
+      <div className={formStyles.actions}>
         <Bar style={{ width: "5.5rem", height: "2.5rem" }} />
         <Bar style={{ width: "7.5rem", height: "2.5rem" }} />
       </div>
