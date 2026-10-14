@@ -128,6 +128,9 @@ const HIT_PIXEL_DISTANCE = 12;
 // Distance max, en pixels écran, entre deux clics pour que le second termine
 // le segment (défaut terra-draw : 40, trop permissif).
 const FINISH_PIXEL_DISTANCE = 8;
+// Distance, en pixels écran, à partir de laquelle un appui sur une poignée
+// d'extrémité devient un glisser (déplacement du sommet) plutôt qu'un clic.
+const ENDPOINT_DRAG_PIXEL_DISTANCE = 4;
 // Tolérance, en mètres, pour considérer que deux points coïncident.
 const SNAP_TOLERANCE_METERS = 2;
 // Distance max, en mètres, entre deux extrémités pour autoriser la fusion de
@@ -615,6 +618,9 @@ export function useLocalPathDrawer(
     let draw: TerraDrawInstance | null = null;
     let removeContextMenuListener: (() => void) | null = null;
     let removeMouseDownListener: (() => void) | null = null;
+    // Appui en cours sur une poignée d'extrémité ("+") : le segment d'extrémité
+    // est présélectionné côté terra-draw pour qu'un glisser déplace le sommet.
+    let endpointPress: { cancel: () => void } | null = null;
 
     (async () => {
       const [
@@ -658,6 +664,8 @@ export function useLocalPathDrawer(
       const instance = new TerraDraw({
         adapter: new adapterMod.TerraDrawMapLibreGLAdapter({
           map: nativeMap,
+          // Aligné sur notre détection clic/glisser des poignées d'extrémité.
+          minPixelDragDistanceSelecting: ENDPOINT_DRAG_PIXEL_DISTANCE,
         }),
         modes: [
           new TerraDrawLineStringMode({
@@ -801,6 +809,8 @@ export function useLocalPathDrawer(
       instance.on("select", (...args: unknown[]) => {
         // terra-draw a sélectionné un segment (clic natif ou `selectFeature`) :
         // on synchronise l'état React (accordéon + mode select).
+        // Appui sur une poignée d'extrémité : clic ou glisser pas encore tranché.
+        if (endpointPress) return;
         const [id] = args as [string | number];
         applySelected(String(id));
         applyModeState("select");
@@ -811,6 +821,7 @@ export function useLocalPathDrawer(
         // draw reste en select (mode au repos) ; changer `modeRef` ici sans
         // rebasculer terra-draw le désynchroniserait (le clic sur une poignée
         // d'extrémité ne repasserait alors plus en dessin).
+        if (endpointPress) return;
         applySelected(null);
       });
 
@@ -873,8 +884,46 @@ export function useLocalPathDrawer(
         }
         return min;
       };
+      // Appui sur une poignée d'extrémité : un clic relance le dessin, un
+      // glisser déplace le sommet (comme un point blanc de sélection).
+      const beginEndpointPress = (
+        segmentId: string,
+        down: { x: number; y: number },
+      ) => {
+        endpointPress?.cancel();
+        const prev = selectedIdRef.current;
+        try {
+          if (modeRef.current !== "select") instance.setMode("select");
+          if (prev != null && prev !== segmentId) instance.deselectFeature(prev);
+          instance.selectFeature(segmentId);
+        } catch {
+          // ignore
+        }
+        const stop = () => {
+          window.removeEventListener("pointermove", onMove, true);
+          window.removeEventListener("pointerup", onUp, true);
+          endpointPress = null;
+        };
+        // Phase de capture : exécuté avant les écouteurs de terra-draw, donc
+        // `modeRef` et l'état React sont à jour quand il traite le même évènement.
+        const onMove = (ev: PointerEvent) => {
+          const dist = Math.hypot(ev.clientX - down.x, ev.clientY - down.y);
+          if (dist < ENDPOINT_DRAG_PIXEL_DISTANCE) return;
+          stop();
+          applySelected(segmentId);
+          applyModeState("select");
+        };
+        const onUp = () => {
+          stop();
+          setMode("draw");
+        };
+        window.addEventListener("pointermove", onMove, true);
+        window.addEventListener("pointerup", onUp, true);
+        endpointPress = { cancel: stop };
+      };
       const onModeDecideMouseDown = (e: {
         point: { x: number; y: number };
+        originalEvent: MouseEvent;
       }) => {
         // Ne jamais interrompre un tracé en cours (premier point déjà posé).
         if (wipFeatureRef.current) return;
@@ -882,13 +931,17 @@ export function useLocalPathDrawer(
         if (chain.length === 0) return;
         const chainStart = chain[0].coordinates[0];
         const chainEnd = chain[chain.length - 1].coordinates.at(-1)!;
-        const endpointDist = Math.min(
-          pixelDistance(projectToPixel(chainStart), e.point),
-          pixelDistance(projectToPixel(chainEnd), e.point),
-        );
+        const startDist = pixelDistance(projectToPixel(chainStart), e.point);
+        const endDist = pixelDistance(projectToPixel(chainEnd), e.point);
+        const endpointDist = Math.min(startDist, endDist);
         let target: DrawMode | null = null;
         if (endpointDist <= SNAP_PIXEL_DISTANCE) {
-          target = "draw";
+          if (e.originalEvent.button !== 0) return;
+          beginEndpointPress(
+            (startDist <= endDist ? chain[0] : chain[chain.length - 1]).id,
+            { x: e.originalEvent.clientX, y: e.originalEvent.clientY },
+          );
+          return;
         } else if (
           chain.some(
             (seg) =>
@@ -963,6 +1016,7 @@ export function useLocalPathDrawer(
       }
       removeContextMenuListener?.();
       removeMouseDownListener?.();
+      endpointPress?.cancel();
       drawRef.current = null;
       setIsReady(false);
       // React StrictMode invoque cet effet deux fois au montage (dev) : sans

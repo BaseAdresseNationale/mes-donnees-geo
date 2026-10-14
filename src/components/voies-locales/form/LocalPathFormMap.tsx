@@ -42,7 +42,7 @@ const OTHER_HITAREA_LAYER_ID = "voies-locales-other-hitarea";
 
 // Poignées d'extrémité (apparaissent au survol du chemin) : plus grosses et
 // d'une couleur distincte des points de manipulation blancs ; cliquer dessus
-// relance le mode dessin.
+// relance le mode dessin, les glisser-déposer déplace le sommet.
 // Violet de la palette La Suite (brand-600 / brand-500) ; MapLibre n'accepte pas les variables CSS.
 const ENDPOINT_COLOR = "#6969df";
 const ENDPOINT_HOVER_COLOR = "#534fc2";
