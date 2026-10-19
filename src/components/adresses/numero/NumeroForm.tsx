@@ -27,6 +27,10 @@ import {
 import { PositionsField } from "@/components/adresses/form/PositionsField";
 import { ParcellesField } from "@/components/adresses/form/ParcellesField";
 import { useShowCadastre } from "@/components/adresses/form/useShowCadastre";
+import {
+  useGoBack,
+  useSetFormBackFallback,
+} from "@/components/adresses/form/form-back";
 import formStyles from "@/components/adresses/form/form.module.css";
 import styles from "./NumeroForm.module.css";
 
@@ -76,6 +80,9 @@ export function NumeroForm({
   const router = useRouter();
   const { mapRef, setMapOverlayChildren } = useContext(MapContext);
   const showCadastre = useShowCadastre();
+  // Retour / Annuler : page précédente, sinon la voie du numéro
+  useSetFormBackFallback(voieHref);
+  const goBack = useGoBack();
   const [pending, startTransition] = useTransition();
 
   const [numeroValue, setNumeroValue] = useState(
@@ -307,7 +314,7 @@ export function NumeroForm({
           type="button"
           color="neutral"
           variant="tertiary"
-          onClick={() => router.push(voieHref)}
+          onClick={() => goBack(voieHref)}
           disabled={pending}
         >
           Annuler

@@ -30,14 +30,13 @@ export default async function NumeroEditPage({
   params: Promise<{
     codeCommune: string;
     balId: string;
-    voieId: string;
     numeroId: string;
   }>;
 }) {
-  const { codeCommune, balId, voieId, numeroId } = await params;
+  const { codeCommune, balId, numeroId } = await params;
 
   const [numero, { data: toponymes }] = await Promise.all([
-    requireBalNumero(balId, voieId, numeroId),
+    requireBalNumero(balId, numeroId),
     requireBalClient(balId).then((client) =>
       findBaseLocaleToponymes({
         client,
@@ -52,13 +51,13 @@ export default async function NumeroEditPage({
       <BboxMapEffects bbox={positionsBbox(numero)} />
       <NumeroForm
         balId={balId}
-        voieId={voieId}
+        voieId={numero.voieId}
         numero={numero}
         // Seuls id et nom servent au choix du toponyme
         toponymes={toponymes
           .map(({ id, nom }) => ({ id, nom }))
           .sort((a, b) => a.nom.localeCompare(b.nom, "fr"))}
-        voieHref={`/${codeCommune}/adresses/${balId}/voies/${voieId}`}
+        voieHref={`/${codeCommune}/adresses/${balId}/voies/${numero.voieId}`}
       />
     </>
   );

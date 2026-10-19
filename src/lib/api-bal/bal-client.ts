@@ -45,23 +45,18 @@ export const requireBalVoie = cache(async (balId: string, voieId: string) => {
   return voie;
 });
 
-// Numéro d'une voie de la BAL pour les pages sous /numeros/{numeroId}.
-// 404 si le numéro n'existe pas ou n'appartient pas à la BAL / voie de l'URL.
+// Numéro de la BAL pour les pages sous /numeros/{numeroId}.
+// 404 si le numéro n'existe pas ou n'appartient pas à la BAL de l'URL.
 export const requireBalNumero = cache(
-  async (balId: string, voieId: string, numeroId: string) => {
+  async (balId: string, numeroId: string) => {
     const client = await requireBalClient(balId);
-    if (!OBJECT_ID_RE.test(voieId) || !OBJECT_ID_RE.test(numeroId)) {
-      notFound();
-    }
+    if (!OBJECT_ID_RE.test(numeroId)) notFound();
 
     const { data: numero, response } = await findNumero({
       client,
       path: { numeroId },
     });
-    if (
-      response?.status === 404 ||
-      (numero && (numero.balId !== balId || numero.voieId !== voieId))
-    ) {
+    if (response?.status === 404 || (numero && numero.balId !== balId)) {
       notFound();
     }
     if (!numero) {

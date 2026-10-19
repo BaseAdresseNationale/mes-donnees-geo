@@ -4,6 +4,7 @@ import { Button } from "@gouvfr-lasuite/ui-components";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import styles from "./BalTabs.module.css";
 import { getBalTab, getFormBackHref } from "./bal-tab";
+import { useFormBackFallback, useGoBack } from "./form/form-back";
 
 // Onglets d'une BAL : chacun correspond à une route sous /adresses/{balId}
 // Chaque onglet est habillé en panneau de signalisation : entrée
@@ -34,7 +35,12 @@ export function BalTabs() {
   const router = useRouter();
 
   const activeTabId = getBalTab(pathname);
-  const formBackHref = getFormBackHref(pathname);
+  // Formulaire : repli fixé par le formulaire (ex. la voie d'un numéro),
+  // sinon page parente déduite de l'URL
+  const formFallbackHref = useFormBackFallback();
+  const parentHref = getFormBackHref(pathname);
+  const formBackHref = parentHref && (formFallbackHref ?? parentHref);
+  const goBack = useGoBack();
 
   // Dans un formulaire de création / modification, les onglets laissent la
   // place à un bouton de retour
@@ -46,7 +52,9 @@ export function BalTabs() {
           color="neutral"
           size="small"
           icon={<span className="material-icons">arrow_back</span>}
-          onClick={() => router.push(formBackHref)}
+          // Retour à la page précédente (ex. le toponyme d'où l'on a ouvert
+          // un numéro), sinon à la page de repli : la voie pour un numéro
+          onClick={() => goBack(formBackHref)}
         >
           Retour
         </Button>

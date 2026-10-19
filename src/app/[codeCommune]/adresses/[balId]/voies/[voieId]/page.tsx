@@ -37,7 +37,7 @@ export default async function VoiePage({
         label="Numéros de la voie"
         searchLabel="Rechercher un numéro"
         emptyMessage="Aucun numéro sur cette voie."
-        hrefPrefix={`${voieHref}/numeros`}
+        hrefPrefix={`/${codeCommune}/adresses/${balId}/numeros`}
         hrefSuffix="/edit"
         addHref={`${voieHref}/numeros/new`}
         addLabel="Ajouter un numéro"

@@ -23,7 +23,7 @@ export function BalMapEffects({ balId }: { balId: string }) {
     toponymeId?: string;
     numeroId?: string;
   }>();
-  const hasDetailTarget = Boolean(voieId || toponymeId);
+  const hasDetailTarget = Boolean(voieId || toponymeId || numeroId);
   // Formulaire de la voie : son tracé est édité sur la carte
   const editedVoieId =
     voieId && !numeroId && pathname.endsWith("/edit") ? voieId : undefined;
