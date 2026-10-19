@@ -11,7 +11,8 @@
 /*
  * Onglets en panneaux de ville. Sélecteurs préfixés par .c__button pour
  * passer devant les styles du Button de l'ui-kit (variant tertiary).
- * Onglet inactif : panneau un peu estompé ; onglet actif : pleine couleur.
+ * Onglet inactif : panneau estompé et désaturé ; onglet actif : pleine
+ * couleur, légèrement agrandi et souligné d'un trait de sa couleur.
  */
 .tabs :global(.c__button).communeSign,
 .tabs :global(.c__button).voieSign,
@@ -21,9 +22,11 @@
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.02em;
-  opacity: 0.55;
+  opacity: 0.4;
+  filter: grayscale(0.7);
   transition:
     opacity 0.15s,
+    filter 0.15s,
     transform 0.15s;
 }
 
@@ -31,7 +34,8 @@
 .tabs :global(.c__button).voieSign:hover,
 .tabs :global(.c__button).toponymeSign:hover {
   color: #fff;
-  opacity: 0.85;
+  opacity: 0.75;
+  filter: grayscale(0.2);
 }
 
 .tabs :global(.c__button).communeSign:global(.c__button--active),
@@ -39,7 +43,34 @@
 .tabs :global(.c__button).toponymeSign:global(.c__button--active) {
   color: #fff;
   opacity: 1;
-  transform: translateY(-1px);
+  filter: none;
+  transform: scale(1.05);
+}
+
+/* Trait sous l'onglet actif, de la couleur de son panneau (--tab-color) */
+.tabs :global(.c__button).communeSign:global(.c__button--active)::after,
+.tabs :global(.c__button).voieSign:global(.c__button--active)::after,
+.tabs :global(.c__button).toponymeSign:global(.c__button--active)::after {
+  content: "";
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  bottom: -0.4rem;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--tab-color);
+}
+
+.tabs :global(.c__button).communeSign {
+  --tab-color: #e30613;
+}
+
+.tabs :global(.c__button).voieSign {
+  --tab-color: #2b3990;
+}
+
+.tabs :global(.c__button).toponymeSign {
+  --tab-color: #7a3b1d;
 }
 
 /*
@@ -115,6 +146,10 @@
 
 .tabs :global(.c__button).toponymeSign:global(.c__button--active) {
   filter: drop-shadow(0 2px 2px rgb(0 0 0 / 25%));
+}
+
+.tabs :global(.c__button).toponymeSign:global(.c__button--active)::after {
+  right: calc(15% + 0.75rem);
 }
 
 @media (prefers-reduced-motion: reduce) {
