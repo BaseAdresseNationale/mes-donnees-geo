@@ -12,11 +12,15 @@ export interface VoieNumeros {
 // liste de ses numéros. Seul l'ensemble défile.
 export function NumerosByVoie({
   balId,
+  numerosHref,
   voies,
   emptyMessage,
 }: {
   // BAL des numéros (bouton « archiver » sur chaque numéro)
   balId: string;
+  // /{codeCommune}/adresses/{balId}/numeros : chaque numéro ouvre son
+  // formulaire
+  numerosHref: string;
   voies: VoieNumeros[];
   emptyMessage: string;
 }) {
@@ -39,6 +43,8 @@ export function NumerosByVoie({
           <NameList
             items={numeros}
             label={`Numéros de ${voieNom}`}
+            hrefPrefix={numerosHref}
+            hrefSuffix="/edit"
             paginated={false}
             archive={{ balId, kind: "numero" }}
           />

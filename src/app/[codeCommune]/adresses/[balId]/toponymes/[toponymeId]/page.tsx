@@ -50,6 +50,7 @@ export default async function ToponymePage({
       />
       <NumerosByVoie
         balId={balId}
+        numerosHref={`/${codeCommune}/adresses/${balId}/numeros`}
         voies={groupByVoie(numeros.toSorted(compareNumerosByVoie))}
         emptyMessage="Aucun numéro associé à ce toponyme."
       />
