@@ -6,7 +6,7 @@ import { getCommuneFlag } from "@/lib/api/blason-commune";
 import { PluginNotFound } from "@/components/plugin-workspace/PluginNotFound";
 import { CommuneSettings } from "@/components/plugin-workspace/CommuneSettings";
 import { getCommuneBalsForClient } from "@/lib/api-bal/bal-access";
-import { BalSelect } from "@/components/adresses/BalSelect";
+import { BalSelectToolbar } from "@/components/adresses/BalSelectToolbar";
 import { ReactNode } from "react";
 
 const PLUGIN_ID = "adresses";
@@ -45,7 +45,7 @@ export default async function AdressesLayout({
         />
       }
     >
-      <BalSelect bals={bals} />
+      <BalSelectToolbar bals={bals} />
       {children}
     </PluginLayout>
   );

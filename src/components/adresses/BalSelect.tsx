@@ -67,8 +67,12 @@ export function BalSelect({ bals }: BalSelectProps) {
   return (
     <div className={styles.container}>
       <Select
+        // Dans la barre d'outils : pas de label visible (lu par les lecteurs
+        // d'écran), variante sans label flottant pour tenir en hauteur
         label="Base Adresse Locale"
-        placeholder="Sélectionner une BAL"
+        hideLabel
+        variant="classic"
+        placeholder="Sélectionner une Base Adresse Locale"
         options={options}
         value={balId}
         onChange={(e) => {

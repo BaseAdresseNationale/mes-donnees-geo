@@ -1,14 +1,17 @@
+/* Affiché dans la barre d'outils au-dessus de la carte (fond et bordure
+   fournis par la barre) */
 .container {
-  flex-shrink: 0;
-  padding: 0.75rem;
-  border-top: 1px solid var(--color-border);
-  background: #fff;
+  width: min(15rem, 100%);
+}
+
+/* Hauteur ramenée à celle de la barre d'outils (50px, padding compris) */
+.container :global(.c__select__wrapper) {
+  height: 2.125rem;
+  min-height: 2.125rem;
 }
 
 .message {
-  flex-shrink: 0;
   margin: 0;
-  padding: 0.75rem;
   font-size: 0.875rem;
   color: var(--color-muted, #555);
 }
