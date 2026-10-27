@@ -1,16 +1,15 @@
 "use client";
 
-import { useCallback, useContext, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useModals } from "@gouvfr-lasuite/ui-components";
-import MapContext from "@/contexts/MapContext";
 import { createBalClient } from "@/lib/api-bal/browser-client";
 import {
   deleteNumero,
   deleteToponyme,
   deleteVoie,
 } from "@/lib/api-bal/generated/sdk.gen";
-import { reloadBalTiles } from "@/components/map/bal/BalTilesMap";
+import { useBalChanged } from "@/components/adresses/bal-changes";
 
 export type DeleteKind = "voie" | "toponyme" | "numero";
 
@@ -38,8 +37,9 @@ const CONFIRMATION: Record<
 // enregistre l'événement correspondant ; la liste et la carte sont rechargées.
 export function useDeleteItem(balId: string, kind: DeleteKind) {
   const router = useRouter();
+  // Recharge la carte et le compteur des modifications à publier
+  const notifyBalChanged = useBalChanged();
   const modals = useModals();
-  const { mapRef } = useContext(MapContext);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,10 +70,10 @@ export function useDeleteItem(balId: string, kind: DeleteKind) {
         return;
       }
 
-      reloadBalTiles(mapRef);
+      notifyBalChanged();
       router.refresh();
     },
-    [balId, kind, modals, mapRef, router],
+    [balId, kind, modals, notifyBalChanged, router],
   );
 
   return { remove, deletingId, error };

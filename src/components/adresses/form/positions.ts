@@ -21,6 +21,10 @@ export interface FormPosition {
   latitude: number;
   // Source d'origine de la position, conservée à l'enregistrement
   source?: string;
+  // Id de la position existante (absent pour une position ajoutée) : renvoyé
+  // à l'API pour qu'un déplacement soit une modification de la position, et
+  // non une suppression + une création (l'API compare les positions par id)
+  id?: string;
 }
 
 export function toFormPositions(positions: Position[]): FormPosition[] {
@@ -36,15 +40,18 @@ export function toFormPositions(positions: Position[]): FormPosition[] {
         longitude,
         latitude,
         source: position.source || undefined,
+        id: position.id,
       },
     ];
   });
 }
 
-// Positions envoyées à l'API : l'ordre définit leur rang ; id et rang sont
-// générés par l'API, d'où le cast vers le type Position du SDK.
+// Positions envoyées à l'API : l'ordre définit leur rang. Les positions
+// existantes gardent leur id ; celui des nouvelles et le rang sont générés
+// par l'API, d'où le cast vers le type Position du SDK.
 export function toApiPositions(positions: FormPosition[]): Position[] {
   return positions.map((position) => ({
+    ...(position.id ? { id: position.id } : {}),
     type: position.type,
     ...(position.source ? { source: position.source } : {}),
     point: {

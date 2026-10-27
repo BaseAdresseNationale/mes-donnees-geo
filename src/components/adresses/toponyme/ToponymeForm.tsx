@@ -20,7 +20,7 @@ import {
 } from "@/lib/api-bal/generated/sdk.gen";
 import type { ExtentedToponymeDto } from "@/lib/api-bal/generated/types.gen";
 import { AddressFormMap } from "@/components/map/bal/AddressFormMap";
-import { reloadBalTiles } from "@/components/map/bal/BalTilesMap";
+import { useBalChanged } from "@/components/adresses/bal-changes";
 import { usePolygonDraw } from "@/components/map/bal/usePolygonDraw";
 import { parseApiFieldErrors } from "@/components/adresses/form/api-errors";
 import {
@@ -117,7 +117,9 @@ export function ToponymeForm({
   const cancelHref = isEdit ? `${toponymesHref}/${toponyme.id}` : toponymesHref;
   const { contour: communeContour } = useCommune();
   const router = useRouter();
-  const { mapRef, setMapOverlayChildren } = useContext(MapContext);
+  // Recharge la carte et le compteur des modifications à publier
+  const notifyBalChanged = useBalChanged();
+  const { setMapOverlayChildren } = useContext(MapContext);
   const showCadastre = useShowCadastre();
   const [pending, startTransition] = useTransition();
 
@@ -315,7 +317,7 @@ export function ToponymeForm({
       ].filter((batch) => batch !== false);
       const results = await Promise.all(batches);
 
-      reloadBalTiles(mapRef);
+      notifyBalChanged();
       const toponymeHref = `${toponymesHref}/${data.id}`;
       // En création, on quitte le formulaire même si l'association échoue :
       // le renvoyer créerait un second toponyme. La page du toponyme montre

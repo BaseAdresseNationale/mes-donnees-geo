@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -9,14 +9,13 @@ import {
   RadioGroup,
   TextArea,
 } from "@gouvfr-lasuite/ui-components";
-import MapContext from "@/contexts/MapContext";
 import { createBalClient } from "@/lib/api-bal/browser-client";
 import { createVoie, updateVoie } from "@/lib/api-bal/generated/sdk.gen";
 import type {
   ExtendedVoieDto,
   UpdateVoieDto,
 } from "@/lib/api-bal/generated/types.gen";
-import { reloadBalTiles } from "@/components/map/bal/BalTilesMap";
+import { useBalChanged } from "@/components/adresses/bal-changes";
 import { useLineDraw } from "@/components/map/bal/useLineDraw";
 import { parseApiFieldErrors } from "@/components/adresses/form/api-errors";
 import {
@@ -70,7 +69,8 @@ export function VoieForm({
   // Annuler : retour à la voie modifiée, ou à la liste en création
   const cancelHref = isEdit ? `${voiesHref}/${voie.id}` : voiesHref;
   const router = useRouter();
-  const { mapRef } = useContext(MapContext);
+  // Recharge la carte et le compteur des modifications à publier
+  const notifyBalChanged = useBalChanged();
   const [pending, startTransition] = useTransition();
 
   const [nom, setNom] = useState(voie?.nom ?? "");
@@ -136,7 +136,7 @@ export function VoieForm({
       }
 
       // Voie (nouvelle ou renommée) visible sur la carte et dans les listes
-      reloadBalTiles(mapRef);
+      notifyBalChanged();
       router.push(`${voiesHref}/${data.id}`);
       router.refresh();
     });

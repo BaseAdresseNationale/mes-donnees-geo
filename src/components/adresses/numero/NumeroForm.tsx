@@ -16,7 +16,7 @@ import { createNumero, updateNumero } from "@/lib/api-bal/generated/sdk.gen";
 import type { Numero } from "@/lib/api-bal/generated/types.gen";
 import { DEFAULT_POSITION_TYPE } from "@/lib/api-bal/positions";
 import { AddressFormMap } from "@/components/map/bal/AddressFormMap";
-import { reloadBalTiles } from "@/components/map/bal/BalTilesMap";
+import { useBalChanged } from "@/components/adresses/bal-changes";
 import { parseApiFieldErrors } from "@/components/adresses/form/api-errors";
 import {
   boundsCenter,
@@ -78,7 +78,9 @@ export function NumeroForm({
   const isEdit = numero !== undefined;
   const { contour: communeContour } = useCommune();
   const router = useRouter();
-  const { mapRef, setMapOverlayChildren } = useContext(MapContext);
+  // Recharge la carte et le compteur des modifications à publier
+  const notifyBalChanged = useBalChanged();
+  const { setMapOverlayChildren } = useContext(MapContext);
   const showCadastre = useShowCadastre();
   // Retour / Annuler : page précédente, sinon la voie du numéro
   useSetFormBackFallback(voieHref);
@@ -202,7 +204,7 @@ export function NumeroForm({
       }
 
       // Nouvelle position visible sur la carte et liste à jour
-      reloadBalTiles(mapRef);
+      notifyBalChanged();
       router.push(voieHref);
       router.refresh();
     });
