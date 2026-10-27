@@ -30,7 +30,11 @@ export default async function LimitesAdministrativesLayout({
   const communeFlagUrl = await getCommuneFlag(session.communeInsee);
 
   return (
-    <PluginLayout pluginId={currentPlugin.id} pluginLabel={currentPlugin.label}>
+    <PluginLayout
+      pluginId={currentPlugin.id}
+      pluginLabel={currentPlugin.label}
+      communeFlagUrl={communeFlagUrl}
+    >
       {children}
     </PluginLayout>
   );

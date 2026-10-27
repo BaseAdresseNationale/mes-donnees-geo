@@ -87,16 +87,17 @@ export function CommuneSettings({
         onClick={() => setIsOpen(true)}
         color="neutral"
         variant="tertiary"
-        size="small"
         icon={
           <ResponsiveImage
             src={communeFlagUrl}
             alt={`Blason de ${communeName}`}
-            style={{ height: 24 }}
+            style={{ height: 24, marginRight: 8 }}
           />
         }
         aria-label={`Paramètres de ${communeName} (${commune.codeInsee})`}
-      />
+      >
+        {commune.nom} ({commune.codeInsee})
+      </Button>
       <Modal
         isOpen={isOpen}
         onClose={handleClose}

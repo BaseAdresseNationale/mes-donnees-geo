@@ -47,6 +47,7 @@ interface InseeSiretResponse {
     };
     adresseEtablissement?: {
       codeCommuneEtablissement?: string | null;
+      libelleCommuneEtablissement: string | null;
     };
   };
 }
@@ -88,6 +89,7 @@ export async function resolveCommuneFromSiret(
   const data = (await res.json()) as InseeSiretResponse;
   const etablissement = data.etablissement;
   const uniteLegale = etablissement?.uniteLegale;
+  const adresseEtablissement = etablissement?.adresseEtablissement;
   if (!etablissement || !uniteLegale) {
     throw new NotACommuneError("SIRET introuvable dans le répertoire Sirene.");
   }
@@ -106,6 +108,7 @@ export async function resolveCommuneFromSiret(
   }
 
   const nom =
+    adresseEtablissement?.libelleCommuneEtablissement ||
     uniteLegale.denominationUniteLegale ||
     (uniteLegale.nomUniteLegale
       ? `${uniteLegale.prenomUsuelUniteLegale ?? ""} ${uniteLegale.nomUniteLegale}`.trim()

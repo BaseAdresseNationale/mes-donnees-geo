@@ -36,6 +36,7 @@ export default async function VoiesLocalesLayout({
     <PluginLayout
       pluginId={currentPlugin.id}
       pluginLabel={currentPlugin.label}
+      communeFlagUrl={communeFlagUrl}
       mapToolChildren={<LayersSwitch />}
     >
       {children}

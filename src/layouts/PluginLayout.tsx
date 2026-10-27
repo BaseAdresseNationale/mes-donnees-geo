@@ -3,10 +3,12 @@ import { useContext, useEffect } from "react";
 import styles from "./PluginLayout.module.css";
 import { PluginSelectionDropDown } from "@/components/plugin-workspace/PluginSelectionDropDown";
 import MapContext from "@/contexts/MapContext";
+import { CommuneSettings } from "@/components/plugin-workspace/CommuneSettings";
 
 interface PluginLayoutProps {
   pluginId: string;
   pluginLabel: string;
+  communeFlagUrl: string;
   children: React.ReactNode;
   mapToolChildren?: React.ReactNode;
 }
@@ -14,6 +16,7 @@ interface PluginLayoutProps {
 export function PluginLayout({
   pluginId,
   pluginLabel,
+  communeFlagUrl,
   children,
   mapToolChildren,
 }: PluginLayoutProps) {
@@ -31,6 +34,10 @@ export function PluginLayout({
       aria-labelledby={`plugin-tab-${pluginId}`}
     >
       <div className={styles.sidebarHeader}>
+        <CommuneSettings
+          currentPluginId={pluginId}
+          communeFlagUrl={communeFlagUrl}
+        />
         <PluginSelectionDropDown
           pluginId={pluginId}
           pluginLabel={pluginLabel}

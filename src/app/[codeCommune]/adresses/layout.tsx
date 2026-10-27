@@ -4,7 +4,6 @@ import { requireSession } from "@/lib/auth/session";
 import { PluginLayout } from "@/layouts/PluginLayout";
 import { getCommuneFlag } from "@/lib/api/blason-commune";
 import { PluginNotFound } from "@/components/plugin-workspace/PluginNotFound";
-import { CommuneSettings } from "@/components/plugin-workspace/CommuneSettings";
 import { getCommuneBalsForClient } from "@/lib/api-bal/bal-access";
 import { BalSelectToolbar } from "@/components/adresses/BalSelectToolbar";
 import { ReactNode } from "react";
@@ -35,7 +34,11 @@ export default async function AdressesLayout({
   ]);
 
   return (
-    <PluginLayout pluginId={currentPlugin.id} pluginLabel={currentPlugin.label}>
+    <PluginLayout
+      pluginId={currentPlugin.id}
+      pluginLabel={currentPlugin.label}
+      communeFlagUrl={communeFlagUrl}
+    >
       <BalSelectToolbar bals={bals} />
       {children}
     </PluginLayout>
