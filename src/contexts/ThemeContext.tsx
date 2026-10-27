@@ -14,8 +14,6 @@ interface ThemeContextType {
   setIsLeftPanelOpen: (value: boolean) => void;
   toolbarChildren: ReactNode | null;
   setToolbarChildren: (value: ReactNode | null) => void;
-  rightHeaderContentChildren: ReactNode | null;
-  setRightHeaderContentChildren: (value: ReactNode | null) => void;
 }
 
 const ThemeContext = React.createContext<ThemeContextType>({
@@ -25,8 +23,6 @@ const ThemeContext = React.createContext<ThemeContextType>({
   setIsLeftPanelOpen: () => {},
   toolbarChildren: null,
   setToolbarChildren: () => {},
-  rightHeaderContentChildren: null,
-  setRightHeaderContentChildren: () => {},
 });
 
 export function ThemeContextProvider({ children }: { children: ReactNode }) {
@@ -35,8 +31,6 @@ export function ThemeContextProvider({ children }: { children: ReactNode }) {
   const [toolbarChildren, setToolbarChildren] = useState<ReactNode | null>(
     null,
   );
-  const [rightHeaderContentChildren, setRightHeaderContentChildren] =
-    useState<ReactNode | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const value = {
@@ -46,8 +40,6 @@ export function ThemeContextProvider({ children }: { children: ReactNode }) {
     setIsLeftPanelOpen,
     toolbarChildren,
     setToolbarChildren,
-    rightHeaderContentChildren,
-    setRightHeaderContentChildren,
   };
 
   useEffect(() => {

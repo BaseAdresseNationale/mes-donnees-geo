@@ -14,15 +14,9 @@ export type AppLayoutProps = {
     email: string;
     fullName: string;
   };
-  rightHeaderContentChildren?: React.ReactNode;
 } & PropsWithChildren<MainLayoutProps>;
 
-export function AppLayout({
-  children,
-  rightHeaderContentChildren,
-  user,
-  ...props
-}: AppLayoutProps) {
+export function AppLayout({ children, user, ...props }: AppLayoutProps) {
   const handleLogout = useCallback(() => {
     // Navigation plein-page requise : un fetch suivrait la redirection vers
     // ProConnect en arrière-plan sans effacer le cookie SSO du navigateur.
@@ -49,6 +43,10 @@ export function AppLayout({
       }
       rightHeaderContent={
         <div className={styles.rightHeaderContent}>
+          <LaGaufreV2
+            apiUrl={`https://operateurs.suite.anct.gouv.fr/api/v1.0/lagaufre/services/?operator=${process.env.NEXT_PUBLIC_OPERATOR_ID}`}
+            widgetPath="https://static.suite.anct.gouv.fr/widgets/lagaufre.js"
+          />
           {user && (
             <UserMenu
               logout={handleLogout}
@@ -57,15 +55,6 @@ export function AppLayout({
                 full_name: user.fullName,
               }}
             />
-          )}
-          <LaGaufreV2
-            apiUrl={`https://operateurs.suite.anct.gouv.fr/api/v1.0/lagaufre/services/?operator=${process.env.NEXT_PUBLIC_OPERATOR_ID}`}
-            widgetPath="https://static.suite.anct.gouv.fr/widgets/lagaufre.js"
-          />
-          {rightHeaderContentChildren && (
-            <div className={styles.rightHeaderContentChildren}>
-              {rightHeaderContentChildren}
-            </div>
           )}
         </div>
       }

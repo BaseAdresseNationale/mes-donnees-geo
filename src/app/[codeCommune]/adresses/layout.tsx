@@ -35,16 +35,7 @@ export default async function AdressesLayout({
   ]);
 
   return (
-    <PluginLayout
-      pluginId={currentPlugin.id}
-      pluginLabel={currentPlugin.label}
-      rightHeaderContentChildren={
-        <CommuneSettings
-          currentPluginId={currentPlugin.id}
-          communeFlagUrl={communeFlagUrl}
-        />
-      }
-    >
+    <PluginLayout pluginId={currentPlugin.id} pluginLabel={currentPlugin.label}>
       <BalSelectToolbar bals={bals} />
       {children}
     </PluginLayout>
