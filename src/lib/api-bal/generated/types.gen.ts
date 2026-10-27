@@ -29,7 +29,6 @@ export type Numero = {
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     balId: string;
     voieId: string;
     toponymeId: string;
@@ -51,7 +50,6 @@ export type Voie = {
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     balId: string;
     nom: string;
     nomAlt: {
@@ -76,7 +74,6 @@ export type BaseLocale = {
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     nom: string;
     communeNom?: string;
     communeNomsAlt: {
@@ -93,6 +90,7 @@ export type BaseLocale = {
     voies: Array<Voie>;
     toponymes: Array<Toponyme>;
     numeros: Array<Numero>;
+    deletedAt: string;
 };
 
 export type Toponyme = {
@@ -100,7 +98,6 @@ export type Toponyme = {
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     balId: string;
     nom: string;
     nomAlt: {
@@ -150,7 +147,6 @@ export type ExtendedVoieDto = {
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     balId: string;
     nom: string;
     nomAlt: {
@@ -198,10 +194,6 @@ export type UpdateVoieDto = {
     comment?: string | null;
 };
 
-export type RestoreVoieDto = {
-    numerosIds: Array<string> | null;
-};
-
 export type CreateNumeroDto = {
     numero: number;
     suffixe?: string | null;
@@ -211,6 +203,7 @@ export type CreateNumeroDto = {
     certifie?: boolean;
     communeDeleguee?: string;
     positions: Array<Position>;
+    banId?: string | null;
 };
 
 export type FusionVoieDto = {
@@ -222,7 +215,6 @@ export type ExtentedToponymeDto = {
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     balId: string;
     nom: string;
     nomAlt: {
@@ -270,7 +262,6 @@ export type ExtendedBaseLocaleDto = {
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     nom: string;
     communeNom?: string;
     communeNomsAlt: {
@@ -287,10 +278,11 @@ export type ExtendedBaseLocaleDto = {
     voies: Array<Voie>;
     toponymes: Array<Toponyme>;
     numeros: Array<Numero>;
+    deletedAt: string;
     nbNumeros: number;
     nbNumerosCertifies: number;
     isAllCertified: boolean;
-    isHabilitationValid: boolean;
+    eventsCount: number;
 };
 
 export type PageBaseLocaleDto = {
@@ -304,12 +296,11 @@ export type FindManyBaseLocalDto = {
     ids: Array<string>;
 };
 
-export type BaseLocaleWithHabilitationDto = {
+export type ExtendedBaseLocaleSafeDto = {
     id: string;
     banId: string;
     createdAt: string;
     updatedAt: string;
-    deletedAt: string;
     nom: string;
     communeNom?: string;
     communeNomsAlt: {
@@ -324,10 +315,11 @@ export type BaseLocaleWithHabilitationDto = {
     voies: Array<Voie>;
     toponymes: Array<Toponyme>;
     numeros: Array<Numero>;
+    deletedAt: string;
     nbNumeros: number;
     nbNumerosCertifies: number;
     isAllCertified: boolean;
-    isHabilitationValid: boolean;
+    eventsCount: number;
 };
 
 export type UpdateBaseLocaleDto = {
@@ -362,9 +354,8 @@ export type RecoverCommuneDto = {
     codeCommune: string;
 };
 
-export type AllDeletedInBalDto = {
-    voies: Array<Voie>;
-    toponymes: Array<Toponyme>;
+export type SyncExecDto = {
+    ignoreEvents?: Array<string>;
 };
 
 export type SearchNumeroDto = {
@@ -404,6 +395,85 @@ export type CreateVoieDto = {
     typeNumerotation?: 'numerique' | 'metrique';
     trace?: LineString;
     comment?: string | null;
+    banId?: string | null;
+};
+
+export type SerializedVoie = {
+    id: string;
+    banId: string;
+    createdAt: string;
+    balId: string;
+    nom: string;
+    nomAlt: {
+        [key: string]: unknown;
+    };
+    typeNumerotation: 'numerique' | 'metrique';
+    centroid: {
+        [key: string]: unknown;
+    };
+    trace: {
+        [key: string]: unknown;
+    };
+    bbox: Array<number>;
+    codeVoie: string;
+    comment: string;
+};
+
+export type SerializedToponyme = {
+    id: string;
+    banId: string;
+    createdAt: string;
+    balId: string;
+    nom: string;
+    nomAlt: {
+        [key: string]: unknown;
+    };
+    communeDeleguee: string;
+    parcelles: Array<string>;
+    codeVoie: string;
+    numeroIds: Array<string>;
+};
+
+export type SerializedNumero = {
+    id: string;
+    banId: string;
+    createdAt: string;
+    balId: string;
+    voieId: string;
+    numero: number;
+    suffixe: string;
+    comment: string;
+    parcelles: Array<string>;
+    certifie: boolean;
+    communeDeleguee: string;
+};
+
+export type SerializedPosition = {
+    id: string;
+    toponymeId: string;
+    numeroId: string;
+    type: 'entrée' | 'bâtiment' | 'cage d’escalier' | 'logement' | 'service technique' | 'délivrance postale' | 'parcelle' | 'segment';
+    source: string;
+    rank: number;
+    point: {
+        [key: string]: unknown;
+    };
+};
+
+export type Event = {
+    id: string;
+    balId: string;
+    voieId: string;
+    parentEventId: string;
+    childEvents: Array<Event> | null;
+    entityType: 'voie' | 'toponyme' | 'numero' | 'position';
+    entityId: string;
+    action: 'CREATE' | 'UPDATE' | 'DELETE';
+    payloadBefore: SerializedVoie | SerializedToponyme | SerializedNumero | SerializedPosition | null;
+    payloadAfter: SerializedVoie | SerializedToponyme | SerializedNumero | SerializedPosition | null;
+    isSyncedWithRevision: string | null;
+    createdAt: string;
+    updatedAt: string;
 };
 
 export type CreateToponymeDto = {
@@ -486,6 +556,40 @@ export type FusionCommunesDto = {
     nom: string;
     emails: Array<string>;
     communes?: Array<CommuneBalDto>;
+};
+
+export type RepublishCommunesDto = {
+    codesCommunes: Array<string>;
+};
+
+export type RepublishCommuneReportDto = {
+    codeCommune: string;
+    balId?: string;
+    status: 'published' | 'unchanged' | 'error' | 'not_found';
+    revisionId?: string;
+    error?: string;
+};
+
+export type RepublishCommunesReportDto = {
+    id: string;
+    status: 'running' | 'done' | 'failed';
+    startedAt: string;
+    updatedAt: string;
+    finishedAt?: string;
+    error?: string;
+    /**
+     * Nombre de communes demandées
+     */
+    totalCommunes: number;
+    /**
+     * Nombre de communes traitées
+     */
+    processedCommunes: number;
+    published: number;
+    unchanged: number;
+    errors: number;
+    notFound: number;
+    details: Array<RepublishCommuneReportDto>;
 };
 
 export type CreatedAddressDto = {
@@ -602,21 +706,6 @@ export type GenerateArreteDeNumerotationResponses = {
 
 export type GenerateArreteDeNumerotationResponse = GenerateArreteDeNumerotationResponses[keyof GenerateArreteDeNumerotationResponses];
 
-export type SoftDeleteNumeroData = {
-    body?: never;
-    path: {
-        numeroId: string;
-    };
-    query?: never;
-    url: '/v2/numeros/{numeroId}/soft-delete';
-};
-
-export type SoftDeleteNumeroResponses = {
-    200: Numero;
-};
-
-export type SoftDeleteNumeroResponse = SoftDeleteNumeroResponses[keyof SoftDeleteNumeroResponses];
-
 export type DeleteVoieData = {
     body?: never;
     path: {
@@ -677,44 +766,12 @@ export type FindVoieMetasResponses = {
 
 export type FindVoieMetasResponse = FindVoieMetasResponses[keyof FindVoieMetasResponses];
 
-export type SoftDeleteVoieData = {
-    body?: never;
-    path: {
-        voieId: string;
-    };
-    query?: never;
-    url: '/v2/voies/{voieId}/soft-delete';
-};
-
-export type SoftDeleteVoieResponses = {
-    200: Voie;
-};
-
-export type SoftDeleteVoieResponse = SoftDeleteVoieResponses[keyof SoftDeleteVoieResponses];
-
-export type RestoreVoieData = {
-    body: RestoreVoieDto;
-    path: {
-        voieId: string;
-    };
-    query?: never;
-    url: '/v2/voies/{voieId}/restore';
-};
-
-export type RestoreVoieResponses = {
-    200: Voie;
-};
-
-export type RestoreVoieResponse = RestoreVoieResponses[keyof RestoreVoieResponses];
-
 export type FindVoieNumerosData = {
     body?: never;
     path: {
         voieId: string;
     };
-    query?: {
-        isdeleted?: boolean;
-    };
+    query?: never;
     url: '/v2/voies/{voieId}/numeros';
 };
 
@@ -852,36 +909,6 @@ export type UpdateToponymeResponses = {
 
 export type UpdateToponymeResponse = UpdateToponymeResponses[keyof UpdateToponymeResponses];
 
-export type SoftDeleteToponymeData = {
-    body?: never;
-    path: {
-        toponymeId: string;
-    };
-    query?: never;
-    url: '/v2/toponymes/{toponymeId}/soft-delete';
-};
-
-export type SoftDeleteToponymeResponses = {
-    200: Toponyme;
-};
-
-export type SoftDeleteToponymeResponse = SoftDeleteToponymeResponses[keyof SoftDeleteToponymeResponses];
-
-export type RestoreToponymeData = {
-    body?: never;
-    path: {
-        toponymeId: string;
-    };
-    query?: never;
-    url: '/v2/toponymes/{toponymeId}/restore';
-};
-
-export type RestoreToponymeResponses = {
-    200: Toponyme;
-};
-
-export type RestoreToponymeResponse = RestoreToponymeResponses[keyof RestoreToponymeResponses];
-
 export type FindToponymeNumerosData = {
     body?: never;
     path: {
@@ -952,7 +979,7 @@ export type FindManyBaseLocalesData = {
 };
 
 export type FindManyBaseLocalesResponses = {
-    200: Array<BaseLocaleWithHabilitationDto>;
+    200: Array<ExtendedBaseLocaleSafeDto>;
 };
 
 export type FindManyBaseLocalesResponse = FindManyBaseLocalesResponses[keyof FindManyBaseLocalesResponses];
@@ -1133,7 +1160,7 @@ export type FindBaseLocaleParcellesResponses = {
 export type FindBaseLocaleParcellesResponse = FindBaseLocaleParcellesResponses[keyof FindBaseLocaleParcellesResponses];
 
 export type PublishBaseLocaleData = {
-    body?: never;
+    body?: SyncExecDto;
     path: {
         baseLocaleId: string;
     };
@@ -1177,21 +1204,6 @@ export type ResumeBaseLocaleResponses = {
 
 export type ResumeBaseLocaleResponse = ResumeBaseLocaleResponses[keyof ResumeBaseLocaleResponses];
 
-export type FindAllDeletedData = {
-    body?: never;
-    path: {
-        baseLocaleId: string;
-    };
-    query?: never;
-    url: '/v2/bases-locales/{baseLocaleId}/all/deleted';
-};
-
-export type FindAllDeletedResponses = {
-    200: AllDeletedInBalDto;
-};
-
-export type FindAllDeletedResponse = FindAllDeletedResponses[keyof FindAllDeletedResponses];
-
 export type FindNumerosData = {
     body?: never;
     path: {
@@ -1201,7 +1213,7 @@ export type FindNumerosData = {
         /**
          * Liste (séparée par des virgules) des champs à retourner pour chaque numero
          */
-        select?: string;
+        select?: Array<string>;
     };
     url: '/v2/bases-locales/{baseLocaleId}/numeros';
 };
@@ -1256,21 +1268,6 @@ export type UpdateNumerosResponses = {
 };
 
 export type UpdateNumerosResponse = UpdateNumerosResponses[keyof UpdateNumerosResponses];
-
-export type SoftDeleteNumerosData = {
-    body: DeleteBatchNumeroDto;
-    path: {
-        baseLocaleId: string;
-    };
-    query?: never;
-    url: '/v2/bases-locales/{baseLocaleId}/numeros/batch/soft-delete';
-};
-
-export type SoftDeleteNumerosResponses = {
-    200: BatchNumeroResponseDto;
-};
-
-export type SoftDeleteNumerosResponse = SoftDeleteNumerosResponses[keyof SoftDeleteNumerosResponses];
 
 export type FindBaseLocaleVoiesData = {
     body?: never;
@@ -1360,6 +1357,64 @@ export type CreateToponymeResponses = {
 
 export type CreateToponymeResponse = CreateToponymeResponses[keyof CreateToponymeResponses];
 
+export type FindBaseLocaleEventsData = {
+    body?: never;
+    path: {
+        baseLocaleId: string;
+    };
+    query?: never;
+    url: '/v2/bases-locales/{baseLocaleId}/events';
+};
+
+export type FindBaseLocaleEventsResponses = {
+    200: Array<Event>;
+};
+
+export type FindBaseLocaleEventsResponse = FindBaseLocaleEventsResponses[keyof FindBaseLocaleEventsResponses];
+
+export type FindBaseLocaleSyncedEventsData = {
+    body?: never;
+    path: {
+        baseLocaleId: string;
+    };
+    query?: never;
+    url: '/v2/bases-locales/{baseLocaleId}/events/synced';
+};
+
+export type FindBaseLocaleSyncedEventsResponses = {
+    200: Array<Event>;
+};
+
+export type FindBaseLocaleSyncedEventsResponse = FindBaseLocaleSyncedEventsResponses[keyof FindBaseLocaleSyncedEventsResponses];
+
+export type GetCsvBalData = {
+    body?: never;
+    path: {
+        baseLocaleId: string;
+    };
+    query: {
+        withComment: boolean;
+    };
+    url: '/v2/bases-locales/{baseLocaleId}/csv';
+};
+
+export type GetCsvBalResponses = {
+    200: unknown;
+};
+
+export type GetCsvVoiesData = {
+    body?: never;
+    path: {
+        baseLocaleId: string;
+    };
+    query?: never;
+    url: '/v2/bases-locales/{baseLocaleId}/voies/csv';
+};
+
+export type GetCsvVoiesResponses = {
+    200: unknown;
+};
+
 export type FindIsValidData = {
     body?: never;
     path: {
@@ -1428,34 +1483,6 @@ export type ValidePinCodeHabilitationData = {
 };
 
 export type ValidePinCodeHabilitationResponses = {
-    200: unknown;
-};
-
-export type GetCsvBalData = {
-    body?: never;
-    path: {
-        baseLocaleId: string;
-    };
-    query: {
-        withComment: boolean;
-    };
-    url: '/v2/bases-locales/{baseLocaleId}/csv';
-};
-
-export type GetCsvBalResponses = {
-    200: unknown;
-};
-
-export type GetCsvVoiesData = {
-    body?: never;
-    path: {
-        baseLocaleId: string;
-    };
-    query?: never;
-    url: '/v2/bases-locales/{baseLocaleId}/voies/csv';
-};
-
-export type GetCsvVoiesResponses = {
     200: unknown;
 };
 
@@ -1565,6 +1592,40 @@ export type FusionCommunesResponses = {
 };
 
 export type FusionCommunesResponse = FusionCommunesResponses[keyof FusionCommunesResponses];
+
+export type RepublishCommunesData = {
+    /**
+     *
+     * {
+     * "codesCommunes": ["08439", "08300"]
+     * }
+     */
+    body: RepublishCommunesDto;
+    path?: never;
+    query?: never;
+    url: '/v2/admin/republish-communes';
+};
+
+export type RepublishCommunesResponses = {
+    202: RepublishCommunesReportDto;
+};
+
+export type RepublishCommunesResponse = RepublishCommunesResponses[keyof RepublishCommunesResponses];
+
+export type GetRepublishCommunesReportData = {
+    body?: never;
+    path: {
+        reportId: string;
+    };
+    query?: never;
+    url: '/v2/admin/republish-communes/{reportId}';
+};
+
+export type GetRepublishCommunesReportResponses = {
+    200: RepublishCommunesReportDto;
+};
+
+export type GetRepublishCommunesReportResponse = GetRepublishCommunesReportResponses[keyof GetRepublishCommunesReportResponses];
 
 export type SyncIdsBanPublishData = {
     body?: never;

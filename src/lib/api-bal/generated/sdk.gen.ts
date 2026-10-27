@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CertifyVoieNumerosData, CertifyVoieNumerosResponses, ConvertToToponymeData, ConvertToToponymeResponses, CreateBaseLocaleData, CreateBaseLocaleDemoData, CreateBaseLocaleDemoResponses, CreateBaseLocaleResponses, CreateHabilitationData, CreateHabilitationResponses, CreateNumeroData, CreateNumeroResponses, CreateToponymeData, CreateToponymeResponses, CreateVoieData, CreateVoieResponses, DeleteBaseLocaleData, DeleteBaseLocaleResponses, DeleteNumeroData, DeleteNumeroResponses, DeleteNumerosData, DeleteNumerosResponses, DeleteToponymeData, DeleteToponymeResponses, DeleteVoieData, DeleteVoieResponses, FindAllDeletedData, FindAllDeletedResponses, FindBalsCreationStatsData, FindBalsCreationStatsResponses, FindBalsStatsData, FindBalsStatsResponses, FindBalsStatusStatsData, FindBalsStatusStatsResponses, FindBaseLocaleData, FindBaseLocaleParcellesData, FindBaseLocaleParcellesResponses, FindBaseLocaleResponses, FindBaseLocaleToponymesData, FindBaseLocaleToponymesResponses, FindBaseLocaleVoiesData, FindBaseLocaleVoiesResponses, FindCommuneBasesLocalesWithTokenData, FindCommuneBasesLocalesWithTokenResponses, FindCommuneData, FindCommuneResponses, FindFilairesVoiesGeoJsonData, FindFilairesVoiesGeoJsonResponses, FindHabilitationData, FindHabilitationResponses, FindIsValidData, FindIsValidResponses, FindManyBaseLocalesData, FindManyBaseLocalesResponses, FindNumeroData, FindNumeroResponses, FindNumerosData, FindNumerosResponses, FindToponymeData, FindToponymeNumerosData, FindToponymeNumerosResponses, FindToponymeResponses, FindVoieData, FindVoieMetasByBalData, FindVoieMetasByBalResponses, FindVoieMetasData, FindVoieMetasResponses, FindVoieNumerosData, FindVoieNumerosResponses, FindVoieResponses, FusionCommunesData, FusionCommunesResponses, FusionVoiesData, FusionVoiesResponses, GenerateArreteDeNumerotation2Data, GenerateArreteDeNumerotation2Responses, GenerateArreteDeNumerotationData, GenerateArreteDeNumerotationResponses, GenerateCertificatData, GenerateCertificatResponses, GetBaseLocaleTileData, GetBaseLocaleTileResponses, GetCsvBalData, GetCsvBalResponses, GetCsvVoiesData, GetCsvVoiesResponses, GetReportData, GetReportResponses, IsPopulatingBaseLocaleData, IsPopulatingBaseLocaleResponses, PauseBaseLocaleData, PauseBaseLocaleResponses, PopulateBaseLocaleData, PopulateBaseLocaleResponses, PublishBaseLocaleData, PublishBaseLocaleResponses, RecoveryBaseLocaleData, RecoveryBasesLocalesByCommuneData, RecoveryBasesLocalesByCommuneResponses, RecoveryBasesLocalesData, RecoveryBasesLocalesResponses, RenewTokenBaseLocaleData, RenewTokenBaseLocaleResponses, RestoreToponymeData, RestoreToponymeResponses, RestoreVoieData, RestoreVoieResponses, ResumeBaseLocaleData, ResumeBaseLocaleResponses, SearchBaseLocaleData, SearchBaseLocaleResponses, SearchNumerosInPolygonData, SearchNumerosInPolygonResponses, SendPinCodeHabilitationData, SendPinCodeHabilitationResponses, SoftDeleteNumeroData, SoftDeleteNumeroResponses, SoftDeleteNumerosData, SoftDeleteNumerosResponses, SoftDeleteToponymeData, SoftDeleteToponymeResponses, SoftDeleteVoieData, SoftDeleteVoieResponses, SyncIdsBanPublishData, SyncIdsBanPublishResponses, UpdateBaseLocaleData, UpdateBaseLocaleDemoToDraftData, UpdateBaseLocaleDemoToDraftResponses, UpdateBaseLocaleResponses, UpdateNumeroData, UpdateNumeroResponses, UpdateNumerosData, UpdateNumerosResponses, UpdateReportData, UpdateReportResponses, UpdateReportsData, UpdateReportsResponses, UpdateToponymeData, UpdateToponymeResponses, UpdateVoieData, UpdateVoieResponses, UploadCsvBalFileData, UploadCsvBalFileResponses, ValidePinCodeHabilitationData, ValidePinCodeHabilitationResponses } from './types.gen';
+import type { CertifyVoieNumerosData, CertifyVoieNumerosResponses, ConvertToToponymeData, ConvertToToponymeResponses, CreateBaseLocaleData, CreateBaseLocaleDemoData, CreateBaseLocaleDemoResponses, CreateBaseLocaleResponses, CreateHabilitationData, CreateHabilitationResponses, CreateNumeroData, CreateNumeroResponses, CreateToponymeData, CreateToponymeResponses, CreateVoieData, CreateVoieResponses, DeleteBaseLocaleData, DeleteBaseLocaleResponses, DeleteNumeroData, DeleteNumeroResponses, DeleteNumerosData, DeleteNumerosResponses, DeleteToponymeData, DeleteToponymeResponses, DeleteVoieData, DeleteVoieResponses, FindBalsCreationStatsData, FindBalsCreationStatsResponses, FindBalsStatsData, FindBalsStatsResponses, FindBalsStatusStatsData, FindBalsStatusStatsResponses, FindBaseLocaleData, FindBaseLocaleEventsData, FindBaseLocaleEventsResponses, FindBaseLocaleParcellesData, FindBaseLocaleParcellesResponses, FindBaseLocaleResponses, FindBaseLocaleSyncedEventsData, FindBaseLocaleSyncedEventsResponses, FindBaseLocaleToponymesData, FindBaseLocaleToponymesResponses, FindBaseLocaleVoiesData, FindBaseLocaleVoiesResponses, FindCommuneBasesLocalesWithTokenData, FindCommuneBasesLocalesWithTokenResponses, FindCommuneData, FindCommuneResponses, FindFilairesVoiesGeoJsonData, FindFilairesVoiesGeoJsonResponses, FindHabilitationData, FindHabilitationResponses, FindIsValidData, FindIsValidResponses, FindManyBaseLocalesData, FindManyBaseLocalesResponses, FindNumeroData, FindNumeroResponses, FindNumerosData, FindNumerosResponses, FindToponymeData, FindToponymeNumerosData, FindToponymeNumerosResponses, FindToponymeResponses, FindVoieData, FindVoieMetasByBalData, FindVoieMetasByBalResponses, FindVoieMetasData, FindVoieMetasResponses, FindVoieNumerosData, FindVoieNumerosResponses, FindVoieResponses, FusionCommunesData, FusionCommunesResponses, FusionVoiesData, FusionVoiesResponses, GenerateArreteDeNumerotation2Data, GenerateArreteDeNumerotation2Responses, GenerateArreteDeNumerotationData, GenerateArreteDeNumerotationResponses, GenerateCertificatData, GenerateCertificatResponses, GetBaseLocaleTileData, GetBaseLocaleTileResponses, GetCsvBalData, GetCsvBalResponses, GetCsvVoiesData, GetCsvVoiesResponses, GetReportData, GetReportResponses, GetRepublishCommunesReportData, GetRepublishCommunesReportResponses, IsPopulatingBaseLocaleData, IsPopulatingBaseLocaleResponses, PauseBaseLocaleData, PauseBaseLocaleResponses, PopulateBaseLocaleData, PopulateBaseLocaleResponses, PublishBaseLocaleData, PublishBaseLocaleResponses, RecoveryBaseLocaleData, RecoveryBasesLocalesByCommuneData, RecoveryBasesLocalesByCommuneResponses, RecoveryBasesLocalesData, RecoveryBasesLocalesResponses, RenewTokenBaseLocaleData, RenewTokenBaseLocaleResponses, RepublishCommunesData, RepublishCommunesResponses, ResumeBaseLocaleData, ResumeBaseLocaleResponses, SearchBaseLocaleData, SearchBaseLocaleResponses, SearchNumerosInPolygonData, SearchNumerosInPolygonResponses, SendPinCodeHabilitationData, SendPinCodeHabilitationResponses, SyncIdsBanPublishData, SyncIdsBanPublishResponses, UpdateBaseLocaleData, UpdateBaseLocaleDemoToDraftData, UpdateBaseLocaleDemoToDraftResponses, UpdateBaseLocaleResponses, UpdateNumeroData, UpdateNumeroResponses, UpdateNumerosData, UpdateNumerosResponses, UpdateReportData, UpdateReportResponses, UpdateReportsData, UpdateReportsResponses, UpdateToponymeData, UpdateToponymeResponses, UpdateVoieData, UpdateVoieResponses, UploadCsvBalFileData, UploadCsvBalFileResponses, ValidePinCodeHabilitationData, ValidePinCodeHabilitationResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -77,15 +77,6 @@ export const generateArreteDeNumerotation = <ThrowOnError extends boolean = fals
 });
 
 /**
- * Soft delete the numero by id
- */
-export const softDeleteNumero = <ThrowOnError extends boolean = false>(options: Options<SoftDeleteNumeroData, ThrowOnError>): RequestResult<SoftDeleteNumeroResponses, unknown, ThrowOnError> => (options.client ?? client).put<SoftDeleteNumeroResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/numeros/{numeroId}/soft-delete',
-    ...options
-});
-
-/**
  * Delete Voie by id
  */
 export const deleteVoie = <ThrowOnError extends boolean = false>(options: Options<DeleteVoieData, ThrowOnError>): RequestResult<DeleteVoieResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteVoieResponses, unknown, ThrowOnError>({
@@ -123,28 +114,6 @@ export const findVoieMetas = <ThrowOnError extends boolean = false>(options: Opt
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/voies/{voieId}/metas',
     ...options
-});
-
-/**
- * Soft delete Voie by id
- */
-export const softDeleteVoie = <ThrowOnError extends boolean = false>(options: Options<SoftDeleteVoieData, ThrowOnError>): RequestResult<SoftDeleteVoieResponses, unknown, ThrowOnError> => (options.client ?? client).put<SoftDeleteVoieResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/voies/{voieId}/soft-delete',
-    ...options
-});
-
-/**
- * Restore Voie by id
- */
-export const restoreVoie = <ThrowOnError extends boolean = false>(options: Options<RestoreVoieData, ThrowOnError>): RequestResult<RestoreVoieResponses, unknown, ThrowOnError> => (options.client ?? client).put<RestoreVoieResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/voies/{voieId}/restore',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
 });
 
 /**
@@ -243,24 +212,6 @@ export const updateToponyme = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
-});
-
-/**
- * Soft delete Tpponyme by id
- */
-export const softDeleteToponyme = <ThrowOnError extends boolean = false>(options: Options<SoftDeleteToponymeData, ThrowOnError>): RequestResult<SoftDeleteToponymeResponses, unknown, ThrowOnError> => (options.client ?? client).put<SoftDeleteToponymeResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/toponymes/{toponymeId}/soft-delete',
-    ...options
-});
-
-/**
- * Restore Toponyme by id
- */
-export const restoreToponyme = <ThrowOnError extends boolean = false>(options: Options<RestoreToponymeData, ThrowOnError>): RequestResult<RestoreToponymeResponses, unknown, ThrowOnError> => (options.client ?? client).put<RestoreToponymeResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/toponymes/{toponymeId}/restore',
-    ...options
 });
 
 /**
@@ -442,7 +393,11 @@ export const findBaseLocaleParcelles = <ThrowOnError extends boolean = false>(op
 export const publishBaseLocale = <ThrowOnError extends boolean = false>(options: Options<PublishBaseLocaleData, ThrowOnError>): RequestResult<PublishBaseLocaleResponses, unknown, ThrowOnError> => (options.client ?? client).post<PublishBaseLocaleResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/bases-locales/{baseLocaleId}/sync/exec',
-    ...options
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -460,15 +415,6 @@ export const pauseBaseLocale = <ThrowOnError extends boolean = false>(options: O
 export const resumeBaseLocale = <ThrowOnError extends boolean = false>(options: Options<ResumeBaseLocaleData, ThrowOnError>): RequestResult<ResumeBaseLocaleResponses, unknown, ThrowOnError> => (options.client ?? client).post<ResumeBaseLocaleResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/bases-locales/{baseLocaleId}/sync/resume',
-    ...options
-});
-
-/**
- * Find all model deleted in Bal
- */
-export const findAllDeleted = <ThrowOnError extends boolean = false>(options: Options<FindAllDeletedData, ThrowOnError>): RequestResult<FindAllDeletedResponses, unknown, ThrowOnError> => (options.client ?? client).get<FindAllDeletedResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/bases-locales/{baseLocaleId}/all/deleted',
     ...options
 });
 
@@ -509,19 +455,6 @@ export const deleteNumeros = <ThrowOnError extends boolean = false>(options: Opt
 export const updateNumeros = <ThrowOnError extends boolean = false>(options: Options<UpdateNumerosData, ThrowOnError>): RequestResult<UpdateNumerosResponses, unknown, ThrowOnError> => (options.client ?? client).put<UpdateNumerosResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/bases-locales/{baseLocaleId}/numeros/batch',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Multi soft delete numeros
- */
-export const softDeleteNumeros = <ThrowOnError extends boolean = false>(options: Options<SoftDeleteNumerosData, ThrowOnError>): RequestResult<SoftDeleteNumerosResponses, unknown, ThrowOnError> => (options.client ?? client).put<SoftDeleteNumerosResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/bases-locales/{baseLocaleId}/numeros/batch/soft-delete',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -588,6 +521,34 @@ export const createToponyme = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
+ * Find all events for a Bal
+ */
+export const findBaseLocaleEvents = <ThrowOnError extends boolean = false>(options: Options<FindBaseLocaleEventsData, ThrowOnError>): RequestResult<FindBaseLocaleEventsResponses, unknown, ThrowOnError> => (options.client ?? client).get<FindBaseLocaleEventsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/bases-locales/{baseLocaleId}/events',
+    ...options
+});
+
+/**
+ * Find all events synced with a given revision for a Bal
+ */
+export const findBaseLocaleSyncedEvents = <ThrowOnError extends boolean = false>(options: Options<FindBaseLocaleSyncedEventsData, ThrowOnError>): RequestResult<FindBaseLocaleSyncedEventsResponses, unknown, ThrowOnError> => (options.client ?? client).get<FindBaseLocaleSyncedEventsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/bases-locales/{baseLocaleId}/events/synced',
+    ...options
+});
+
+/**
+ * Get Bal csv file
+ */
+export const getCsvBal = <ThrowOnError extends boolean = false>(options: Options<GetCsvBalData, ThrowOnError>): RequestResult<GetCsvBalResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetCsvBalResponses, unknown, ThrowOnError>({ url: '/v2/bases-locales/{baseLocaleId}/csv', ...options });
+
+/**
+ * Get voies csv file
+ */
+export const getCsvVoies = <ThrowOnError extends boolean = false>(options: Options<GetCsvVoiesData, ThrowOnError>): RequestResult<GetCsvVoiesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetCsvVoiesResponses, unknown, ThrowOnError>({ url: '/v2/bases-locales/{baseLocaleId}/voies/csv', ...options });
+
+/**
  * Find habiliation is Valid
  */
 export const findIsValid = <ThrowOnError extends boolean = false>(options: Options<FindIsValidData, ThrowOnError>): RequestResult<FindIsValidResponses, unknown, ThrowOnError> => (options.client ?? client).get<FindIsValidResponses, unknown, ThrowOnError>({ url: '/v2/bases-locales/{baseLocaleId}/habilitation/is-valid', ...options });
@@ -637,16 +598,6 @@ export const validePinCodeHabilitation = <ThrowOnError extends boolean = false>(
 });
 
 /**
- * Get Bal csv file
- */
-export const getCsvBal = <ThrowOnError extends boolean = false>(options: Options<GetCsvBalData, ThrowOnError>): RequestResult<GetCsvBalResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetCsvBalResponses, unknown, ThrowOnError>({ url: '/v2/bases-locales/{baseLocaleId}/csv', ...options });
-
-/**
- * Get voies csv file
- */
-export const getCsvVoies = <ThrowOnError extends boolean = false>(options: Options<GetCsvVoiesData, ThrowOnError>): RequestResult<GetCsvVoiesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetCsvVoiesResponses, unknown, ThrowOnError>({ url: '/v2/bases-locales/{baseLocaleId}/voies/csv', ...options });
-
-/**
  * Get tile (with voies and numeros features)
  */
 export const getBaseLocaleTile = <ThrowOnError extends boolean = false>(options: Options<GetBaseLocaleTileData, ThrowOnError>): RequestResult<GetBaseLocaleTileResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetBaseLocaleTileResponses, unknown, ThrowOnError>({ url: '/v2/bases-locales/{baseLocaleId}/tiles/{z}/{x}/{y}.pbf', ...options });
@@ -689,6 +640,28 @@ export const fusionCommunes = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Lance en tâche de fond la republication des BALs publiées d’une liste de communes
+ */
+export const republishCommunes = <ThrowOnError extends boolean = false>(options: Options<RepublishCommunesData, ThrowOnError>): RequestResult<RepublishCommunesResponses, unknown, ThrowOnError> => (options.client ?? client).post<RepublishCommunesResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/admin/republish-communes',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Rapport de republication des BALs
+ */
+export const getRepublishCommunesReport = <ThrowOnError extends boolean = false>(options: Options<GetRepublishCommunesReportData, ThrowOnError>): RequestResult<GetRepublishCommunesReportResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetRepublishCommunesReportResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/admin/republish-communes/{reportId}',
+    ...options
 });
 
 /**

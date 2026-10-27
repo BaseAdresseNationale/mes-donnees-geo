@@ -25,7 +25,7 @@ export default async function BalVoiesPage({
       hrefPrefix={`/${codeCommune}/adresses/${balId}/voies`}
       addHref={`/${codeCommune}/adresses/${balId}/voies/new`}
       addLabel="Ajouter une voie"
-      archive={{ balId, kind: "voie" }}
+      deletable={{ balId, kind: "voie" }}
     />
   );
 }

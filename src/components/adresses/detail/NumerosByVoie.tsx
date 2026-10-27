@@ -16,7 +16,7 @@ export function NumerosByVoie({
   voies,
   emptyMessage,
 }: {
-  // BAL des numéros (bouton « archiver » sur chaque numéro)
+  // BAL des numéros (bouton « supprimer » sur chaque numéro)
   balId: string;
   // /{codeCommune}/adresses/{balId}/numeros : chaque numéro ouvre son
   // formulaire
@@ -46,7 +46,7 @@ export function NumerosByVoie({
             hrefPrefix={numerosHref}
             hrefSuffix="/edit"
             paginated={false}
-            archive={{ balId, kind: "numero" }}
+            deletable={{ balId, kind: "numero" }}
           />
         </section>
       ))}

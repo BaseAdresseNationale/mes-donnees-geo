@@ -41,7 +41,7 @@ export default async function VoiePage({
         hrefSuffix="/edit"
         addHref={`${voieHref}/numeros/new`}
         addLabel="Ajouter un numéro"
-        archive={{ balId, kind: "numero" }}
+        deletable={{ balId, kind: "numero" }}
       />
     </>
   );

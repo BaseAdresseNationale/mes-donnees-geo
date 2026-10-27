@@ -10,7 +10,7 @@ import {
 } from "@gouvfr-lasuite/ui-components";
 import { IconLinkButton } from "@/components/adresses/detail/IconLinkButton";
 import { normalizeSearch, type NameListItem } from "./name-list.utils";
-import { useArchiveItem, type ArchiveKind } from "./useArchiveItem";
+import { useDeleteItem, type DeleteKind } from "./useDeleteItem";
 import styles from "./NameList.module.css";
 
 export const NAME_LIST_PAGE_SIZE = 20;
@@ -29,8 +29,8 @@ interface NameListProps {
   // Si fourni, bouton « ajouter » à droite de la recherche
   addHref?: string;
   addLabel?: string;
-  // Si fourni, bouton « archiver » sur chaque ligne
-  archive?: { balId: string; kind: ArchiveKind };
+  // Si fourni, bouton « supprimer » sur chaque ligne
+  deletable?: { balId: string; kind: DeleteKind };
 }
 
 // Liste de noms inspirée de RuralPathList (recherche + cartes), paginée côté
@@ -45,14 +45,14 @@ export function NameList({
   paginated = true,
   addHref,
   addLabel = "Ajouter",
-  archive,
+  deletable,
 }: NameListProps) {
   const [query, setQuery] = useState("");
   const {
-    archive: archiveItem,
-    archivingId,
-    error: archiveError,
-  } = useArchiveItem(archive?.balId ?? "", archive?.kind ?? "numero");
+    remove: removeItem,
+    deletingId,
+    error: deleteError,
+  } = useDeleteItem(deletable?.balId ?? "", deletable?.kind ?? "numero");
 
   // Recherche par nom sur la liste complète, avant pagination
   const filteredItems = useMemo(() => {
@@ -93,9 +93,9 @@ export function NameList({
         </div>
       )}
 
-      {archiveError && (
+      {deleteError && (
         <p className={styles.error} role="alert">
-          {archiveError}
+          {deleteError}
         </p>
       )}
 
@@ -121,17 +121,17 @@ export function NameList({
                   <span className={styles.itemTitle}>{item.nom}</span>
                 </div>
               )}
-              {archive && (
+              {deletable && (
                 <Button
                   type="button"
                   variant="tertiary"
                   color="neutral"
                   size="small"
                   icon={<span className="material-icons">delete</span>}
-                  aria-label={`Archiver ${item.nom}`}
-                  title="Archiver"
-                  onClick={() => archiveItem(item.id, item.nom)}
-                  disabled={archivingId !== null}
+                  aria-label={`Supprimer ${item.nom}`}
+                  title="Supprimer"
+                  onClick={() => removeItem(item.id, item.nom)}
+                  disabled={deletingId !== null}
                 />
               )}
             </li>
