@@ -30,7 +30,7 @@ import { useShowCadastre } from "@/components/adresses/form/useShowCadastre";
 import {
   useGoBack,
   useSetFormBackFallback,
-} from "@/components/adresses/form/form-back";
+} from "@/components/adresses/navigation";
 import formStyles from "@/components/adresses/form/form.module.css";
 import styles from "./NumeroForm.module.css";
 

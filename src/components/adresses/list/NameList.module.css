@@ -101,6 +101,12 @@
   background: #f6f8ff;
 }
 
+/* Dernier élément consulté, retrouvé en revenant sur la liste */
+.rowSelected {
+  border-color: var(--color-primary, #000091);
+  background: #f6f8ff;
+}
+
 .itemLink:focus-visible {
   outline: 2px solid var(--color-focus, #0a76f6);
   outline-offset: 2px;

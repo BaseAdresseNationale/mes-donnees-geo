@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Input,
@@ -11,6 +11,10 @@ import {
 import { IconLinkButton } from "@/components/adresses/detail/IconLinkButton";
 import { normalizeSearch, type NameListItem } from "./name-list.utils";
 import { useDeleteItem, type DeleteKind } from "./useDeleteItem";
+import {
+  useListMemory,
+  type ListMemoryKey,
+} from "@/components/adresses/navigation";
 import styles from "./NameList.module.css";
 
 export const NAME_LIST_PAGE_SIZE = 20;
@@ -31,6 +35,15 @@ interface NameListProps {
   addLabel?: string;
   // Si fourni, bouton « supprimer » sur chaque ligne
   deletable?: { balId: string; kind: DeleteKind };
+  // Si fourni, la recherche, la page et le dernier élément consulté sont
+  // retrouvés en revenant sur la liste (élément centré et mis en évidence)
+  memoryKey?: ListMemoryKey;
+}
+
+function filterItems(items: NameListItem[], query: string): NameListItem[] {
+  const search = normalizeSearch(query);
+  if (!search) return items;
+  return items.filter((item) => normalizeSearch(item.nom).includes(search));
 }
 
 // Liste de noms inspirée de RuralPathList (recherche + cartes), paginée côté
@@ -46,8 +59,31 @@ export function NameList({
   addHref,
   addLabel = "Ajouter",
   deletable,
+  memoryKey,
 }: NameListProps) {
-  const [query, setQuery] = useState("");
+  const listMemory = useListMemory(memoryKey);
+  // État restauré au montage : recherche mémorisée, et page du dernier
+  // élément consulté (à défaut, page mémorisée)
+  const [initial] = useState(() => {
+    const { query, page, selectedId } = listMemory.get();
+    const filtered = filterItems(items, query);
+    const pagesCount = Math.max(
+      1,
+      Math.ceil(filtered.length / NAME_LIST_PAGE_SIZE),
+    );
+    const selectedIndex = filtered.findIndex((item) => item.id === selectedId);
+    return {
+      query,
+      selectedId,
+      pagesCount,
+      page:
+        selectedIndex >= 0
+          ? Math.floor(selectedIndex / NAME_LIST_PAGE_SIZE) + 1
+          : Math.min(page, pagesCount),
+    };
+  });
+  const [query, setQuery] = useState(initial.query);
+  const selectedRowRef = useRef<HTMLLIElement>(null);
   const {
     remove: removeItem,
     deletingId,
@@ -55,19 +91,35 @@ export function NameList({
   } = useDeleteItem(deletable?.balId ?? "", deletable?.kind ?? "numero");
 
   // Recherche par nom sur la liste complète, avant pagination
-  const filteredItems = useMemo(() => {
-    const search = normalizeSearch(query);
-    if (!search) return items;
-    return items.filter((item) => normalizeSearch(item.nom).includes(search));
-  }, [items, query]);
+  const filteredItems = useMemo(
+    () => filterItems(items, query),
+    [items, query],
+  );
 
-  const pagination = usePagination({ pageSize: NAME_LIST_PAGE_SIZE });
+  const pagination = usePagination({
+    pageSize: NAME_LIST_PAGE_SIZE,
+    defaultPage: initial.page,
+    defaultPagesCount: initial.pagesCount,
+  });
   const { page, setPage, pagesCount, setPagesCount, pageSize } = pagination;
 
+  // La page courante est gardée (page restaurée au montage), ramenée au
+  // nombre de pages si la liste a raccourci (ex. après une suppression).
+  // C'est la saisie d'une recherche qui ramène à la première page.
   useEffect(() => {
-    setPagesCount(Math.max(1, Math.ceil(filteredItems.length / pageSize)));
-    setPage(1);
+    const count = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+    setPagesCount(count);
+    setPage((current) => Math.min(current, count));
   }, [filteredItems, pageSize, setPage, setPagesCount]);
+
+  useEffect(() => {
+    listMemory.save({ query, page });
+  }, [listMemory, query, page]);
+
+  // Dernier élément consulté centré dans la liste au montage
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: "center" });
+  }, []);
 
   const pageItems = paginated
     ? filteredItems.slice((page - 1) * pageSize, page * pageSize)
@@ -84,7 +136,10 @@ export function NameList({
             fullWidth
             className={styles.searchInput}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
             icon={<span className="material-icons">search</span>}
           />
           {addHref && (
@@ -107,35 +162,43 @@ export function NameList({
         </p>
       ) : (
         <ul className={styles.list}>
-          {pageItems.map((item) => (
-            <li key={item.id} className={styles.row}>
-              {hrefPrefix ? (
-                <Link
-                  href={`${hrefPrefix}/${item.id}${hrefSuffix}`}
-                  className={`${styles.itemContent} ${styles.itemLink}`}
-                >
-                  <span className={styles.itemTitle}>{item.nom}</span>
-                </Link>
-              ) : (
-                <div className={styles.itemContent}>
-                  <span className={styles.itemTitle}>{item.nom}</span>
-                </div>
-              )}
-              {deletable && (
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  color="neutral"
-                  size="small"
-                  icon={<span className="material-icons">delete</span>}
-                  aria-label={`Supprimer ${item.nom}`}
-                  title="Supprimer"
-                  onClick={() => removeItem(item.id, item.nom)}
-                  disabled={deletingId !== null}
-                />
-              )}
-            </li>
-          ))}
+          {pageItems.map((item) => {
+            const isSelected = item.id === initial.selectedId;
+            return (
+              <li
+                key={item.id}
+                ref={isSelected ? selectedRowRef : undefined}
+                className={`${styles.row} ${isSelected ? styles.rowSelected : ""}`}
+                aria-current={isSelected ? "true" : undefined}
+              >
+                {hrefPrefix ? (
+                  <Link
+                    href={`${hrefPrefix}/${item.id}${hrefSuffix}`}
+                    className={`${styles.itemContent} ${styles.itemLink}`}
+                  >
+                    <span className={styles.itemTitle}>{item.nom}</span>
+                  </Link>
+                ) : (
+                  <div className={styles.itemContent}>
+                    <span className={styles.itemTitle}>{item.nom}</span>
+                  </div>
+                )}
+                {deletable && (
+                  <Button
+                    type="button"
+                    variant="tertiary"
+                    color="neutral"
+                    size="small"
+                    icon={<span className="material-icons">delete</span>}
+                    aria-label={`Supprimer ${item.nom}`}
+                    title="Supprimer"
+                    onClick={() => removeItem(item.id, item.nom)}
+                    disabled={deletingId !== null}
+                  />
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

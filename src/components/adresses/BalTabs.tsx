@@ -4,7 +4,7 @@ import { Button } from "@gouvfr-lasuite/ui-components";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import styles from "./BalTabs.module.css";
 import { getBalTab, getFormBackHref } from "./bal-tab";
-import { useFormBackFallback, useGoBack } from "./form/form-back";
+import { useFormBackFallback, useGoBack } from "./navigation";
 
 // Onglets d'une BAL : chacun correspond à une route sous /adresses/{balId}
 // Chaque onglet est habillé en panneau de signalisation : entrée

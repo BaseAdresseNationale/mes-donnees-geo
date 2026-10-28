@@ -23,6 +23,7 @@ export default async function BalVoiesPage({
       label="Liste des voies"
       searchLabel="Rechercher une voie"
       hrefPrefix={`/${codeCommune}/adresses/${balId}/voies`}
+      memoryKey="voies"
       addHref={`/${codeCommune}/adresses/${balId}/voies/new`}
       addLabel="Ajouter une voie"
       deletable={{ balId, kind: "voie" }}

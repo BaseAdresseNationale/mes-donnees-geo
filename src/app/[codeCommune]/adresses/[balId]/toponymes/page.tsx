@@ -23,6 +23,7 @@ export default async function BalToponymesPage({
       label="Liste des toponymes"
       searchLabel="Rechercher un toponyme"
       hrefPrefix={`/${codeCommune}/adresses/${balId}/toponymes`}
+      memoryKey="toponymes"
       addHref={`/${codeCommune}/adresses/${balId}/toponymes/new`}
       addLabel="Ajouter un toponyme"
       deletable={{ balId, kind: "toponyme" }}
