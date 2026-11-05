@@ -91,12 +91,12 @@ export function CommuneSettings({
           <ResponsiveImage
             src={communeFlagUrl}
             alt={`Blason de ${communeName}`}
-            style={{ height: 24, marginRight: 8 }}
+            style={{ height: 24, marginRight: 8, width: "auto" }}
           />
         }
         aria-label={`Paramètres de ${communeName} (${commune.codeInsee})`}
       >
-        {commune.nom} ({commune.codeInsee})
+        {communeName}
       </Button>
       <Modal
         isOpen={isOpen}

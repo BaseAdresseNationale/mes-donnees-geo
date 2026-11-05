@@ -34,10 +34,12 @@ export function PluginLayout({
       aria-labelledby={`plugin-tab-${pluginId}`}
     >
       <div className={styles.sidebarHeader}>
-        <CommuneSettings
-          currentPluginId={pluginId}
-          communeFlagUrl={communeFlagUrl}
-        />
+        <div className={styles.communeSettingsWrapper}>
+          <CommuneSettings
+            currentPluginId={pluginId}
+            communeFlagUrl={communeFlagUrl}
+          />
+        </div>
         <PluginSelectionDropDown
           pluginId={pluginId}
           pluginLabel={pluginLabel}
