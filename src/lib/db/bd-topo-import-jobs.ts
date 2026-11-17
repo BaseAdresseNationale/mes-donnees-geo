@@ -16,6 +16,10 @@ import {
   LocalPathSource,
 } from "@/components/voies-locales/types";
 import type { AssembledLocalPathResponse } from "@/components/voies-locales/import/types";
+import {
+  DEFAULT_IMPORT_ALGORITHM,
+  type ImportAlgorithm,
+} from "@/components/voies-locales/import/algorithms";
 import { refreshPreviewImportStatus } from "./bd-topo-preview-cache";
 
 const JOB_LIFETIME_MS = 30 * 60 * 1000;
@@ -39,10 +43,13 @@ async function expireJobs(codeInsee: string) {
 export async function createBdTopoImportJob(
   codeInsee: string,
   kind: "import" | "preview" = "import",
+  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
 ) {
   await expireJobs(codeInsee);
   try {
-    return await prisma.bdTopoImportJob.create({ data: { codeInsee, kind } });
+    return await prisma.bdTopoImportJob.create({
+      data: { codeInsee, kind, algorithm },
+    });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -54,10 +61,13 @@ export async function createBdTopoImportJob(
   }
 }
 
-export async function getPendingBdTopoPreviewJob(codeInsee: string) {
+export async function getPendingBdTopoPreviewJob(
+  codeInsee: string,
+  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
+) {
   await expireJobs(codeInsee);
   return prisma.bdTopoImportJob.findFirst({
-    where: { codeInsee, kind: "preview", status: "pending" },
+    where: { codeInsee, kind: "preview", algorithm, status: "pending" },
     select: { id: true },
   });
 }
@@ -93,10 +103,11 @@ export async function getBdTopoImportJob(codeInsee: string, id: string) {
 export async function runBdTopoPreviewJob(
   id: string,
   codeInsee: string,
+  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
 ): Promise<void> {
   try {
     const [assembled, importedRefs] = await Promise.all([
-      assembleForCommune(codeInsee),
+      assembleForCommune(codeInsee, algorithm),
       getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
     ]);
     const result: AssembledLocalPathResponse[] = assembled.map((path) => ({
@@ -117,6 +128,7 @@ export async function runBdTopoPreviewJob(
         0,
       ),
       alreadyImported: isAlreadyImported(path, importedRefs),
+      couverture: path.couverture ?? null,
     }));
     await prisma.bdTopoImportJob.updateMany({
       where: {
@@ -157,10 +169,11 @@ export async function runBdTopoImportJob(
   id: string,
   codeInsee: string,
   keys: string[],
+  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
 ): Promise<void> {
   try {
     const [assembled, importedRefs] = await Promise.all([
-      assembleForCommune(codeInsee),
+      assembleForCommune(codeInsee, algorithm),
       getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
     ]);
     const selectedKeys = new Set(keys);

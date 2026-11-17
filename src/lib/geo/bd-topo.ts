@@ -55,7 +55,12 @@ interface WfsGeometry {
 
 interface WfsFeatureCollection {
   features: { properties: WfsProperties; geometry: WfsGeometry }[];
+  numberMatched?: number | string;
 }
+
+const WFS_PAGE_SIZE = 5000;
+// Garde-fou contre une boucle infinie si le serveur ignore STARTINDEX.
+const WFS_MAX_PAGES = 50;
 
 function firstNonEmpty(...values: (string | undefined)[]): string | null {
   for (const v of values) {
@@ -105,25 +110,42 @@ function toCandidate(
 async function requestGetFeature(
   cqlFilter: string,
 ): Promise<BdTopoTronconCandidate[]> {
-  const url = new URL(URL_API_BD_TOPO_WFS);
-  url.searchParams.set("SERVICE", "WFS");
-  url.searchParams.set("VERSION", "2.0.0");
-  url.searchParams.set("REQUEST", "GetFeature");
-  url.searchParams.set("TYPENAMES", "BDTOPO_V3:troncon_de_route");
-  url.searchParams.set("OUTPUTFORMAT", "application/json");
-  url.searchParams.set("SRSNAME", "EPSG:4326");
-  url.searchParams.set("COUNT", "5000");
-  url.searchParams.set("CQL_FILTER", cqlFilter);
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Requête BD TOPO (WFS) échouée (${res.status}).`);
-  }
-  const data = (await res.json()) as WfsFeatureCollection;
   const candidates: BdTopoTronconCandidate[] = [];
-  for (const feature of data.features) {
-    const candidate = toCandidate(feature.properties, feature.geometry);
-    if (candidate) candidates.push(candidate);
+  const seen = new Set<string>();
+  let startIndex = 0;
+
+  for (let page = 0; page < WFS_MAX_PAGES; page++) {
+    const url = new URL(URL_API_BD_TOPO_WFS);
+    url.searchParams.set("SERVICE", "WFS");
+    url.searchParams.set("VERSION", "2.0.0");
+    url.searchParams.set("REQUEST", "GetFeature");
+    url.searchParams.set("TYPENAMES", "BDTOPO_V3:troncon_de_route");
+    url.searchParams.set("OUTPUTFORMAT", "application/json");
+    url.searchParams.set("SRSNAME", "EPSG:4326");
+    url.searchParams.set("COUNT", String(WFS_PAGE_SIZE));
+    url.searchParams.set("STARTINDEX", String(startIndex));
+    // Un tri stable est nécessaire pour que la pagination ne perde ni ne duplique de features.
+    url.searchParams.set("SORTBY", "cleabs");
+    url.searchParams.set("CQL_FILTER", cqlFilter);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Requête BD TOPO (WFS) échouée (${res.status}).`);
+    }
+    const data = (await res.json()) as WfsFeatureCollection;
+    if (data.features.length === 0) break;
+
+    for (const feature of data.features) {
+      const candidate = toCandidate(feature.properties, feature.geometry);
+      if (candidate && !seen.has(candidate.cleabs)) {
+        seen.add(candidate.cleabs);
+        candidates.push(candidate);
+      }
+    }
+
+    startIndex += data.features.length;
+    const matched = Number(data.numberMatched);
+    if (Number.isFinite(matched) && startIndex >= matched) break;
   }
   return candidates;
 }

@@ -33,6 +33,7 @@ export const availableDataLayerOptions = [
     value: AvailableDataLayer.VOIES_LOCALES,
     label: "Voies Locales (Cadastre)",
   },
+  { value: AvailableDataLayer.BD_TOPO, label: "BD TOPO (WFS)" },
 ];
 
 interface MapContextValue {

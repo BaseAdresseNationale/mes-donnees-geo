@@ -5,10 +5,23 @@ import {
   assembleLocalPathsFromCadastre,
   type AssembledLocalPath,
 } from "./local-path-cadastre-matching";
+import { assembleByBuffer } from "./local-path-matching-buffer";
+import { assembleByGraph } from "./local-path-matching-graph";
 import { LocalPathClassement } from "@/components/voies-locales/types";
+import {
+  DEFAULT_IMPORT_ALGORITHM,
+  type ImportAlgorithm,
+} from "@/components/voies-locales/import/algorithms";
+
+const ASSEMBLERS = {
+  legacy: assembleLocalPathsFromCadastre,
+  buffer: assembleByBuffer,
+  graph: assembleByGraph,
+} satisfies Record<ImportAlgorithm, typeof assembleLocalPathsFromCadastre>;
 
 export async function assembleForCommune(
   codeInsee: string,
+  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
 ): Promise<AssembledLocalPath[]> {
   const [candidates, ruralPaths, voiesCommunales] = await Promise.all([
     BdTopoService.findTronconsForCommune(codeInsee),
@@ -31,7 +44,7 @@ export async function assembleForCommune(
       classement: LocalPathClassement.VOIE_COMMUNALE,
     })),
   ];
-  return assembleLocalPathsFromCadastre(candidates, cadastralPaths);
+  return ASSEMBLERS[algorithm](candidates, cadastralPaths);
 }
 
 export function isAlreadyImported(

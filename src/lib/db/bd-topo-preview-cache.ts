@@ -3,6 +3,10 @@ import { prisma } from "./prisma";
 import { getImportedSourceRefs } from "./voies-locales";
 import { LocalPathSource } from "@/components/voies-locales/types";
 import type { AssembledLocalPathResponse } from "@/components/voies-locales/import/types";
+import {
+  DEFAULT_IMPORT_ALGORITHM,
+  type ImportAlgorithm,
+} from "@/components/voies-locales/import/algorithms";
 
 function hasSourceRefs(
   result: unknown,
@@ -26,11 +30,15 @@ function hasSourceRefs(
   );
 }
 
-export async function getCachedBdTopoPreviewJob(codeInsee: string) {
+export async function getCachedBdTopoPreviewJob(
+  codeInsee: string,
+  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
+) {
   const job = await prisma.bdTopoImportJob.findFirst({
     where: {
       codeInsee,
       kind: "preview",
+      algorithm,
       status: "succeeded",
     },
     orderBy: { finishedAt: "desc" },

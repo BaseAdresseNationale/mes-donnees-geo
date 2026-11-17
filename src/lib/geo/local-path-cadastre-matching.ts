@@ -12,9 +12,9 @@ import {
 import type { BdTopoTronconCandidate } from "./bd-topo";
 
 // Couloir de tolérance entre un tronçon BD TOPO et le tracé cadastral de référence.
-const MATCH_BUFFER_METERS = 8;
+export const MATCH_BUFFER_METERS = 8;
 // Pas de tolérance pour l'échantillonnage des tronçons.
-const SAMPLE_STEP_METERS = 5;
+export const SAMPLE_STEP_METERS = 5;
 // Marge du pré-filtre bbox (~55 m en latitude), très supérieure à MATCH_BUFFER_METERS.
 const BBOX_MARGIN_DEGREES = 0.0005;
 // En-deçà de ce seuil, le trou entre deux portions est ignoré (l'éditeur tolère ~2 m).
@@ -30,7 +30,7 @@ const DEDUP_TOL_METERS = 5;
 const DEDUP_COVER_RATIO = 0.7;
 // Un chemin assemblé composé d'un seul segment plus court que ça n'est pas créé (bruit,
 // amorce de tronçon sans intérêt pratique).
-const MIN_SINGLE_SEGMENT_METERS = 40;
+export const MIN_SINGLE_SEGMENT_METERS = 40;
 // Seuil de similarité (0..1, cf. `labelSimilarity`) au-dessus duquel deux libellés
 // cadastraux (à numéro égal) sont considérés comme désignant le même chemin.
 const LABEL_SIMILARITY_THRESHOLD = 0.6;
@@ -66,11 +66,13 @@ export interface AssembledLocalPath {
   nom: string | null;
   classement: LocalPathClassement;
   segments: AssembledSegment[];
+  /** Part (0..1) du filaire cadastral couverte, renseignée par les algorithmes qui la calculent. */
+  couverture?: number;
 }
 
-type Bbox = [number, number, number, number];
+export type Bbox = [number, number, number, number];
 
-interface CadastralGroup {
+export interface CadastralGroup {
   key: string;
   numero: number | null;
   nom: string | null;
@@ -82,12 +84,12 @@ interface CadastralGroup {
   bbox: Bbox;
 }
 
-interface Portion {
+export interface Portion {
   path: LineString;
   candidate: BdTopoTronconCandidate;
 }
 
-function haversineMeters(a: Position, b: Position): number {
+export function haversineMeters(a: Position, b: Position): number {
   const R = 6_371_000;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(b[1] - a[1]);
@@ -100,7 +102,7 @@ function haversineMeters(a: Position, b: Position): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-function bboxesOverlap(a: Bbox, b: Bbox): boolean {
+export function bboxesOverlap(a: Bbox, b: Bbox): boolean {
   return (
     a[0] - BBOX_MARGIN_DEGREES <= b[2] &&
     b[0] - BBOX_MARGIN_DEGREES <= a[2] &&
@@ -148,7 +150,7 @@ interface NearestCadastral {
 // + cap local du segment cadastral concerné (pour le test d'orientation).
 // Projection planaire locale : exacte à quelques mètres, bien plus rapide que
 // `nearestPointOnLine` de turf (appelé des millions de fois sur de grosses communes).
-function nearestCadastral(
+export function nearestCadastral(
   coord: Position,
   lines: LineString[],
 ): NearestCadastral {
@@ -186,7 +188,7 @@ function nearestCadastral(
 }
 
 // Normalise un libellé pour la comparaison (accents/casse/espaces insensibles).
-function normalizeLabel(label: string): string {
+export function normalizeLabel(label: string): string {
   return label
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -226,7 +228,7 @@ function labelSimilarity(a: string, b: string): number {
 // (distance d'édition normalisée ≥ seuil) d'un groupe déjà constitué — un matching sur
 // libellé strictement égal était trop fragile (variantes de ponctuation/graphie). Fallback
 // sur l'index de feature si pas de libellé (aucune base de comparaison fiable).
-function groupCadastralPaths(
+export function groupCadastralPaths(
   cadastralPaths: CadastralRuralPathGeometry[],
 ): CadastralGroup[] {
   const groups: CadastralGroup[] = [];
@@ -339,7 +341,7 @@ function reversePortion(portion: Portion): Portion {
 
 // Ordonne les portions en une chaîne, en rattachant à chaque étape la portion la
 // plus proche de l'une des deux extrémités courantes (avec inversion si besoin).
-function chainPortions(portions: Portion[]): Portion[] {
+export function chainPortions(portions: Portion[]): Portion[] {
   if (portions.length <= 1) return portions;
   const remaining = portions.slice();
   const chain: Portion[] = [remaining.shift()!];

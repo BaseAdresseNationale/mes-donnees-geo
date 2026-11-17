@@ -32,6 +32,12 @@ import {
 } from "@/components/common/left-panel-list/LeftPanelFilterModal";
 import styles from "./LocalPathImportBdTopo.module.css";
 import { loadBdTopoPreview } from "./load-bd-topo-preview";
+import { ImportAlgorithmModal } from "./ImportAlgorithmModal";
+import {
+  DEFAULT_IMPORT_ALGORITHM,
+  IMPORT_ALGORITHM_LABELS,
+  type ImportAlgorithm,
+} from "./algorithms";
 import {
   readImportJob,
   writeImportJob,
@@ -48,6 +54,10 @@ const CLASSEMENT_CLASS: Record<LocalPathClassement, string> = {
   [LocalPathClassement.CHEMIN_RURAL]: styles.classementCheminRural,
   [LocalPathClassement.VOIE_COMMUNALE]: styles.classementVoieCommunale,
 };
+
+function plural(count: number, singular: string, pluralForm: string): string {
+  return `${count} ${count > 1 ? pluralForm : singular}`;
+}
 
 function formatLength(meters: number): string {
   if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
@@ -101,6 +111,11 @@ const SORT_OPTIONS: LeftPanelSortOption<AssembledLocalPathResponse>[] = [
     label: "Longueur décroissante",
     comparator: (a, b) => b.longueur - a.longueur,
   },
+  {
+    key: "couverture-asc",
+    label: "Couverture croissante",
+    comparator: (a, b) => (a.couverture ?? 2) - (b.couverture ?? 2),
+  },
 ];
 
 const FILTER_GROUP_CLASSEMENT = "classement";
@@ -142,6 +157,9 @@ export function LocalPathImportBdTopo({
   const { setMapChildren, setMapMessage } = useContext(MapContext);
   const [queryClient] = useState(() => new QueryClient());
   const [submitting, setSubmitting] = useState(false);
+  // Tant qu'aucun algorithme n'est choisi, la reconstitution n'est pas lancée.
+  const [algorithm, setAlgorithm] = useState<ImportAlgorithm | null>(null);
+  const [algorithmModalOpen, setAlgorithmModalOpen] = useState(true);
   const storageKey = `bd-topo-import:${codeCommune}`;
   const jobId = useSyncExternalStore(
     subscribeImportJob,
@@ -249,8 +267,9 @@ export function LocalPathImportBdTopo({
   });
 
   useEffect(() => {
+    if (algorithm === null) return;
     const controller = new AbortController();
-    loadBdTopoPreview(controller.signal, (previewId, count) => {
+    loadBdTopoPreview(controller.signal, algorithm, (previewId, count) => {
       notifyPreviewSuccess(previewId, count);
     })
       .then((data) => {
@@ -274,12 +293,40 @@ export function LocalPathImportBdTopo({
     return () => {
       controller.abort();
     };
-  }, [codeCommune, jobId]);
+  }, [codeCommune, jobId, algorithm]);
+
+  function chooseAlgorithm(next: ImportAlgorithm) {
+    setAlgorithmModalOpen(false);
+    if (next === algorithm) return;
+    setPaths(null);
+    setLoadError(null);
+    setSelected(new Set());
+    setAlgorithm(next);
+  }
+
+  function closeAlgorithmModal() {
+    if (algorithm === null) {
+      router.push(`/${codeCommune}/voies-locales`);
+      return;
+    }
+    setAlgorithmModalOpen(false);
+  }
 
   const importable = useMemo(
     () => (paths ?? []).filter((p) => !p.alreadyImported),
     [paths],
   );
+
+  const report = useMemo(() => {
+    if (!paths) return null;
+    return {
+      voies: paths.length,
+      cheminsRuraux: paths.filter(
+        (p) => p.classement === LocalPathClassement.CHEMIN_RURAL,
+      ).length,
+      segments: paths.reduce((sum, p) => sum + p.segments.length, 0),
+    };
+  }, [paths]);
 
   const classementFilters = filters[FILTER_GROUP_CLASSEMENT];
   const hasActiveFilters = classementFilters.size > 0;
@@ -375,7 +422,10 @@ export function LocalPathImportBdTopo({
       const res = await fetch("/api/voies-locales/import/bd-topo", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ keys: [...selected] }),
+        body: JSON.stringify({
+          keys: [...selected],
+          algorithm: algorithm ?? DEFAULT_IMPORT_ALGORITHM,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -407,14 +457,57 @@ export function LocalPathImportBdTopo({
         coïncidant avec l&apos;habillage cadastral. Vous pourrez ensuite
         qualifier chaque voie importée (numéro, revêtement…) individuellement.
       </p>
+      {algorithm && (
+        <p className={styles.algorithm}>
+          <span>
+            Algorithme : {IMPORT_ALGORITHM_LABELS[algorithm].label}
+          </span>
+          <Button
+            variant="secondary"
+            color="neutral"
+            size="small"
+            onClick={() => setAlgorithmModalOpen(true)}
+          >
+            Changer
+          </Button>
+        </p>
+      )}
+      {report && (
+        <p className={styles.report}>
+          {plural(report.voies, "voie locale détectée", "voies locales détectées")}
+          {" · "}
+          {plural(report.cheminsRuraux, "chemin rural", "chemins ruraux")}
+          {" · "}
+          {plural(report.segments, "segment", "segments")}
+        </p>
+      )}
     </div>
   );
+
+  const algorithmModal = (
+    <ImportAlgorithmModal
+      isOpen={algorithmModalOpen}
+      initialValue={algorithm ?? DEFAULT_IMPORT_ALGORITHM}
+      onConfirm={chooseAlgorithm}
+      onClose={closeAlgorithmModal}
+    />
+  );
+
+  if (algorithm === null) {
+    return (
+      <section className={styles.container} aria-label="Import BD TOPO">
+        {header}
+        {algorithmModal}
+      </section>
+    );
+  }
 
   if (loadError) {
     return (
       <section className={styles.container} aria-label="Import BD TOPO">
         {header}
         <p className={styles.error}>{loadError}</p>
+        {algorithmModal}
       </section>
     );
   }
@@ -431,11 +524,13 @@ export function LocalPathImportBdTopo({
             commune.
           </span>
         </div>
+        {algorithmModal}
       </section>
     );
   }
 
   return (
+    <>
     <LeftPanelList
       ariaLabel="Import BD TOPO"
       items={importable}
@@ -495,10 +590,17 @@ export function LocalPathImportBdTopo({
                 {CLASSEMENT_ABBR[p.classement]}
               </span>
               <span>{formatLength(p.longueur)}</span>
+              {p.couverture != null && (
+                <span title="Part du filaire cadastral couverte par le tracé BD TOPO">
+                  {Math.round(p.couverture * 100)} %
+                </span>
+              )}
             </span>
           </span>
         </label>
       )}
     />
+    {algorithmModal}
+    </>
   );
 }

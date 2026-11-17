@@ -20,4 +20,6 @@ export interface AssembledLocalPathResponse {
   segments: ImportSegmentResponse[];
   longueur: number;
   alreadyImported: boolean;
+  /** Part (0..1) du filaire cadastral couverte par le tracé BD TOPO, si l'algorithme la calcule. */
+  couverture?: number | null;
 }
