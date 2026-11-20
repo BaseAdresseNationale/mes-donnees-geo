@@ -40,6 +40,12 @@
   gap: 0.5rem;
 }
 
+.report {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted, #555);
+}
+
 .toolbarRow {
   display: flex;
   align-items: center;

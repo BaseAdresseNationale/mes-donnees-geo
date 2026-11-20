@@ -49,6 +49,10 @@ const CLASSEMENT_CLASS: Record<LocalPathClassement, string> = {
   [LocalPathClassement.VOIE_COMMUNALE]: styles.classementVoieCommunale,
 };
 
+function plural(count: number, singular: string, pluralForm: string): string {
+  return `${count} ${count > 1 ? pluralForm : singular}`;
+}
+
 function formatLength(meters: number): string {
   if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
   return `${Math.round(meters)} m`;
@@ -100,6 +104,11 @@ const SORT_OPTIONS: LeftPanelSortOption<AssembledLocalPathResponse>[] = [
     key: "longueur-desc",
     label: "Longueur décroissante",
     comparator: (a, b) => b.longueur - a.longueur,
+  },
+  {
+    key: "couverture-asc",
+    label: "Couverture croissante",
+    comparator: (a, b) => (a.couverture ?? 2) - (b.couverture ?? 2),
   },
 ];
 
@@ -281,6 +290,17 @@ export function LocalPathImportBdTopo({
     [paths],
   );
 
+  const report = useMemo(() => {
+    if (!paths) return null;
+    return {
+      voies: paths.length,
+      cheminsRuraux: paths.filter(
+        (p) => p.classement === LocalPathClassement.CHEMIN_RURAL,
+      ).length,
+      segments: paths.reduce((sum, p) => sum + p.segments.length, 0),
+    };
+  }, [paths]);
+
   const classementFilters = filters[FILTER_GROUP_CLASSEMENT];
   const hasActiveFilters = classementFilters.size > 0;
 
@@ -407,6 +427,19 @@ export function LocalPathImportBdTopo({
         coïncidant avec l&apos;habillage cadastral. Vous pourrez ensuite
         qualifier chaque voie importée (numéro, revêtement…) individuellement.
       </p>
+      {report && (
+        <p className={styles.report}>
+          {plural(
+            report.voies,
+            "voie locale détectée",
+            "voies locales détectées",
+          )}
+          {" · "}
+          {plural(report.cheminsRuraux, "chemin rural", "chemins ruraux")}
+          {" · "}
+          {plural(report.segments, "segment", "segments")}
+        </p>
+      )}
     </div>
   );
 
@@ -495,6 +528,11 @@ export function LocalPathImportBdTopo({
                 {CLASSEMENT_ABBR[p.classement]}
               </span>
               <span>{formatLength(p.longueur)}</span>
+              {p.couverture != null && (
+                <span title="Part du filaire cadastral couverte par le tracé BD TOPO">
+                  {Math.round(p.couverture * 100)} %
+                </span>
+              )}
             </span>
           </span>
         </label>

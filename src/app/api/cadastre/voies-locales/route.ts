@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-import type { Feature, FeatureCollection, LineString } from "geojson";
-import { LocalPathClassement } from "@/generated/prisma/browser";
+import type { FeatureCollection, LineString } from "geojson";
 import { requireSession } from "@/lib/auth/session";
 import {
   CadastreService,
-  type CadastralRuralPathProperties,
+  type CadastralLocalPathProperties,
 } from "@/lib/geo/cadastre";
-
-type CadastralLocalPathProperties = CadastralRuralPathProperties & {
-  classement: LocalPathClassement;
-};
 
 export async function GET(): Promise<Response> {
   let session;
@@ -20,29 +15,14 @@ export async function GET(): Promise<Response> {
   }
 
   try {
-    const [ruralPaths, voiesCommunales] = await Promise.all([
-      CadastreService.findRuralPathToponymsForCommune(session.communeInsee),
-      CadastreService.findVoieCommunaleToponymsForCommune(session.communeInsee),
-    ]);
-
-    const tag = (
-      features: Feature<LineString, CadastralRuralPathProperties>[],
-      classement: LocalPathClassement,
-    ): Feature<LineString, CadastralLocalPathProperties>[] =>
-      features.map((feature) => ({
-        ...feature,
-        properties: { ...feature.properties, classement },
-      }));
-
     const featureCollection: FeatureCollection<
       LineString,
       CadastralLocalPathProperties
     > = {
       type: "FeatureCollection",
-      features: [
-        ...tag(ruralPaths, LocalPathClassement.CHEMIN_RURAL),
-        ...tag(voiesCommunales, LocalPathClassement.VOIE_COMMUNALE),
-      ],
+      features: await CadastreService.findLocalPathToponymsForCommune(
+        session.communeInsee,
+      ),
     };
 
     return NextResponse.json(featureCollection);

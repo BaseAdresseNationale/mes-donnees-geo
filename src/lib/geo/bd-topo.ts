@@ -1,20 +1,12 @@
 import type { LineString } from "geojson";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
-import {
-  LocalPathClassement,
-  LocalPathRevetement,
-  LocalPathType,
-} from "@/generated/prisma/browser";
+import { LocalPathRevetement, LocalPathType } from "@/generated/prisma/browser";
 
 const URL_API_BD_TOPO_WFS: string =
   process.env.URL_API_BD_TOPO_WFS || "https://data.geopf.fr/wfs/ows";
 
 // Nature BD TOPO -> valeurs par défaut de qualification (l'utilisateur les corrige ensuite).
-const NATURE_CLASSEMENT: Record<string, LocalPathClassement> = {
-  Chemin: LocalPathClassement.CHEMIN_RURAL,
-  Sentier: LocalPathClassement.CHEMIN_RURAL,
-};
 const NATURE_TYPE: Record<string, LocalPathType> = {
   Chemin: LocalPathType.CHEMIN,
   Sentier: LocalPathType.SENTIER,
@@ -31,7 +23,6 @@ export interface BdTopoTronconCandidate {
   nomVoie: string | null;
   longueur: number;
   path: LineString;
-  suggestedClassement: LocalPathClassement;
   suggestedType: LocalPathType;
   suggestedRevetement: LocalPathRevetement;
   suggestedLargeurMoyenne: number | null;
@@ -55,7 +46,12 @@ interface WfsGeometry {
 
 interface WfsFeatureCollection {
   features: { properties: WfsProperties; geometry: WfsGeometry }[];
+  numberMatched?: number | string;
 }
+
+const WFS_PAGE_SIZE = 5000;
+// Garde-fou contre une boucle infinie si le serveur ignore STARTINDEX.
+const WFS_MAX_PAGES = 50;
 
 function firstNonEmpty(...values: (string | undefined)[]): string | null {
   for (const v of values) {
@@ -90,8 +86,6 @@ function toCandidate(
     ),
     longueur: turfLength(lineString(coordinates), { units: "meters" }),
     path,
-    suggestedClassement:
-      NATURE_CLASSEMENT[nature] ?? LocalPathClassement.VOIE_COMMUNALE,
     suggestedType: NATURE_TYPE[nature] ?? LocalPathType.TRONCON,
     suggestedRevetement:
       NATURE_REVETEMENT[nature] ?? LocalPathRevetement.REVETU,
@@ -105,25 +99,42 @@ function toCandidate(
 async function requestGetFeature(
   cqlFilter: string,
 ): Promise<BdTopoTronconCandidate[]> {
-  const url = new URL(URL_API_BD_TOPO_WFS);
-  url.searchParams.set("SERVICE", "WFS");
-  url.searchParams.set("VERSION", "2.0.0");
-  url.searchParams.set("REQUEST", "GetFeature");
-  url.searchParams.set("TYPENAMES", "BDTOPO_V3:troncon_de_route");
-  url.searchParams.set("OUTPUTFORMAT", "application/json");
-  url.searchParams.set("SRSNAME", "EPSG:4326");
-  url.searchParams.set("COUNT", "5000");
-  url.searchParams.set("CQL_FILTER", cqlFilter);
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Requête BD TOPO (WFS) échouée (${res.status}).`);
-  }
-  const data = (await res.json()) as WfsFeatureCollection;
   const candidates: BdTopoTronconCandidate[] = [];
-  for (const feature of data.features) {
-    const candidate = toCandidate(feature.properties, feature.geometry);
-    if (candidate) candidates.push(candidate);
+  const seen = new Set<string>();
+  let startIndex = 0;
+
+  for (let page = 0; page < WFS_MAX_PAGES; page++) {
+    const url = new URL(URL_API_BD_TOPO_WFS);
+    url.searchParams.set("SERVICE", "WFS");
+    url.searchParams.set("VERSION", "2.0.0");
+    url.searchParams.set("REQUEST", "GetFeature");
+    url.searchParams.set("TYPENAMES", "BDTOPO_V3:troncon_de_route");
+    url.searchParams.set("OUTPUTFORMAT", "application/json");
+    url.searchParams.set("SRSNAME", "EPSG:4326");
+    url.searchParams.set("COUNT", String(WFS_PAGE_SIZE));
+    url.searchParams.set("STARTINDEX", String(startIndex));
+    // Un tri stable est nécessaire pour que la pagination ne perde ni ne duplique de features.
+    url.searchParams.set("SORTBY", "cleabs");
+    url.searchParams.set("CQL_FILTER", cqlFilter);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Requête BD TOPO (WFS) échouée (${res.status}).`);
+    }
+    const data = (await res.json()) as WfsFeatureCollection;
+    if (data.features.length === 0) break;
+
+    for (const feature of data.features) {
+      const candidate = toCandidate(feature.properties, feature.geometry);
+      if (candidate && !seen.has(candidate.cleabs)) {
+        seen.add(candidate.cleabs);
+        candidates.push(candidate);
+      }
+    }
+
+    startIndex += data.features.length;
+    const matched = Number(data.numberMatched);
+    if (Number.isFinite(matched) && startIndex >= matched) break;
   }
   return candidates;
 }
@@ -141,14 +152,5 @@ export class BdTopoService {
     return requestGetFeature(
       `insee_commune_gauche='${escaped}' OR insee_commune_droite='${escaped}'`,
     );
-  }
-
-  /** Ré-interroge le WFS par cleabs (jamais le géométrie/attributs fournis par le client). */
-  public static findTronconsByCleabs(
-    cleabsList: string[],
-  ): Promise<BdTopoTronconCandidate[]> {
-    if (cleabsList.length === 0) return Promise.resolve([]);
-    const list = cleabsList.map((c) => `'${c.replace(/'/g, "''")}'`).join(",");
-    return requestGetFeature(`cleabs IN (${list})`);
   }
 }

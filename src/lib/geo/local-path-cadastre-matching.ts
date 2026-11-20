@@ -1,46 +1,40 @@
-import along from "@turf/along";
 import bbox from "@turf/bbox";
 import { lineString } from "@turf/helpers";
 import turfLength from "@turf/length";
 import type { LineString, Position } from "geojson";
 import {
-  LocalPathClassement,
-  LocalPathRevetement,
   LocalPathSource,
-  LocalPathType,
+  type LocalPathClassement,
+  type LocalPathRevetement,
+  type LocalPathType,
 } from "@/generated/prisma/browser";
 import type { BdTopoTronconCandidate } from "./bd-topo";
 
 // Couloir de tolérance entre un tronçon BD TOPO et le tracé cadastral de référence.
 const MATCH_BUFFER_METERS = 8;
-// Pas de tolérance pour l'échantillonnage des tronçons.
+// Pas d'échantillonnage des tronçons et du filaire cadastral.
 const SAMPLE_STEP_METERS = 5;
 // Marge du pré-filtre bbox (~55 m en latitude), très supérieure à MATCH_BUFFER_METERS.
 const BBOX_MARGIN_DEGREES = 0.0005;
-// En-deçà de ce seuil, le trou entre deux portions est ignoré (l'éditeur tolère ~2 m).
+// Une voie n'est validée que si ≥ 80 % du filaire cadastral est couvert et ≥ 80 % du
+// tracé retenu est dans le couloir.
+const MIN_COVERAGE_RATIO = 0.8;
+// Longueur minimale d'une voie assemblée (en-deçà, c'est du bruit).
+const MIN_PATH_METERS = 40;
+// Un tronçon n'entre dans le graphe que s'il est au moins à moitié dans le couloir.
+const GRAPH_MIN_EDGE_INSIDE = 0.5;
+// Un tronçon moins bien aligné n'est retenu que s'il relie deux composantes admises ("pont").
+const BRIDGE_MIN_INSIDE = 0.3;
+// Coût d'un tronçon = longueur × (1 + facteur × part hors couloir).
+const OUTSIDE_COST_FACTOR = 4;
+// Nombre max de terminaux testés par composante (une recherche de plus court chemin chacun).
+const MAX_TERMINALS = 10;
+// Longueur max d'un segment manuel reliant deux chemins d'une même voie.
+const MAX_JOIN_METERS = 200;
+// Similarité minimale des noms pour considérer deux chemins comme une même voie.
+const JOIN_NAME_SIMILARITY = 0.8;
+// En-deçà de ce seuil, le trou entre deux chemins est ignoré (l'éditeur tolère ~2 m).
 const GAP_FILL_MIN_METERS = 2;
-// Longueur max d'un raccordement en ligne droite ; au-delà, on scinde en 2 chemins distincts.
-const MAX_FILLER_METERS = 150;
-// Écart d'orientation max (mod 180°) entre un tronçon et le tracé cadastral local :
-// au-delà, le tronçon est jugé transversal (intersection/amorce) et écarté.
-const MAX_BEARING_DIFF_DEGREES = 45;
-// Dédoublonnage : une portion dont ≥ DEDUP_COVER_RATIO des points sont à ≤ DEDUP_TOL_METERS
-// d'une portion plus longue déjà retenue est jugée redondante (doublon/superposition BD TOPO).
-const DEDUP_TOL_METERS = 5;
-const DEDUP_COVER_RATIO = 0.7;
-// Un chemin assemblé composé d'un seul segment plus court que ça n'est pas créé (bruit,
-// amorce de tronçon sans intérêt pratique).
-const MIN_SINGLE_SEGMENT_METERS = 40;
-// Seuil de similarité (0..1, cf. `labelSimilarity`) au-dessus duquel deux libellés
-// cadastraux (à numéro égal) sont considérés comme désignant le même chemin.
-const LABEL_SIMILARITY_THRESHOLD = 0.6;
-// Tolérance (plus large que MATCH_BUFFER_METERS) pour comparer deux chemins ASSEMBLÉS
-// entiers entre eux — leurs segments MANUEL peuvent diverger davantage qu'un simple
-// tronçon BD TOPO du tracé cadastral.
-const DUPLICATE_PATH_TOLERANCE_METERS = 15;
-// En-deçà de cette distance, 2 segments consécutifs qui ramènent quasiment au point de
-// départ du 1er sont jugés « s'annuler » (aller-retour, pas un vrai prolongement).
-const CANCELLING_SEGMENT_TOLERANCE_METERS = 5;
 
 export interface CadastralRuralPathGeometry {
   path: LineString;
@@ -60,12 +54,14 @@ export interface AssembledSegment {
 }
 
 export interface AssembledLocalPath {
-  /** Clé de regroupement stable (numéro cadastral, sinon nom, sinon index de feature). */
+  /** Clé stable (classement, numéro, libellé, sinon index de feature) : sélecteur d'import. */
   key: string;
   numero: number | null;
   nom: string | null;
   classement: LocalPathClassement;
   segments: AssembledSegment[];
+  /** Part (0..1) du filaire cadastral couverte par le tracé BD TOPO. */
+  couverture?: number;
 }
 
 type Bbox = [number, number, number, number];
@@ -75,17 +71,56 @@ interface CadastralGroup {
   numero: number | null;
   nom: string | null;
   classement: LocalPathClassement;
-  /** Libellé normalisé du 1er membre du groupe, utilisé comme référence pour la similarité. */
-  label: string;
   lines: LineString[];
   lineBboxes: Bbox[];
   bbox: Bbox;
 }
 
-interface Portion {
-  path: LineString;
+interface CandidateWithBbox {
   candidate: BdTopoTronconCandidate;
+  bbox: Bbox;
+  // Calculé à la demande puis réutilisé pour tous les groupes cadastraux.
+  samples?: Position[];
 }
+
+/** Un tronçon BD TOPO évalué par rapport au filaire d'un groupe cadastral. */
+interface Edge {
+  candidate: BdTopoTronconCandidate;
+  length: number;
+  /** Part (0..1) du tronçon située à ≤ MATCH_BUFFER_METERS du filaire. */
+  insideRatio: number;
+  /** Indices des échantillons du filaire situés à ≤ MATCH_BUFFER_METERS du tronçon. */
+  covered: Set<number>;
+}
+
+interface GraphEdge {
+  edge: Edge;
+  from: number;
+  to: number;
+  cost: number;
+}
+
+interface Graph {
+  nodes: Position[];
+  edges: GraphEdge[];
+  adjacency: { edge: number; other: number }[][];
+}
+
+interface Step {
+  edge: GraphEdge;
+  from: number;
+}
+
+interface ChosenPath {
+  steps: Step[];
+  edges: Edge[];
+  covered: Set<number>;
+  length: number;
+}
+
+// ---------------------------------------------------------------------------
+// Géométrie et chaînes de caractères
+// ---------------------------------------------------------------------------
 
 function haversineMeters(a: Position, b: Position): number {
   const R = 6_371_000;
@@ -109,55 +144,14 @@ function bboxesOverlap(a: Bbox, b: Bbox): boolean {
   );
 }
 
-function mergeBbox(a: Bbox, b: Bbox): Bbox {
-  return [
-    Math.min(a[0], b[0]),
-    Math.min(a[1], b[1]),
-    Math.max(a[2], b[2]),
-    Math.max(a[3], b[3]),
-  ];
-}
-
-function initialBearing(a: Position, b: Position): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const toDeg = (rad: number) => (rad * 180) / Math.PI;
-  const lat1 = toRad(a[1]);
-  const lat2 = toRad(b[1]);
-  const dLng = toRad(b[0] - a[0]);
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
-
-// Écart angulaire entre deux caps, insensible au sens de parcours (0..90°).
-function bearingDifference(b1: number, b2: number): number {
-  let d = Math.abs(b1 - b2) % 360;
-  if (d > 180) d = 360 - d;
-  if (d > 90) d = 180 - d;
-  return d;
-}
-
-interface NearestCadastral {
-  distance: number;
-  bearing: number | null;
-}
-
-// Point le plus proche sur l'ensemble des lignes cadastrales du groupe : distance (m)
-// + cap local du segment cadastral concerné (pour le test d'orientation).
-// Projection planaire locale : exacte à quelques mètres, bien plus rapide que
-// `nearestPointOnLine` de turf (appelé des millions de fois sur de grosses communes).
-function nearestCadastral(
-  coord: Position,
-  lines: LineString[],
-): NearestCadastral {
+// Distance (m) d'un point à l'ensemble de lignes. Projection planaire locale : exacte à
+// quelques mètres, bien plus rapide que `nearestPointOnLine` de turf (appelé des millions
+// de fois sur de grosses communes).
+function distanceToLines(coord: Position, lines: LineString[]): number {
   const metersPerDegree = (Math.PI / 180) * 6_371_000;
   const kx = Math.cos((coord[1] * Math.PI) / 180) * metersPerDegree;
   const ky = metersPerDegree;
   let bestSq = Infinity;
-  let bestLine: Position[] | null = null;
-  let bestIndex = 0;
   for (const line of lines) {
     const coords = line.coordinates;
     for (let i = 0; i < coords.length - 1; i++) {
@@ -166,23 +160,16 @@ function nearestCadastral(
       const dx = (coords[i + 1][0] - coord[0]) * kx - ax;
       const dy = (coords[i + 1][1] - coord[1]) * ky - ay;
       const lenSq = dx * dx + dy * dy;
-      const t =
-        lenSq === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
+      // Comparaisons plutôt que Math.min/max : boucle exécutée des millions de fois.
+      const projected = lenSq === 0 ? 0 : -(ax * dx + ay * dy) / lenSq;
+      const t = projected < 0 ? 0 : projected > 1 ? 1 : projected;
       const px = ax + t * dx;
       const py = ay + t * dy;
       const sq = px * px + py * py;
-      if (sq < bestSq) {
-        bestSq = sq;
-        bestLine = coords;
-        bestIndex = i;
-      }
+      if (sq < bestSq) bestSq = sq;
     }
   }
-  if (!bestLine) return { distance: Infinity, bearing: null };
-  return {
-    distance: Math.sqrt(bestSq),
-    bearing: initialBearing(bestLine[bestIndex], bestLine[bestIndex + 1]),
-  };
+  return Math.sqrt(bestSq);
 }
 
 // Normalise un libellé pour la comparaison (accents/casse/espaces insensibles).
@@ -195,8 +182,8 @@ function normalizeLabel(label: string): string {
     .replace(/\s+/g, " ");
 }
 
-// Distance d'édition (Levenshtein) entre deux chaînes, en O(a.length * b.length) en temps
-// et O(min(a.length, b.length)) en mémoire (2 lignes de la matrice DP).
+// Distance d'édition (Levenshtein), en O(a.length * b.length) en temps et
+// O(min(a.length, b.length)) en mémoire.
 function levenshteinDistance(a: string, b: string): number {
   if (a.length < b.length) return levenshteinDistance(b, a);
   if (b.length === 0) return a.length;
@@ -222,432 +209,573 @@ function labelSimilarity(a: string, b: string): number {
   return 1 - levenshteinDistance(a, b) / maxLength;
 }
 
-// Regroupe les chemins ruraux cadastraux par identité : même numéro ET libellé « proche »
-// (distance d'édition normalisée ≥ seuil) d'un groupe déjà constitué — un matching sur
-// libellé strictement égal était trop fragile (variantes de ponctuation/graphie). Fallback
-// sur l'index de feature si pas de libellé (aucune base de comparaison fiable).
+function nodeKey(position: Position): string {
+  return `${position[0].toFixed(6)},${position[1].toFixed(6)}`;
+}
+
+// Cède la main à l'event loop au plus toutes les 20 ms (le traitement tourne dans le serveur Next).
+function createYielder(): () => Promise<void> {
+  let last = Date.now();
+  return async () => {
+    if (Date.now() - last < 20) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    last = Date.now();
+  };
+}
+
+function samplePath(path: LineString): Position[] {
+  const coords = path.coordinates;
+  if (coords.length < 2) return [];
+  const segmentLengths: number[] = [];
+  let length = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const segmentLength = haversineMeters(coords[i], coords[i + 1]);
+    segmentLengths.push(segmentLength);
+    length += segmentLength;
+  }
+  if (length === 0) return [coords[0]];
+
+  // Un seul parcours de la ligne, interpolation linéaire dans chaque segment.
+  const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
+  const samples: Position[] = [];
+  let segment = 0;
+  let walked = 0;
+  for (let i = 0; i <= count; i++) {
+    const target = (length * i) / count;
+    while (
+      segment < segmentLengths.length - 1 &&
+      walked + segmentLengths[segment] < target
+    ) {
+      walked += segmentLengths[segment];
+      segment++;
+    }
+    const ratio =
+      segmentLengths[segment] === 0
+        ? 0
+        : Math.min(1, (target - walked) / segmentLengths[segment]);
+    const a = coords[segment];
+    const b = coords[segment + 1];
+    samples.push([a[0] + (b[0] - a[0]) * ratio, a[1] + (b[1] - a[1]) * ratio]);
+  }
+  return samples;
+}
+
+// ---------------------------------------------------------------------------
+// Regroupement cadastral et évaluation des tronçons
+// ---------------------------------------------------------------------------
+
+// Regroupe les lignes cadastrales par identité stricte (classement + numéro + libellé
+// normalisé identiques). Une ligne sans numéro ni nom reste seule : rien ne dit qu'elle
+// désigne le même chemin qu'une autre.
 function groupCadastralPaths(
   cadastralPaths: CadastralRuralPathGeometry[],
 ): CadastralGroup[] {
-  const groups: CadastralGroup[] = [];
+  const groups = new Map<string, CadastralGroup>();
   cadastralPaths.forEach((cadastral, index) => {
-    const label = normalizeLabel(cadastral.libelle);
+    const named = cadastral.numero !== null || cadastral.nom !== null;
+    const key = named
+      ? `${cadastral.classement}|${cadastral.numero ?? ""}|${normalizeLabel(cadastral.libelle)}`
+      : `feat:${index}`;
     const lineBbox = bbox(cadastral.path) as Bbox;
-    const existing = label
-      ? groups.find(
-          (group) =>
-            group.label !== "" &&
-            group.classement === cadastral.classement &&
-            group.numero === cadastral.numero &&
-            labelSimilarity(group.label, label) >= LABEL_SIMILARITY_THRESHOLD,
-        )
-      : undefined;
+    const existing = groups.get(key);
     if (existing) {
       existing.lines.push(cadastral.path);
       existing.lineBboxes.push(lineBbox);
-      existing.bbox = mergeBbox(existing.bbox, lineBbox);
-      existing.numero ??= cadastral.numero;
-      existing.nom ??= cadastral.nom;
+      existing.bbox = [
+        Math.min(existing.bbox[0], lineBbox[0]),
+        Math.min(existing.bbox[1], lineBbox[1]),
+        Math.max(existing.bbox[2], lineBbox[2]),
+        Math.max(existing.bbox[3], lineBbox[3]),
+      ];
     } else {
-      groups.push({
-        key: label
-          ? `${cadastral.classement}|${cadastral.numero ?? ""}|${label}`
-          : `feat:${index}`,
+      groups.set(key, {
+        key,
         numero: cadastral.numero,
         nom: cadastral.nom,
         classement: cadastral.classement,
-        label,
         lines: [cadastral.path],
         lineBboxes: [lineBbox],
         bbox: lineBbox,
       });
     }
   });
-  return groups;
+  return [...groups.values()];
 }
 
-// Extrait la ou les portions d'un tronçon BD TOPO qui restent dans le couloir cadastral.
-// Si tout le tronçon matche, on renvoie sa géométrie d'origine (sans rééchantillonnage).
-function corridorPortions(
-  tronconPath: LineString,
-  cadastralLines: LineString[],
-): LineString[] {
-  if (tronconPath.coordinates.length < 2) return [];
-  const line = lineString(tronconPath.coordinates);
-  const length = turfLength(line, { units: "meters" });
-  if (length === 0) return [];
-
-  const sampleCount = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
-  const samples: Position[] = [];
-  for (let i = 0; i <= sampleCount; i++) {
-    samples.push(
-      along(line, (length * i) / sampleCount, { units: "meters" }).geometry
-        .coordinates as Position,
+async function analyzeEdges(
+  group: CadastralGroup,
+  samples: Position[],
+  pool: CandidateWithBbox[],
+  tick: () => Promise<void>,
+): Promise<Edge[]> {
+  const edges: Edge[] = [];
+  for (const item of pool) {
+    const { candidate, bbox: candidateBbox } = item;
+    await tick();
+    if (!bboxesOverlap(candidateBbox, group.bbox)) continue;
+    const nearbyLines = group.lines.filter((_, i) =>
+      bboxesOverlap(candidateBbox, group.lineBboxes[i]),
     );
-  }
+    if (nearbyLines.length === 0) continue;
 
-  // Un point compte comme « dans le couloir » s'il est à ≤5 m ET orienté comme le
-  // tracé cadastral local (écarte les tronçons transversaux aux intersections).
-  const inside: boolean[] = samples.map((coord, i) => {
-    const info = nearestCadastral(coord, cadastralLines);
-    if (info.distance > MATCH_BUFFER_METERS || info.bearing === null) {
-      return false;
-    }
-    const j = i < samples.length - 1 ? i : i - 1;
-    const tronconBearing = initialBearing(samples[j], samples[j + 1]);
-    return (
-      bearingDifference(tronconBearing, info.bearing) <=
-      MAX_BEARING_DIFF_DEGREES
-    );
-  });
+    const pathSamples = (item.samples ??= samplePath(candidate.path));
+    if (pathSamples.length === 0) continue;
+    const inside = pathSamples.filter(
+      (sample) => distanceToLines(sample, nearbyLines) <= MATCH_BUFFER_METERS,
+    ).length;
+    if (inside === 0) continue;
 
-  if (inside.every(Boolean)) return [tronconPath];
-
-  const portions: LineString[] = [];
-  let run: Position[] = [];
-  for (let i = 0; i < samples.length; i++) {
-    if (inside[i]) {
-      run.push(samples[i]);
-    } else if (run.length >= 2) {
-      portions.push({ type: "LineString", coordinates: run });
-      run = [];
-    } else {
-      run = [];
-    }
-  }
-  if (run.length >= 2) portions.push({ type: "LineString", coordinates: run });
-  return portions;
-}
-
-function start(path: LineString): Position {
-  return path.coordinates[0];
-}
-
-function end(path: LineString): Position {
-  return path.coordinates[path.coordinates.length - 1];
-}
-
-function reversePortion(portion: Portion): Portion {
-  return {
-    ...portion,
-    path: {
-      type: "LineString",
-      coordinates: [...portion.path.coordinates].reverse(),
-    },
-  };
-}
-
-// Ordonne les portions en une chaîne, en rattachant à chaque étape la portion la
-// plus proche de l'une des deux extrémités courantes (avec inversion si besoin).
-function chainPortions(portions: Portion[]): Portion[] {
-  if (portions.length <= 1) return portions;
-  const remaining = portions.slice();
-  const chain: Portion[] = [remaining.shift()!];
-
-  let progress = true;
-  while (remaining.length > 0 && progress) {
-    progress = false;
-    const headStart = start(chain[0].path);
-    const tailEnd = end(chain[chain.length - 1].path);
-
-    let best: {
-      idx: number;
-      dist: number;
-      where: "head" | "tail";
-      flip: boolean;
-    } | null = null;
-    remaining.forEach((portion, idx) => {
-      const s = start(portion.path);
-      const e = end(portion.path);
-      const options: { dist: number; where: "head" | "tail"; flip: boolean }[] =
-        [
-          { dist: haversineMeters(tailEnd, s), where: "tail", flip: false },
-          { dist: haversineMeters(tailEnd, e), where: "tail", flip: true },
-          { dist: haversineMeters(headStart, e), where: "head", flip: false },
-          { dist: haversineMeters(headStart, s), where: "head", flip: true },
-        ];
-      for (const option of options) {
-        if (!best || option.dist < best.dist) {
-          best = { idx, ...option };
-        }
+    const covered = new Set<number>();
+    samples.forEach((sample, index) => {
+      const samplePoint: Bbox = [sample[0], sample[1], sample[0], sample[1]];
+      if (!bboxesOverlap(samplePoint, candidateBbox)) return;
+      if (distanceToLines(sample, [candidate.path]) <= MATCH_BUFFER_METERS) {
+        covered.add(index);
       }
     });
 
-    if (best) {
-      const chosen = best as {
-        idx: number;
-        dist: number;
-        where: "head" | "tail";
-        flip: boolean;
-      };
-      const [portion] = remaining.splice(chosen.idx, 1);
-      const oriented = chosen.flip ? reversePortion(portion) : portion;
-      if (chosen.where === "tail") chain.push(oriented);
-      else chain.unshift(oriented);
-      progress = true;
+    edges.push({
+      candidate,
+      length: candidate.longueur,
+      insideRatio: inside / pathSamples.length,
+      covered,
+    });
+  }
+  return edges;
+}
+
+function precisionRatio(edges: Edge[]): number {
+  const total = edges.reduce((sum, edge) => sum + edge.length, 0);
+  if (total === 0) return 0;
+  const inside = edges.reduce(
+    (sum, edge) => sum + edge.length * edge.insideRatio,
+    0,
+  );
+  return inside / total;
+}
+
+// Composantes connexes (tronçons partageant une extrémité).
+function connectedComponents(edges: Edge[]): Edge[][] {
+  const parent = new Map<string, string>();
+  const find = (key: string): string => {
+    let root = parent.get(key) ?? key;
+    while (root !== (parent.get(root) ?? root)) root = parent.get(root)!;
+    parent.set(key, root);
+    return root;
+  };
+  const union = (a: string, b: string) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent.set(rootA, rootB);
+  };
+
+  for (const edge of edges) {
+    const coords = edge.candidate.path.coordinates;
+    union(nodeKey(coords[0]), nodeKey(coords[coords.length - 1]));
+  }
+
+  const components = new Map<string, Edge[]>();
+  for (const edge of edges) {
+    const root = find(nodeKey(edge.candidate.path.coordinates[0]));
+    const component = components.get(root);
+    if (component) component.push(edge);
+    else components.set(root, [edge]);
+  }
+  return [...components.values()];
+}
+
+// Tronçons partiellement hors couloir (ex. filaire décalé) qui raccordent deux composantes
+// admises : sans eux, une voie continue serait coupée en plusieurs chemins. On ne garde
+// que le mieux aligné par paire de composantes.
+function findBridges(admitted: Edge[], all: Edge[]): Edge[] {
+  const componentOf = new Map<string, number>();
+  connectedComponents(admitted).forEach((component, index) => {
+    for (const edge of component) {
+      const coords = edge.candidate.path.coordinates;
+      componentOf.set(nodeKey(coords[0]), index);
+      componentOf.set(nodeKey(coords[coords.length - 1]), index);
+    }
+  });
+
+  const bestByPair = new Map<string, Edge>();
+  for (const edge of all) {
+    if (
+      edge.insideRatio >= GRAPH_MIN_EDGE_INSIDE ||
+      edge.insideRatio < BRIDGE_MIN_INSIDE
+    ) {
+      continue;
+    }
+    const coords = edge.candidate.path.coordinates;
+    const a = componentOf.get(nodeKey(coords[0]));
+    const b = componentOf.get(nodeKey(coords[coords.length - 1]));
+    if (a === undefined || b === undefined || a === b) continue;
+    const pair = a < b ? `${a}|${b}` : `${b}|${a}`;
+    const current = bestByPair.get(pair);
+    if (!current || edge.insideRatio > current.insideRatio) {
+      bestByPair.set(pair, edge);
     }
   }
-  // Sécurité : en cas d'égalité pathologique, on n'abandonne aucune portion.
-  return chain.concat(remaining);
+  return [...bestByPair.values()];
 }
 
-// Géométrie du segment de comblement (source MANUEL) : ligne droite entre les deux
-// extrémités des portions BD TOPO adjacentes (préserve la continuité de la chaîne).
-function fillerGeometry(from: Position, to: Position): LineString | null {
-  if (haversineMeters(from, to) < GAP_FILL_MIN_METERS) return null;
-  return { type: "LineString", coordinates: [from, to] };
+// ---------------------------------------------------------------------------
+// Graphe et plus court chemin
+// ---------------------------------------------------------------------------
+
+function buildGraph(edges: Edge[]): Graph {
+  const index = new Map<string, number>();
+  const nodes: Position[] = [];
+  const nodeOf = (position: Position): number => {
+    const key = nodeKey(position);
+    let i = index.get(key);
+    if (i === undefined) {
+      i = nodes.length;
+      index.set(key, i);
+      nodes.push(position);
+    }
+    return i;
+  };
+
+  const graphEdges: GraphEdge[] = edges.map((edge) => {
+    const coords = edge.candidate.path.coordinates;
+    return {
+      edge,
+      from: nodeOf(coords[0]),
+      to: nodeOf(coords[coords.length - 1]),
+      cost: edge.length * (1 + OUTSIDE_COST_FACTOR * (1 - edge.insideRatio)),
+    };
+  });
+
+  const adjacency = nodes.map(() => [] as { edge: number; other: number }[]);
+  graphEdges.forEach((graphEdge, i) => {
+    if (graphEdge.from === graphEdge.to) return;
+    adjacency[graphEdge.from].push({ edge: i, other: graphEdge.to });
+    adjacency[graphEdge.to].push({ edge: i, other: graphEdge.from });
+  });
+  return { nodes, edges: graphEdges, adjacency };
 }
 
-function bdTopoSegment(portion: Portion): AssembledSegment {
+// Dijkstra en O(V²) : les graphes par voie comptent quelques dizaines de nœuds.
+function shortestPaths(graph: Graph, source: number) {
+  const size = graph.nodes.length;
+  const dist = new Array<number>(size).fill(Infinity);
+  const via = new Array<{ edge: number; prev: number } | null>(size).fill(null);
+  const done = new Array<boolean>(size).fill(false);
+  dist[source] = 0;
+  for (let round = 0; round < size; round++) {
+    let current = -1;
+    for (let i = 0; i < size; i++) {
+      if (!done[i] && (current === -1 || dist[i] < dist[current])) current = i;
+    }
+    if (current === -1 || dist[current] === Infinity) break;
+    done[current] = true;
+    for (const { edge, other } of graph.adjacency[current]) {
+      const next = dist[current] + graph.edges[edge].cost;
+      if (next < dist[other]) {
+        dist[other] = next;
+        via[other] = { edge, prev: current };
+      }
+    }
+  }
+  return { dist, via };
+}
+
+function reconstruct(
+  graph: Graph,
+  via: ({ edge: number; prev: number } | null)[],
+  target: number,
+): Step[] {
+  const steps: Step[] = [];
+  let current = target;
+  for (let hop = via[current]; hop; hop = via[current]) {
+    steps.push({ edge: graph.edges[hop.edge], from: hop.prev });
+    current = hop.prev;
+  }
+  return steps.reverse();
+}
+
+// Terminaux candidats : les feuilles (extrémités de la composante), sinon tous les nœuds ;
+// on garde les plus éloignés du centre pour borner le nombre de recherches.
+function pickTerminals(graph: Graph): number[] {
+  const leaves = graph.adjacency.flatMap((links, i) =>
+    links.length === 1 ? [i] : [],
+  );
+  const terminals = leaves.length >= 2 ? leaves : graph.nodes.map((_, i) => i);
+  if (terminals.length <= MAX_TERMINALS) return terminals;
+  const center: Position = [
+    graph.nodes.reduce((sum, node) => sum + node[0], 0) / graph.nodes.length,
+    graph.nodes.reduce((sum, node) => sum + node[1], 0) / graph.nodes.length,
+  ];
+  return terminals
+    .map((i) => ({ i, d: haversineMeters(graph.nodes[i], center) }))
+    .sort((a, b) => b.d - a.d)
+    .slice(0, MAX_TERMINALS)
+    .map(({ i }) => i);
+}
+
+// Meilleur chemin entre deux terminaux : maximise le filaire couvert et pénalise la
+// longueur hors couloir (écarte les antennes et impasses).
+function bestPathInComponent(edges: Edge[]): ChosenPath | null {
+  const graph = buildGraph(edges);
+  const terminals = pickTerminals(graph);
+  let best: (ChosenPath & { score: number }) | null = null;
+
+  for (let a = 0; a < terminals.length; a++) {
+    const { dist, via } = shortestPaths(graph, terminals[a]);
+    for (let b = a + 1; b < terminals.length; b++) {
+      if (dist[terminals[b]] === Infinity) continue;
+      const steps = reconstruct(graph, via, terminals[b]);
+      if (steps.length === 0) continue;
+
+      const pathEdges = steps.map((step) => step.edge.edge);
+      const covered = new Set<number>();
+      let length = 0;
+      let inside = 0;
+      for (const edge of pathEdges) {
+        edge.covered.forEach((i) => covered.add(i));
+        length += edge.length;
+        inside += edge.length * edge.insideRatio;
+      }
+      const score = covered.size - (length - inside) / SAMPLE_STEP_METERS;
+      if (!best || score > best.score) {
+        best = { steps, edges: pathEdges, covered, length, score };
+      }
+    }
+  }
+  return best;
+}
+
+function orientedPath(step: Step): LineString {
+  const coordinates = step.edge.edge.candidate.path.coordinates;
   return {
-    path: portion.path,
-    source: LocalPathSource.BD_TOPO,
-    sourceRef: portion.candidate.cleabs,
-    type: portion.candidate.suggestedType,
-    revetement: portion.candidate.suggestedRevetement,
-    largeurMoyenne: portion.candidate.suggestedLargeurMoyenne,
+    type: "LineString",
+    coordinates:
+      step.edge.from === step.from ? coordinates : [...coordinates].reverse(),
   };
 }
 
-// Fraction des points de `path` situés à ≤ DEDUP_TOL_METERS de `cover`.
-function coverageRatio(path: LineString, cover: LineString): number {
-  const line = lineString(path.coordinates);
-  const length = turfLength(line, { units: "meters" });
-  const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
-  let inside = 0;
-  for (let i = 0; i <= count; i++) {
-    const coord = along(line, (length * i) / count, { units: "meters" })
-      .geometry.coordinates as Position;
-    if (nearestCadastral(coord, [cover]).distance <= DEDUP_TOL_METERS) inside++;
-  }
-  return inside / (count + 1);
+function toBdTopoSegment(step: Step): AssembledSegment {
+  const { candidate } = step.edge.edge;
+  return {
+    path: orientedPath(step),
+    source: LocalPathSource.BD_TOPO,
+    sourceRef: candidate.cleabs,
+    type: candidate.suggestedType,
+    revetement: candidate.suggestedRevetement,
+    largeurMoyenne: candidate.suggestedLargeurMoyenne,
+  };
 }
 
-// Écarte les portions redondantes (doublons/superpositions) qui produiraient des
-// allers-retours dans la chaîne : on garde les plus longues et on retire celles
-// largement recouvertes par une portion déjà conservée.
-async function dedupePortions(portions: Portion[]): Promise<Portion[]> {
-  const sorted = [...portions].sort(
-    (a, b) =>
-      turfLength(lineString(b.path.coordinates), { units: "meters" }) -
-      turfLength(lineString(a.path.coordinates), { units: "meters" }),
-  );
-  const kept: Portion[] = [];
-  for (const portion of sorted) {
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    const redundant = kept.some(
-      (k) => coverageRatio(portion.path, k.path) >= DEDUP_COVER_RATIO,
-    );
-    if (!redundant) kept.push(portion);
-  }
-  return kept;
-}
+// ---------------------------------------------------------------------------
+// Jonction des chemins d'une même voie et noms BD TOPO
+// ---------------------------------------------------------------------------
 
-function assembledPathLines(path: AssembledLocalPath): LineString[] {
-  return path.segments.map((segment) => segment.path);
-}
-
-function assembledPathLength(path: AssembledLocalPath): number {
-  return path.segments.reduce(
-    (total, segment) =>
-      total +
-      turfLength(lineString(segment.path.coordinates), { units: "meters" }),
-    0,
+function isSameVoie(a: AssembledLocalPath, b: AssembledLocalPath): boolean {
+  if (a.classement !== b.classement || a.numero !== b.numero) return false;
+  if (!a.nom || !b.nom) return false;
+  return (
+    labelSimilarity(normalizeLabel(a.nom), normalizeLabel(b.nom)) >=
+    JOIN_NAME_SIMILARITY
   );
 }
 
-// Fraction des points échantillonnés de `lines` situés à ≤ `toleranceMeters` d'au moins
-// une ligne de `otherLines` (même principe que `coverageRatio`, mais sur plusieurs lignes
-// de chaque côté).
-async function linesOverlapRatio(
-  lines: LineString[],
-  otherLines: LineString[],
-  toleranceMeters: number,
-): Promise<number> {
-  let sampled = 0;
-  let inside = 0;
-  let lastYield = Date.now();
-  for (const path of lines) {
-    if (path.coordinates.length < 2) continue;
-    const line = lineString(path.coordinates);
-    const length = turfLength(line, { units: "meters" });
-    if (length === 0) continue;
-    const count = Math.max(1, Math.round(length / SAMPLE_STEP_METERS));
-    for (let i = 0; i <= count; i++) {
-      if (Date.now() - lastYield >= 20) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        lastYield = Date.now();
-      }
-      const coord = along(line, (length * i) / count, { units: "meters" })
-        .geometry.coordinates as Position;
-      sampled++;
-      if (nearestCadastral(coord, otherLines).distance <= toleranceMeters) {
-        inside++;
-      }
-    }
-  }
-  return sampled === 0 ? 0 : inside / sampled;
+function reverseSegments(segments: AssembledSegment[]): AssembledSegment[] {
+  return [...segments].reverse().map((segment) => ({
+    ...segment,
+    path: {
+      type: "LineString",
+      coordinates: [...segment.path.coordinates].reverse(),
+    },
+  }));
 }
 
-// Post-traitement : deux chemins assemblés portant le même numéro et le même nom (une
-// fois normalisés) et dont le tracé du plus court est presque entièrement superposé au
-// tracé du plus long sont un doublon (ex. libellés cadastraux voisins non fusionnés en
-// amont). On ne garde alors que le plus long.
-async function dedupeAssembledPaths(
+function firstPosition(segments: AssembledSegment[]): Position {
+  return segments[0].path.coordinates[0];
+}
+
+function lastPosition(segments: AssembledSegment[]): Position {
+  const coordinates = segments[segments.length - 1].path.coordinates;
+  return coordinates[coordinates.length - 1];
+}
+
+// Relie par un segment manuel droit (≤ 200 m) les chemins d'une même voie (même
+// classement, même numéro, noms similaires à ≥ 80 %) séparés par un trou de la BD TOPO.
+// On relie toujours la paire d'extrémités la plus proche, jusqu'à épuisement.
+function joinPathsAcrossGaps(
   paths: AssembledLocalPath[],
-): Promise<AssembledLocalPath[]> {
-  const groups = new Map<string, AssembledLocalPath[]>();
-  for (const path of paths) {
-    const nom = path.nom ? normalizeLabel(path.nom) : "";
-    if (!nom) continue;
-    const groupKey = `${path.numero ?? ""}|${nom}`;
-    const group = groups.get(groupKey);
-    if (group) group.push(path);
-    else groups.set(groupKey, [path]);
-  }
+): AssembledLocalPath[] {
+  const result = [...paths];
+  for (;;) {
+    let best: {
+      i: number;
+      j: number;
+      aAtEnd: boolean;
+      bAtStart: boolean;
+      distance: number;
+    } | null = null;
 
-  const discarded = new Set<AssembledLocalPath>();
-  for (const group of groups.values()) {
-    for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        const a = group[i];
-        const b = group[j];
-        if (discarded.has(a) || discarded.has(b)) continue;
-        const [shorter, longer] =
-          assembledPathLength(a) <= assembledPathLength(b) ? [a, b] : [b, a];
-        const ratio = await linesOverlapRatio(
-          assembledPathLines(shorter),
-          assembledPathLines(longer),
-          DUPLICATE_PATH_TOLERANCE_METERS,
-        );
-        if (ratio >= DEDUP_COVER_RATIO) discarded.add(shorter);
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        if (!isSameVoie(result[i], result[j])) continue;
+        const aEnds = [
+          { atEnd: false, position: firstPosition(result[i].segments) },
+          { atEnd: true, position: lastPosition(result[i].segments) },
+        ];
+        const bEnds = [
+          { atStart: true, position: firstPosition(result[j].segments) },
+          { atStart: false, position: lastPosition(result[j].segments) },
+        ];
+        for (const a of aEnds) {
+          for (const b of bEnds) {
+            const distance = haversineMeters(a.position, b.position);
+            if (
+              distance <= MAX_JOIN_METERS &&
+              (!best || distance < best.distance)
+            ) {
+              best = { i, j, aAtEnd: a.atEnd, bAtStart: b.atStart, distance };
+            }
+          }
+        }
       }
     }
+    if (!best) return result;
+
+    const a = result[best.i];
+    const b = result[best.j];
+    const aSegments = best.aAtEnd ? a.segments : reverseSegments(a.segments);
+    const bSegments = best.bAtStart ? b.segments : reverseSegments(b.segments);
+    const previous = aSegments[aSegments.length - 1];
+    const filler: AssembledSegment[] =
+      best.distance >= GAP_FILL_MIN_METERS
+        ? [
+            {
+              path: {
+                type: "LineString",
+                coordinates: [
+                  lastPosition(aSegments),
+                  firstPosition(bSegments),
+                ],
+              },
+              source: LocalPathSource.MANUEL,
+              sourceRef: null,
+              type: previous.type,
+              revetement: previous.revetement,
+              largeurMoyenne: null,
+            },
+          ]
+        : [];
+
+    result[best.i] = {
+      ...a,
+      segments: [...aSegments, ...filler, ...bSegments],
+      couverture:
+        a.couverture !== undefined && b.couverture !== undefined
+          ? Math.min(a.couverture, b.couverture)
+          : a.couverture,
+    };
+    result.splice(best.j, 1);
   }
-  return paths.filter((path) => !discarded.has(path));
 }
 
-// Écarte les paires de segments consécutifs qui « s'annulent » : le 2e ramène (à
-// CANCELLING_SEGMENT_TOLERANCE_METERS près) au point de départ du 1er, signe d'un
-// aller-retour parasite (ex. impasse chaînée par erreur) plutôt que d'un vrai tracé. La
-// jonction restante est recollée sur ce point de départ pour garder la chaîne contiguë.
-function removeCancellingSegments(
-  segments: AssembledSegment[],
-): AssembledSegment[] {
-  const result = segments.map((segment) => ({ ...segment }));
-  let i = 0;
-  while (i < result.length - 1) {
-    const anchor = start(result[i].path);
-    const after = end(result[i + 1].path);
-    if (haversineMeters(anchor, after) > CANCELLING_SEGMENT_TOLERANCE_METERS) {
-      i++;
-      continue;
-    }
-    result.splice(i, 2);
-    const next = result[i];
-    if (next) {
-      next.path = {
-        type: "LineString",
-        coordinates: [anchor, ...next.path.coordinates.slice(1)],
-      };
-    }
-    i = Math.max(i - 1, 0);
+// Les chemins sans nom cadastral prennent le nom BD TOPO (`nomVoie`) le plus présent, en
+// longueur, parmi leurs tronçons.
+function fillMissingNamesFromBdTopo(
+  paths: AssembledLocalPath[],
+  candidates: BdTopoTronconCandidate[],
+): AssembledLocalPath[] {
+  const nameByCleabs = new Map<string, string>();
+  for (const candidate of candidates) {
+    if (candidate.nomVoie)
+      nameByCleabs.set(candidate.cleabs, candidate.nomVoie);
   }
-  return result;
+
+  return paths.map((path) => {
+    if (path.nom) return path;
+    const lengthByName = new Map<string, number>();
+    for (const segment of path.segments) {
+      const name = segment.sourceRef && nameByCleabs.get(segment.sourceRef);
+      if (!name) continue;
+      const length = turfLength(lineString(segment.path.coordinates), {
+        units: "meters",
+      });
+      lengthByName.set(name, (lengthByName.get(name) ?? 0) + length);
+    }
+    const [best] = [...lengthByName.entries()].sort((a, b) => b[1] - a[1]);
+    return best ? { ...path, nom: best[0] } : path;
+  });
 }
+
+// ---------------------------------------------------------------------------
+// Point d'entrée
+// ---------------------------------------------------------------------------
 
 /**
- * Assemble des chemins ruraux « prêts à importer » à partir des tronçons BD TOPO qui
- * coïncident géométriquement avec l'habillage cadastral. Chaque chemin cadastral
- * (regroupé par numéro + proximité de libellé) devient un chemin composé de segments :
- * portions de tronçons BD TOPO découpées au couloir de tolérance (`source=BD_TOPO`), et
- * segments de comblement en ligne droite là où subsiste un trou ≤ 20 m (`source=MANUEL`).
- * Un trou > 20 m scinde le groupe en chemins distincts (pas de longue ligne droite
- * aberrante). Les allers-retours parasites (2 segments qui s'annulent) sont retirés, un
- * chemin qui se résume à un seul segment de moins de 40 m est écarté, et un doublon
- * (même numéro + nom, tracé superposé) au profit du plus long.
+ * Reconstitue les voies locales en calant le filaire cadastral sur le graphe BD TOPO
+ * (map matching). Pour chaque groupe cadastral (même classement, numéro et libellé), on
+ * retient dans chaque composante connexe de tronçons proches le plus court chemin (coût
+ * pénalisé hors couloir) qui couvre le mieux le filaire. Les chemins d'une même voie
+ * séparés par un trou ≤ 200 m sont reliés par un segment manuel, et les voies sans nom
+ * cadastral prennent le nom BD TOPO.
  */
-export async function assembleLocalPathsFromCadastre(
+export async function assembleLocalPaths(
   candidates: BdTopoTronconCandidate[],
   cadastralPaths: CadastralRuralPathGeometry[],
 ): Promise<AssembledLocalPath[]> {
   const groups = groupCadastralPaths(cadastralPaths);
-  const candidatesWithBbox = candidates.map((candidate) => ({
+  const pool: CandidateWithBbox[] = candidates.map((candidate) => ({
     candidate,
     bbox: bbox(candidate.path) as Bbox,
   }));
-
+  const used = new Set<string>();
+  const tick = createYielder();
   const assembled: AssembledLocalPath[] = [];
-  let lastYield = Date.now();
+
   for (const group of groups) {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    const portions: Portion[] = [];
-    for (const { candidate, bbox: candidateBbox } of candidatesWithBbox) {
-      if (Date.now() - lastYield >= 20) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        lastYield = Date.now();
-      }
-      if (!bboxesOverlap(candidateBbox, group.bbox)) continue;
-      // Seules les lignes proches du tronçon peuvent être à ≤ MATCH_BUFFER_METERS de lui.
-      const nearbyLines = group.lines.filter((_, i) =>
-        bboxesOverlap(candidateBbox, group.lineBboxes[i]),
-      );
-      if (nearbyLines.length === 0) continue;
-      for (const path of corridorPortions(candidate.path, nearbyLines)) {
-        portions.push({ path, candidate });
+    const samples = group.lines.flatMap(samplePath);
+    if (samples.length === 0) continue;
+
+    const available = pool.filter(
+      ({ candidate }) => !used.has(candidate.cleabs),
+    );
+    const analyzed = await analyzeEdges(group, samples, available, tick);
+    const admitted = analyzed.filter(
+      (edge) => edge.insideRatio >= GRAPH_MIN_EDGE_INSIDE,
+    );
+    if (admitted.length === 0) continue;
+    const edges = [...admitted, ...findBridges(admitted, analyzed)];
+
+    const chosen: ChosenPath[] = [];
+    for (const component of connectedComponents(edges)) {
+      await tick();
+      const path = bestPathInComponent(component);
+      if (path && path.covered.size > 0 && path.length >= MIN_PATH_METERS) {
+        chosen.push(path);
       }
     }
-    if (portions.length === 0) continue;
+    if (chosen.length === 0) continue;
 
-    const ordered = chainPortions(await dedupePortions(portions));
-
-    // Découpe la chaîne en sous-chemins à chaque trou > MAX_FILLER_METERS : au-delà,
-    // un raccordement en ligne droite n'aurait pas de sens (chemins distincts).
-    const runs: AssembledSegment[][] = [];
-    let current: AssembledSegment[] = [];
-    for (let i = 0; i < ordered.length; i++) {
-      if (i > 0) {
-        const previous = ordered[i - 1];
-        const from = end(previous.path);
-        const to = start(ordered[i].path);
-        if (haversineMeters(from, to) > MAX_FILLER_METERS) {
-          runs.push(current);
-          current = [];
-        } else {
-          const filler = fillerGeometry(from, to);
-          if (filler) {
-            current.push({
-              path: filler,
-              source: LocalPathSource.MANUEL,
-              sourceRef: null,
-              type: previous.candidate.suggestedType,
-              revetement: previous.candidate.suggestedRevetement,
-              largeurMoyenne: null,
-            });
-          }
-        }
-      }
-      current.push(bdTopoSegment(ordered[i]));
+    const covered = new Set<number>();
+    for (const path of chosen) path.covered.forEach((i) => covered.add(i));
+    const couverture = covered.size / samples.length;
+    const precision = precisionRatio(chosen.flatMap((path) => path.edges));
+    if (couverture < MIN_COVERAGE_RATIO || precision < MIN_COVERAGE_RATIO) {
+      continue;
     }
-    if (current.length > 0) runs.push(current);
 
-    runs.forEach((rawSegments, index) => {
-      const segments = removeCancellingSegments(rawSegments);
-      if (segments.length === 0) return;
-      if (segments.length === 1) {
-        const length = turfLength(lineString(segments[0].path.coordinates), {
-          units: "meters",
-        });
-        if (length < MIN_SINGLE_SEGMENT_METERS) return;
+    chosen.forEach((path, index) => {
+      for (const step of path.steps) {
+        used.add(step.edge.edge.candidate.cleabs);
       }
       assembled.push({
-        key: runs.length > 1 ? `${group.key}#${index}` : group.key,
+        key: chosen.length > 1 ? `${group.key}#${index}` : group.key,
         numero: group.numero,
         nom: group.nom,
         classement: group.classement,
-        segments,
+        segments: path.steps.map(toBdTopoSegment),
+        couverture,
       });
     });
   }
-  return dedupeAssembledPaths(assembled);
+  return fillMissingNamesFromBdTopo(joinPathsAcrossGaps(assembled), candidates);
 }

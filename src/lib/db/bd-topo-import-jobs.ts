@@ -7,16 +7,18 @@ import {
   createLocalPathsFromImport,
   getImportedSourceRefs,
 } from "./voies-locales";
-import {
-  assembleForCommune,
-  isAlreadyImported,
-} from "@/lib/geo/bd-topo-import";
+import { assembleForCommune } from "@/lib/geo/bd-topo-import";
+import type { AssembledLocalPath } from "@/lib/geo/local-path-cadastre-matching";
 import {
   LocalPathEtat,
   LocalPathSource,
 } from "@/components/voies-locales/types";
 import type { AssembledLocalPathResponse } from "@/components/voies-locales/import/types";
-import { refreshPreviewImportStatus } from "./bd-topo-preview-cache";
+import {
+  getCachedBdTopoPreviewPaths,
+  markAlreadyImported,
+  refreshPreviewImportStatus,
+} from "./bd-topo-preview-cache";
 
 const JOB_LIFETIME_MS = 30 * 60 * 1000;
 
@@ -62,15 +64,6 @@ export async function getPendingBdTopoPreviewJob(codeInsee: string) {
   });
 }
 
-export async function getPendingBdTopoJobs(codeInsee: string) {
-  await expireJobs(codeInsee);
-  return prisma.bdTopoImportJob.findMany({
-    where: { codeInsee, status: "pending", kind: { in: ["preview", "import"] } },
-    select: { id: true, kind: true },
-    orderBy: { createdAt: "desc" },
-  });
-}
-
 export async function getBdTopoImportJob(codeInsee: string, id: string) {
   await expireJobs(codeInsee);
   const job = await prisma.bdTopoImportJob.findFirst({
@@ -85,9 +78,49 @@ export async function getBdTopoImportJob(codeInsee: string, id: string) {
     },
   });
   if (job?.kind === "preview" && job.status === "succeeded") {
-    return { ...job, result: await refreshPreviewImportStatus(codeInsee, job.result) };
+    return {
+      ...job,
+      result: await refreshPreviewImportStatus(codeInsee, job.result),
+    };
   }
   return job;
+}
+
+function toPreviewResponse(
+  assembled: AssembledLocalPath[],
+): AssembledLocalPathResponse[] {
+  return assembled.map((path) => ({
+    key: path.key,
+    numero: path.numero,
+    nom: path.nom,
+    classement: path.classement,
+    segments: path.segments.map((segment) => ({
+      path: segment.path,
+      source: segment.source,
+      sourceRef: segment.sourceRef,
+      type: segment.type,
+      revetement: segment.revetement,
+      largeurMoyenne: segment.largeurMoyenne,
+    })),
+    longueur: path.segments.reduce(
+      (sum, segment) =>
+        sum +
+        turfLength(lineString(segment.path.coordinates), { units: "meters" }),
+      0,
+    ),
+    alreadyImported: false,
+    couverture: path.couverture ?? null,
+  }));
+}
+
+async function computePreviewPaths(
+  codeInsee: string,
+): Promise<AssembledLocalPathResponse[]> {
+  const [assembled, importedRefs] = await Promise.all([
+    assembleForCommune(codeInsee),
+    getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
+  ]);
+  return markAlreadyImported(toPreviewResponse(assembled), importedRefs);
 }
 
 export async function runBdTopoPreviewJob(
@@ -95,29 +128,7 @@ export async function runBdTopoPreviewJob(
   codeInsee: string,
 ): Promise<void> {
   try {
-    const [assembled, importedRefs] = await Promise.all([
-      assembleForCommune(codeInsee),
-      getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
-    ]);
-    const result: AssembledLocalPathResponse[] = assembled.map((path) => ({
-      key: path.key,
-      numero: path.numero,
-      nom: path.nom,
-      classement: path.classement,
-      segments: path.segments.map((segment) => ({
-        path: segment.path,
-        source: segment.source,
-        sourceRef: segment.sourceRef,
-        revetement: segment.revetement,
-      })),
-      longueur: path.segments.reduce(
-        (sum, segment) =>
-          sum +
-          turfLength(lineString(segment.path.coordinates), { units: "meters" }),
-        0,
-      ),
-      alreadyImported: isAlreadyImported(path, importedRefs),
-    }));
+    const result = await computePreviewPaths(codeInsee);
     await prisma.bdTopoImportJob.updateMany({
       where: {
         id,
@@ -159,16 +170,13 @@ export async function runBdTopoImportJob(
   keys: string[],
 ): Promise<void> {
   try {
-    const [assembled, importedRefs] = await Promise.all([
-      assembleForCommune(codeInsee),
-      getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
-    ]);
+    // L'aperçu déjà calculé (celui que l'utilisateur a vu) évite de tout reconstituer.
+    const paths =
+      (await getCachedBdTopoPreviewPaths(codeInsee)) ??
+      (await computePreviewPaths(codeInsee));
     const selectedKeys = new Set(keys);
-    const inputs = assembled
-      .filter(
-        (path) =>
-          selectedKeys.has(path.key) && !isAlreadyImported(path, importedRefs),
-      )
+    const inputs = paths
+      .filter((path) => selectedKeys.has(path.key) && !path.alreadyImported)
       .map((path) => ({
         nom: path.nom,
         classement: path.classement,
@@ -183,7 +191,7 @@ export async function runBdTopoImportJob(
           servitudes: [],
           delimitation: null,
           source: segment.source,
-          sourceRef: segment.sourceRef,
+          sourceRef: segment.sourceRef ?? null,
         })),
       }));
 
