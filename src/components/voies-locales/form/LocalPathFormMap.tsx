@@ -5,6 +5,7 @@ import {
   Layer,
   LayerProps,
   MapLayerMouseEvent,
+  Marker,
   Popup,
   Source,
   useMap,
@@ -17,6 +18,11 @@ import {
   CLASSEMENT_COLORS,
 } from "@/components/voies-locales/types";
 import type { LocalPath } from "@/components/voies-locales/types";
+import {
+  NoEntryIcon,
+  RevetementLegend,
+} from "@/components/voies-locales/MapLegend";
+import { lineMidpoint } from "@/lib/geo/line-midpoint";
 import { Segment } from "../useLocalPathDrawer";
 import {
   BD_TOPO_SNAP_LAYER_ID,
@@ -130,6 +136,19 @@ export function VoiesLocalesFormMap({
         }),
       ),
     }),
+    [drawSegments],
+  );
+
+  // Pictogramme "sens interdit" au milieu des segments fermés à la circulation.
+  const closedSegmentMarkers = useMemo(
+    () =>
+      drawSegments.flatMap((seg) => {
+        const position =
+          seg.fermeALaCirculation && seg.id !== "__preview__"
+            ? lineMidpoint(seg.coordinates)
+            : null;
+        return position ? [{ id: seg.id, position }] : [];
+      }),
     [drawSegments],
   );
 
@@ -308,6 +327,7 @@ export function VoiesLocalesFormMap({
 
   return (
     <>
+      <RevetementLegend />
       {/* Invisible : sert uniquement à aimanter le tracé sur la BD TOPO. */}
       <Source
         id={BD_TOPO_SNAP_SOURCE_ID}
@@ -438,6 +458,16 @@ export function VoiesLocalesFormMap({
           } as LayerProps)}
         />
       </Source>
+      {closedSegmentMarkers.map(({ id, position }) => (
+        <Marker
+          key={id}
+          longitude={position[0]}
+          latitude={position[1]}
+          style={{ pointerEvents: "none" }}
+        >
+          <NoEntryIcon size={22} />
+        </Marker>
+      ))}
       <Source
         id={ENDPOINT_SOURCE_ID}
         type="geojson"

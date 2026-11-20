@@ -15,6 +15,7 @@ import {
   LocalPathClassement,
   CLASSEMENT_COLORS,
 } from "@/components/voies-locales/types";
+import { ClassementLegend } from "@/components/voies-locales/MapLegend";
 import type { AssembledLocalPathResponse } from "./types";
 import { pathLabel } from "./LocalPathImportBdTopo";
 import styles from "./LocalPathImportMap.module.css";
@@ -149,6 +150,7 @@ export function LocalPathImportMap({
 
   return (
     <>
+      <ClassementLegend />
       <Source
         id={`${SOURCE_ID}-already`}
         type="geojson"

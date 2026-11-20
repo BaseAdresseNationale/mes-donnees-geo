@@ -22,6 +22,7 @@ import {
   LocalPathStatus,
   CLASSEMENT_COLORS,
 } from "@/components/voies-locales/types";
+import { ClassementLegend } from "@/components/voies-locales/MapLegend";
 import styles from "./LocalPathsListMap.module.css";
 import { geometryBounds } from "@/lib/geo/bounds";
 import type { PublicationChangeKind } from "@/lib/publication/types";
@@ -218,6 +219,7 @@ export function VoiesLocalesListMap({
 
   return (
     <>
+      <ClassementLegend belowToolbar />
       <Source id={SOURCE_ID} type="geojson" data={featureCollection}>
         <Layer
           {...({
