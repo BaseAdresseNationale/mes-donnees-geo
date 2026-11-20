@@ -1,20 +1,12 @@
 import type { LineString } from "geojson";
 import turfLength from "@turf/length";
 import { lineString } from "@turf/helpers";
-import {
-  LocalPathClassement,
-  LocalPathRevetement,
-  LocalPathType,
-} from "@/generated/prisma/browser";
+import { LocalPathRevetement, LocalPathType } from "@/generated/prisma/browser";
 
 const URL_API_BD_TOPO_WFS: string =
   process.env.URL_API_BD_TOPO_WFS || "https://data.geopf.fr/wfs/ows";
 
 // Nature BD TOPO -> valeurs par défaut de qualification (l'utilisateur les corrige ensuite).
-const NATURE_CLASSEMENT: Record<string, LocalPathClassement> = {
-  Chemin: LocalPathClassement.CHEMIN_RURAL,
-  Sentier: LocalPathClassement.CHEMIN_RURAL,
-};
 const NATURE_TYPE: Record<string, LocalPathType> = {
   Chemin: LocalPathType.CHEMIN,
   Sentier: LocalPathType.SENTIER,
@@ -31,7 +23,6 @@ export interface BdTopoTronconCandidate {
   nomVoie: string | null;
   longueur: number;
   path: LineString;
-  suggestedClassement: LocalPathClassement;
   suggestedType: LocalPathType;
   suggestedRevetement: LocalPathRevetement;
   suggestedLargeurMoyenne: number | null;
@@ -95,8 +86,6 @@ function toCandidate(
     ),
     longueur: turfLength(lineString(coordinates), { units: "meters" }),
     path,
-    suggestedClassement:
-      NATURE_CLASSEMENT[nature] ?? LocalPathClassement.VOIE_COMMUNALE,
     suggestedType: NATURE_TYPE[nature] ?? LocalPathType.TRONCON,
     suggestedRevetement:
       NATURE_REVETEMENT[nature] ?? LocalPathRevetement.REVETU,
@@ -163,14 +152,5 @@ export class BdTopoService {
     return requestGetFeature(
       `insee_commune_gauche='${escaped}' OR insee_commune_droite='${escaped}'`,
     );
-  }
-
-  /** Ré-interroge le WFS par cleabs (jamais le géométrie/attributs fournis par le client). */
-  public static findTronconsByCleabs(
-    cleabsList: string[],
-  ): Promise<BdTopoTronconCandidate[]> {
-    if (cleabsList.length === 0) return Promise.resolve([]);
-    const list = cleabsList.map((c) => `'${c.replace(/'/g, "''")}'`).join(",");
-    return requestGetFeature(`cleabs IN (${list})`);
   }
 }

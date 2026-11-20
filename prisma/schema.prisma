@@ -12,7 +12,6 @@ model BdTopoImportJob {
   codeInsee  String    @map("code_insee") @db.VarChar(5)
   status     String    @default("pending") @db.VarChar(20)
   kind       String    @default("import") @db.VarChar(20)
-  algorithm  String    @default("legacy") @db.VarChar(20)
   result     Json?
   created    Int?
   error      String?

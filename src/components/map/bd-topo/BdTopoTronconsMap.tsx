@@ -22,7 +22,7 @@ const EMPTY: FeatureCollection<LineString, TronconProperties> = {
   features: [],
 };
 
-// Tronçons du flux WFS BD TOPO : l'entrée exacte des algorithmes de matching.
+// Tronçons du flux WFS BD TOPO : l'entrée exacte du matching avec le cadastre.
 export function BdTopoTronconsMap() {
   const [data, setData] = useState(EMPTY);
 
@@ -35,7 +35,9 @@ export function BdTopoTronconsMap() {
           signal: controller.signal,
         });
         if (!response.ok) {
-          throw new Error(`Requête tronçons BD TOPO échouée (${response.status})`);
+          throw new Error(
+            `Requête tronçons BD TOPO échouée (${response.status})`,
+          );
         }
         setData(
           (await response.json()) as FeatureCollection<

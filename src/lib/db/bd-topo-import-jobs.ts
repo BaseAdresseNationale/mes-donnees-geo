@@ -7,20 +7,18 @@ import {
   createLocalPathsFromImport,
   getImportedSourceRefs,
 } from "./voies-locales";
-import {
-  assembleForCommune,
-  isAlreadyImported,
-} from "@/lib/geo/bd-topo-import";
+import { assembleForCommune } from "@/lib/geo/bd-topo-import";
+import type { AssembledLocalPath } from "@/lib/geo/local-path-cadastre-matching";
 import {
   LocalPathEtat,
   LocalPathSource,
 } from "@/components/voies-locales/types";
 import type { AssembledLocalPathResponse } from "@/components/voies-locales/import/types";
 import {
-  DEFAULT_IMPORT_ALGORITHM,
-  type ImportAlgorithm,
-} from "@/components/voies-locales/import/algorithms";
-import { refreshPreviewImportStatus } from "./bd-topo-preview-cache";
+  getCachedBdTopoPreviewPaths,
+  markAlreadyImported,
+  refreshPreviewImportStatus,
+} from "./bd-topo-preview-cache";
 
 const JOB_LIFETIME_MS = 30 * 60 * 1000;
 
@@ -43,13 +41,10 @@ async function expireJobs(codeInsee: string) {
 export async function createBdTopoImportJob(
   codeInsee: string,
   kind: "import" | "preview" = "import",
-  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
 ) {
   await expireJobs(codeInsee);
   try {
-    return await prisma.bdTopoImportJob.create({
-      data: { codeInsee, kind, algorithm },
-    });
+    return await prisma.bdTopoImportJob.create({ data: { codeInsee, kind } });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -61,23 +56,11 @@ export async function createBdTopoImportJob(
   }
 }
 
-export async function getPendingBdTopoPreviewJob(
-  codeInsee: string,
-  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
-) {
+export async function getPendingBdTopoPreviewJob(codeInsee: string) {
   await expireJobs(codeInsee);
   return prisma.bdTopoImportJob.findFirst({
-    where: { codeInsee, kind: "preview", algorithm, status: "pending" },
+    where: { codeInsee, kind: "preview", status: "pending" },
     select: { id: true },
-  });
-}
-
-export async function getPendingBdTopoJobs(codeInsee: string) {
-  await expireJobs(codeInsee);
-  return prisma.bdTopoImportJob.findMany({
-    where: { codeInsee, status: "pending", kind: { in: ["preview", "import"] } },
-    select: { id: true, kind: true },
-    orderBy: { createdAt: "desc" },
   });
 }
 
@@ -95,41 +78,57 @@ export async function getBdTopoImportJob(codeInsee: string, id: string) {
     },
   });
   if (job?.kind === "preview" && job.status === "succeeded") {
-    return { ...job, result: await refreshPreviewImportStatus(codeInsee, job.result) };
+    return {
+      ...job,
+      result: await refreshPreviewImportStatus(codeInsee, job.result),
+    };
   }
   return job;
+}
+
+function toPreviewResponse(
+  assembled: AssembledLocalPath[],
+): AssembledLocalPathResponse[] {
+  return assembled.map((path) => ({
+    key: path.key,
+    numero: path.numero,
+    nom: path.nom,
+    classement: path.classement,
+    segments: path.segments.map((segment) => ({
+      path: segment.path,
+      source: segment.source,
+      sourceRef: segment.sourceRef,
+      type: segment.type,
+      revetement: segment.revetement,
+      largeurMoyenne: segment.largeurMoyenne,
+    })),
+    longueur: path.segments.reduce(
+      (sum, segment) =>
+        sum +
+        turfLength(lineString(segment.path.coordinates), { units: "meters" }),
+      0,
+    ),
+    alreadyImported: false,
+    couverture: path.couverture ?? null,
+  }));
+}
+
+async function computePreviewPaths(
+  codeInsee: string,
+): Promise<AssembledLocalPathResponse[]> {
+  const [assembled, importedRefs] = await Promise.all([
+    assembleForCommune(codeInsee),
+    getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
+  ]);
+  return markAlreadyImported(toPreviewResponse(assembled), importedRefs);
 }
 
 export async function runBdTopoPreviewJob(
   id: string,
   codeInsee: string,
-  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
 ): Promise<void> {
   try {
-    const [assembled, importedRefs] = await Promise.all([
-      assembleForCommune(codeInsee, algorithm),
-      getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
-    ]);
-    const result: AssembledLocalPathResponse[] = assembled.map((path) => ({
-      key: path.key,
-      numero: path.numero,
-      nom: path.nom,
-      classement: path.classement,
-      segments: path.segments.map((segment) => ({
-        path: segment.path,
-        source: segment.source,
-        sourceRef: segment.sourceRef,
-        revetement: segment.revetement,
-      })),
-      longueur: path.segments.reduce(
-        (sum, segment) =>
-          sum +
-          turfLength(lineString(segment.path.coordinates), { units: "meters" }),
-        0,
-      ),
-      alreadyImported: isAlreadyImported(path, importedRefs),
-      couverture: path.couverture ?? null,
-    }));
+    const result = await computePreviewPaths(codeInsee);
     await prisma.bdTopoImportJob.updateMany({
       where: {
         id,
@@ -169,19 +168,15 @@ export async function runBdTopoImportJob(
   id: string,
   codeInsee: string,
   keys: string[],
-  algorithm: ImportAlgorithm = DEFAULT_IMPORT_ALGORITHM,
 ): Promise<void> {
   try {
-    const [assembled, importedRefs] = await Promise.all([
-      assembleForCommune(codeInsee, algorithm),
-      getImportedSourceRefs(codeInsee, LocalPathSource.BD_TOPO),
-    ]);
+    // L'aperçu déjà calculé (celui que l'utilisateur a vu) évite de tout reconstituer.
+    const paths =
+      (await getCachedBdTopoPreviewPaths(codeInsee)) ??
+      (await computePreviewPaths(codeInsee));
     const selectedKeys = new Set(keys);
-    const inputs = assembled
-      .filter(
-        (path) =>
-          selectedKeys.has(path.key) && !isAlreadyImported(path, importedRefs),
-      )
+    const inputs = paths
+      .filter((path) => selectedKeys.has(path.key) && !path.alreadyImported)
       .map((path) => ({
         nom: path.nom,
         classement: path.classement,
@@ -196,7 +191,7 @@ export async function runBdTopoImportJob(
           servitudes: [],
           delimitation: null,
           source: segment.source,
-          sourceRef: segment.sourceRef,
+          sourceRef: segment.sourceRef ?? null,
         })),
       }));
 

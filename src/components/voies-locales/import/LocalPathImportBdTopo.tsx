@@ -32,12 +32,6 @@ import {
 } from "@/components/common/left-panel-list/LeftPanelFilterModal";
 import styles from "./LocalPathImportBdTopo.module.css";
 import { loadBdTopoPreview } from "./load-bd-topo-preview";
-import { ImportAlgorithmModal } from "./ImportAlgorithmModal";
-import {
-  DEFAULT_IMPORT_ALGORITHM,
-  IMPORT_ALGORITHM_LABELS,
-  type ImportAlgorithm,
-} from "./algorithms";
 import {
   readImportJob,
   writeImportJob,
@@ -157,9 +151,6 @@ export function LocalPathImportBdTopo({
   const { setMapChildren, setMapMessage } = useContext(MapContext);
   const [queryClient] = useState(() => new QueryClient());
   const [submitting, setSubmitting] = useState(false);
-  // Tant qu'aucun algorithme n'est choisi, la reconstitution n'est pas lancée.
-  const [algorithm, setAlgorithm] = useState<ImportAlgorithm | null>(null);
-  const [algorithmModalOpen, setAlgorithmModalOpen] = useState(true);
   const storageKey = `bd-topo-import:${codeCommune}`;
   const jobId = useSyncExternalStore(
     subscribeImportJob,
@@ -267,9 +258,8 @@ export function LocalPathImportBdTopo({
   });
 
   useEffect(() => {
-    if (algorithm === null) return;
     const controller = new AbortController();
-    loadBdTopoPreview(controller.signal, algorithm, (previewId, count) => {
+    loadBdTopoPreview(controller.signal, (previewId, count) => {
       notifyPreviewSuccess(previewId, count);
     })
       .then((data) => {
@@ -293,24 +283,7 @@ export function LocalPathImportBdTopo({
     return () => {
       controller.abort();
     };
-  }, [codeCommune, jobId, algorithm]);
-
-  function chooseAlgorithm(next: ImportAlgorithm) {
-    setAlgorithmModalOpen(false);
-    if (next === algorithm) return;
-    setPaths(null);
-    setLoadError(null);
-    setSelected(new Set());
-    setAlgorithm(next);
-  }
-
-  function closeAlgorithmModal() {
-    if (algorithm === null) {
-      router.push(`/${codeCommune}/voies-locales`);
-      return;
-    }
-    setAlgorithmModalOpen(false);
-  }
+  }, [codeCommune, jobId]);
 
   const importable = useMemo(
     () => (paths ?? []).filter((p) => !p.alreadyImported),
@@ -422,10 +395,7 @@ export function LocalPathImportBdTopo({
       const res = await fetch("/api/voies-locales/import/bd-topo", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          keys: [...selected],
-          algorithm: algorithm ?? DEFAULT_IMPORT_ALGORITHM,
-        }),
+        body: JSON.stringify({ keys: [...selected] }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -457,24 +427,13 @@ export function LocalPathImportBdTopo({
         coïncidant avec l&apos;habillage cadastral. Vous pourrez ensuite
         qualifier chaque voie importée (numéro, revêtement…) individuellement.
       </p>
-      {algorithm && (
-        <p className={styles.algorithm}>
-          <span>
-            Algorithme : {IMPORT_ALGORITHM_LABELS[algorithm].label}
-          </span>
-          <Button
-            variant="secondary"
-            color="neutral"
-            size="small"
-            onClick={() => setAlgorithmModalOpen(true)}
-          >
-            Changer
-          </Button>
-        </p>
-      )}
       {report && (
         <p className={styles.report}>
-          {plural(report.voies, "voie locale détectée", "voies locales détectées")}
+          {plural(
+            report.voies,
+            "voie locale détectée",
+            "voies locales détectées",
+          )}
           {" · "}
           {plural(report.cheminsRuraux, "chemin rural", "chemins ruraux")}
           {" · "}
@@ -484,30 +443,11 @@ export function LocalPathImportBdTopo({
     </div>
   );
 
-  const algorithmModal = (
-    <ImportAlgorithmModal
-      isOpen={algorithmModalOpen}
-      initialValue={algorithm ?? DEFAULT_IMPORT_ALGORITHM}
-      onConfirm={chooseAlgorithm}
-      onClose={closeAlgorithmModal}
-    />
-  );
-
-  if (algorithm === null) {
-    return (
-      <section className={styles.container} aria-label="Import BD TOPO">
-        {header}
-        {algorithmModal}
-      </section>
-    );
-  }
-
   if (loadError) {
     return (
       <section className={styles.container} aria-label="Import BD TOPO">
         {header}
         <p className={styles.error}>{loadError}</p>
-        {algorithmModal}
       </section>
     );
   }
@@ -524,13 +464,11 @@ export function LocalPathImportBdTopo({
             commune.
           </span>
         </div>
-        {algorithmModal}
       </section>
     );
   }
 
   return (
-    <>
     <LeftPanelList
       ariaLabel="Import BD TOPO"
       items={importable}
@@ -600,7 +538,5 @@ export function LocalPathImportBdTopo({
         </label>
       )}
     />
-    {algorithmModal}
-    </>
   );
 }

@@ -1,5 +1,4 @@
 import type { AssembledLocalPathResponse } from "./types";
-import type { ImportAlgorithm } from "./algorithms";
 
 function waitForNextPoll(signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -18,13 +17,12 @@ function waitForNextPoll(signal: AbortSignal): Promise<void> {
 
 export async function loadBdTopoPreview(
   signal: AbortSignal,
-  algorithm: ImportAlgorithm,
   onSuccess?: (jobId: string, count: number) => void,
 ): Promise<AssembledLocalPathResponse[]> {
-  const response = await fetch(
-    `/api/voies-locales/import/bd-topo?algorithm=${encodeURIComponent(algorithm)}`,
-    { signal, cache: "no-store" },
-  );
+  const response = await fetch("/api/voies-locales/import/bd-topo", {
+    signal,
+    cache: "no-store",
+  });
   const job = await response.json();
   if (!response.ok) {
     throw new Error(

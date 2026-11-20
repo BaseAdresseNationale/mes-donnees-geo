@@ -7,10 +7,6 @@ import {
   runBdTopoPreviewJob,
   runBdTopoImportJob,
 } from "@/lib/db/bd-topo-import-jobs";
-import {
-  DEFAULT_IMPORT_ALGORITHM,
-  isImportAlgorithm,
-} from "@/components/voies-locales/import/algorithms";
 
 const MAX_SELECTION = 500;
 
@@ -25,7 +21,7 @@ function acceptedJob(id: string): Response {
   );
 }
 
-export async function GET(request: Request): Promise<Response> {
+export async function GET(): Promise<Response> {
   let session;
   try {
     session = await requireSession();
@@ -33,39 +29,20 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const algorithmParam = new URL(request.url).searchParams.get("algorithm");
-  if (algorithmParam !== null && !isImportAlgorithm(algorithmParam)) {
-    return NextResponse.json({ error: "Algorithme inconnu." }, { status: 400 });
-  }
-  const algorithm = algorithmParam ?? DEFAULT_IMPORT_ALGORITHM;
-
-  const cached = await getCachedBdTopoPreviewJob(
-    session.communeInsee,
-    algorithm,
-  );
+  const cached = await getCachedBdTopoPreviewJob(session.communeInsee);
   if (cached) return acceptedJob(cached.id);
-  const pending = await getPendingBdTopoPreviewJob(
-    session.communeInsee,
-    algorithm,
-  );
+  const pending = await getPendingBdTopoPreviewJob(session.communeInsee);
   if (pending) return acceptedJob(pending.id);
-  const job = await createBdTopoImportJob(
-    session.communeInsee,
-    "preview",
-    algorithm,
-  );
+  const job = await createBdTopoImportJob(session.communeInsee, "preview");
   if (!job) {
-    const concurrent = await getPendingBdTopoPreviewJob(
-      session.communeInsee,
-      algorithm,
-    );
+    const concurrent = await getPendingBdTopoPreviewJob(session.communeInsee);
     if (concurrent) return acceptedJob(concurrent.id);
     return NextResponse.json(
       { error: "La reconstitution est momentanément indisponible. Réessayez." },
       { status: 503 },
     );
   }
-  after(() => runBdTopoPreviewJob(job.id, session.communeInsee, algorithm));
+  after(() => runBdTopoPreviewJob(job.id, session.communeInsee));
   return acceptedJob(job.id);
 }
 
@@ -100,25 +77,13 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const algorithmValue = (body as { algorithm?: unknown } | null)?.algorithm;
-  if (algorithmValue !== undefined && !isImportAlgorithm(algorithmValue)) {
-    return NextResponse.json({ error: "Algorithme inconnu." }, { status: 422 });
-  }
-  const algorithm = algorithmValue ?? DEFAULT_IMPORT_ALGORITHM;
-
-  const job = await createBdTopoImportJob(
-    session.communeInsee,
-    "import",
-    algorithm,
-  );
+  const job = await createBdTopoImportJob(session.communeInsee);
   if (!job) {
     return NextResponse.json(
       { error: "Un import est déjà en cours pour cette commune." },
       { status: 409 },
     );
   }
-  after(() =>
-    runBdTopoImportJob(job.id, session.communeInsee, keys, algorithm),
-  );
+  after(() => runBdTopoImportJob(job.id, session.communeInsee, keys));
   return acceptedJob(job.id);
 }

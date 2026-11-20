@@ -1,5 +1,6 @@
 import { gunzipSync } from "zlib";
 import type { Feature, FeatureCollection, Geometry, LineString } from "geojson";
+import { LocalPathClassement } from "@/generated/prisma/browser";
 
 interface ParcelleProperties {
   id: string;
@@ -34,6 +35,10 @@ export interface CadastralRuralPathProperties {
   numero: number | null;
   /** Partie nominale seule (ex. "de la Barosserie"), sans "Chemin rural n°X dit". */
   nom: string | null;
+}
+
+export interface CadastralLocalPathProperties extends CadastralRuralPathProperties {
+  classement: LocalPathClassement;
 }
 
 // "Chemin rural" est un statut juridique, pas un type de voie unique : on ne
@@ -221,49 +226,50 @@ export class CadastreService {
     return JSON.parse(gunzipSync(buffer).toString("utf-8"));
   }
 
-  /** Habillage cadastral (zoncommuni) dont le libellé désigne un chemin rural. */
-  public static async findRuralPathToponymsForCommune(
+  /**
+   * Habillage cadastral (zoncommuni) dont le libellé désigne un chemin rural ou une voie
+   * communale, en un seul téléchargement.
+   */
+  public static async findLocalPathToponymsForCommune(
     codeCommune: string,
-  ): Promise<Feature<LineString, CadastralRuralPathProperties>[]> {
+  ): Promise<Feature<LineString, CadastralLocalPathProperties>[]> {
     const { features } = await this.fetchZonCommuni(codeCommune);
-    return features
-      .filter((feature) =>
-        isRuralPathLabel(feature.extraProperties?.labels?.parts),
-      )
-      .map((feature) => {
-        const parts = normalizePartsOrder(
-          feature.extraProperties!.labels!.parts!,
-        );
-        const { numero, nom } = parseRuralPathLabel(parts);
-        return {
-          type: "Feature",
-          id: feature.id,
-          properties: { libelle: parts.join(" "), numero, nom },
-          geometry: feature.geometry,
-        };
-      });
-  }
 
-  /** Habillage cadastral (zoncommuni) dont le libellé désigne une voie communale. */
-  public static async findVoieCommunaleToponymsForCommune(
-    codeCommune: string,
-  ): Promise<Feature<LineString, CadastralRuralPathProperties>[]> {
-    const { features } = await this.fetchZonCommuni(codeCommune);
-    return features
-      .filter((feature) =>
-        isVoieCommunaleLabel(feature.extraProperties?.labels?.parts),
-      )
-      .map((feature) => {
-        const parts = normalizeVoieCommunalePartsOrder(
-          feature.extraProperties!.labels!.parts!,
-        );
-        const { numero, nom } = parseVoieCommunaleLabel(parts);
-        return {
-          type: "Feature",
-          id: feature.id,
-          properties: { libelle: parts.join(" "), numero, nom },
-          geometry: feature.geometry,
-        };
-      });
+    const collect = (
+      classement: LocalPathClassement,
+      isMatch: (parts: string[] | undefined) => boolean,
+      normalizeParts: (parts: string[]) => string[],
+      parseLabel: (parts: string[]) => {
+        numero: number | null;
+        nom: string | null;
+      },
+    ): Feature<LineString, CadastralLocalPathProperties>[] =>
+      features
+        .filter((feature) => isMatch(feature.extraProperties?.labels?.parts))
+        .map((feature) => {
+          const parts = normalizeParts(feature.extraProperties!.labels!.parts!);
+          const { numero, nom } = parseLabel(parts);
+          return {
+            type: "Feature",
+            id: feature.id,
+            properties: { libelle: parts.join(" "), numero, nom, classement },
+            geometry: feature.geometry,
+          };
+        });
+
+    return [
+      ...collect(
+        LocalPathClassement.CHEMIN_RURAL,
+        isRuralPathLabel,
+        normalizePartsOrder,
+        parseRuralPathLabel,
+      ),
+      ...collect(
+        LocalPathClassement.VOIE_COMMUNALE,
+        isVoieCommunaleLabel,
+        normalizeVoieCommunalePartsOrder,
+        parseVoieCommunaleLabel,
+      ),
+    ];
   }
 }
