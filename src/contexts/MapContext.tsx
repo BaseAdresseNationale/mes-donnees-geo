@@ -25,6 +25,7 @@ export enum AvailableDataLayer {
   BAN = "ban",
   VOIES_LOCALES = "voies-locales",
   BD_TOPO = "bd-topo",
+  MAJIC = "majic",
 }
 
 export const availableDataLayerOptions = [
@@ -32,6 +33,10 @@ export const availableDataLayerOptions = [
   {
     value: AvailableDataLayer.VOIES_LOCALES,
     label: "Voies Locales (Cadastre)",
+  },
+  {
+    value: AvailableDataLayer.MAJIC,
+    label: "Parcelles des personnes morales (MAJIC)",
   },
   // Couche de debug, réservée au développement.
   ...(process.env.NODE_ENV === "development"

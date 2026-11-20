@@ -34,6 +34,7 @@ import { ControlGroupPortal } from "@/components/map/controls/ControlGroupPortal
 import { BANMap } from "@/components/map/ban/BANMap";
 import { BANLayers } from "@/components/map/ban/ban.layers";
 import { CadastralLocalPathsMap } from "@/components/map/cadastre/CadastralLocalPathsMap";
+import { MajicParcellesMap } from "@/components/map/majic/MajicParcellesMap";
 import { BdTopoTronconsMap } from "@/components/map/bd-topo/BdTopoTronconsMap";
 
 type MapLayoutProps = {
@@ -141,6 +142,9 @@ export function MapLayout({
           </Source>
           <PanoramaxMap />
 
+          {activeDataLayers.includes(AvailableDataLayer.MAJIC) && (
+            <MajicParcellesMap />
+          )}
           {activeDataLayers.includes(AvailableDataLayer.BAN) && <BANMap />}
           {activeDataLayers.includes(AvailableDataLayer.BD_TOPO) && (
             <BdTopoTronconsMap />
